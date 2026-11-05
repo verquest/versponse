@@ -1,12 +1,35 @@
 # frozen_string_literal: true
 
 require "bundler/gem_tasks"
-require "minitest/test_task"
+require "rake/testtask"
 
-Minitest::TestTask.create
+Rake::TestTask.new(:test) do |t|
+  t.libs << "test"
+  t.libs << "lib"
+  t.test_files = FileList["test/**/*_test.rb"]
+  t.warning = true
+end
 
 require "rubocop/rake_task"
 
 RuboCop::RakeTask.new
 
-task default: %i[test rubocop]
+desc "Check YARD documentation coverage (must be 100%)"
+task :yard do
+  require "yard"
+
+  stats = YARD::CLI::Stats.new
+  stats.run("--list-undoc")
+  undocumented = stats.instance_variable_get(:@undoc_list) || []
+
+  abort "\nYARD documentation check failed: #{undocumented.size} undocumented objects found." unless undocumented.empty?
+
+  puts "\nYARD documentation: 100% documented"
+end
+
+desc "Benchmark versponse against alba and blueprinter"
+task :bench do
+  ruby "-Ilib", "bench/serializers.rb"
+end
+
+task default: %i[test rubocop yard]

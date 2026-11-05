@@ -2,12 +2,29 @@
 
 source "https://rubygems.org"
 
-# Specify your gem's dependencies in versponse.gemspec
 gemspec
 
 gem "irb"
 gem "rake", "~> 13.0"
 
-gem "minitest", "~> 5.16"
+gem "minitest", "~> 6"
+gem "mocha", "~> 3.0"
+gem "simplecov", "~> 0.22", require: false
 
-gem "rubocop", "~> 1.21"
+gem "standard"
+gem "standard-performance"
+gem "rubocop-minitest"
+gem "rubocop-rake"
+
+gem "yard", "~> 0.9"
+gem "redcarpet", "~> 3.6"
+
+# Interop tests reference verquest request classes.
+# Switch back to a released version once verquest ships schema-only references
+gem "verquest", path: "../verquest"
+
+group :bench do
+  gem "benchmark-ips", "~> 2.14", require: false
+  gem "alba", require: false
+  gem "blueprinter", require: false
+end

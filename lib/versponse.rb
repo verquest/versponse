@@ -1,8 +1,123 @@
 # frozen_string_literal: true
 
-require_relative "versponse/version"
+require "zeitwerk"
+require "json"
+require "time"
 
+require_relative "versponse/gem_version"
+
+loader = Zeitwerk::Loader.new
+loader.tag = File.basename(__FILE__, ".rb")
+loader.ignore("#{File.dirname(__FILE__)}/versponse/gem_version.rb")
+loader.inflector.inflect("dsl" => "DSL")
+loader.push_dir(File.dirname(__FILE__))
+loader.setup
+
+# Versponse serializes objects to JSON-ready hashes with a versioned DSL
+# and generates an OpenAPI schema for every response, version and view.
+#
+# @example
+#   class UserResponse < Versponse::Base
+#     version "2025-09" do
+#       field :id, type: :string
+#       field :name, type: :string
+#     end
+#   end
+#
+#   UserResponse.serialize(user, version: "2025-09") # => {"id" => "u_1", "name" => "Ann"}
 module Versponse
-  class Error < StandardError; end
-  # Your code goes here...
+  # Base error for everything Versponse raises
+  Error = Class.new(StandardError)
+
+  # Raised when the DSL is used incorrectly
+  DefinitionError = Class.new(Error)
+
+  # Raised when exclude_properties names an unknown property
+  PropertyNotFoundError = Class.new(Error)
+
+  # Raised when views include each other in a cycle
+  InvalidViewError = Class.new(Error)
+
+  # Raised when no version matches the requested one
+  VersionNotFoundError = Class.new(Error)
+
+  # Raised when a view does not exist in the resolved version
+  ViewNotFoundError = Class.new(Error)
+
+  # Raised when reading a value from the serialized object fails
+  class ExtractionError < Error
+    # @return [String] the plan where extraction failed, like "UserResponse[2025-09/default]"
+    attr_reader :label
+    # @return [Array<String>] output keys from the plan down to the failing value
+    attr_reader :keys
+    # @return [String] message of the original error
+    attr_reader :detail
+
+    # @param label [String] plan label
+    # @param keys [Array<String>] output keys leading to the failing value
+    # @param detail [String] message of the original error
+    def initialize(label:, keys:, detail:)
+      @label = label
+      @keys = keys
+      @detail = detail
+      super("#{[label, *keys].join(".")}: #{detail}")
+    end
+  end
+
+  # Raised when validate_output is on and the output does not match its schema
+  class InvalidOutputError < Error
+    # @return [Array<Hash>] errors with :pointer, :type, :message and :details
+    attr_reader :errors
+
+    # @param message [String] error message
+    # @param errors [Array<Hash>] validation errors
+    def initialize(message, errors:)
+      super(message)
+      @errors = errors
+    end
+  end
+
+  class << self
+    # @return [Versponse::Configuration] global configuration
+    def configuration
+      @configuration ||= Configuration.new
+    end
+
+    # @yieldparam configuration [Versponse::Configuration]
+    # @return [void]
+    def configure
+      yield(configuration)
+    end
+
+    # Clears compiled plans and schemas of every response class. Call it after changing settings.
+    #
+    # @return [void]
+    def reset_caches!
+      Registry.all.each(&:reset_caches!)
+    end
+
+    # @param version [String] requested version
+    # @param classes [Array<Class>] response classes (default: every loaded one; eager load your app first)
+    # @return [Hash{String => Hash}] components/schemas for an OpenAPI document
+    # @raise [Versponse::DefinitionError] when two components share a name
+    def components(version:, classes: Registry.classes)
+      Components.call(version:, classes:)
+    end
+
+    # Compiles every plan and schema of every version and view, surfacing definition errors at boot
+    #
+    # @param classes [Array<Class>] response classes (default: every loaded one)
+    # @return [Array<Class>] the classes
+    def eager_load!(classes: Registry.classes)
+      classes.each do |klass|
+        klass.versions.each do |definition|
+          definition.view_names.each do |view|
+            klass.plan(version: definition.name, view:)
+            klass.to_schema(version: definition.name, view:)
+            klass.to_validation_schema(version: definition.name, view:)
+          end
+        end
+      end
+    end
+  end
 end

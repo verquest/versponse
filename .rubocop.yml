@@ -1,8 +1,17 @@
+inherit_gem:
+  standard: config/base.yml
+  standard-performance: config/base.yml
+  standard-custom: config/base.yml
+
+plugins:
+  - standard-custom
+  - standard-performance
+  - rubocop-minitest
+  - rubocop-rake
+
 AllCops:
-  TargetRubyVersion: 3.1
+  TargetRubyVersion: 3.2
+  NewCops: enable
 
-Style/StringLiterals:
-  EnforcedStyle: double_quotes
-
-Style/StringLiteralsInInterpolation:
-  EnforcedStyle: double_quotes
+Minitest/MultipleAssertions:
+  Max: 6
