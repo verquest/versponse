@@ -28,17 +28,20 @@ module Versponse
     # @param root [String, Symbol, nil] wraps the result under this key
     # @param meta [Hash, nil] added under "meta" (requires root:)
     # @return [Hash, Array<Hash>] rendered output
+    # @param expand [Array<String, Symbol>, nil] dotted paths of expandable associations to expand, or "*"
     # @raise [ArgumentError] without a version or with meta: but no root:
+    # @raise [Versponse::InvalidExpandError] for unknown expand paths (config.unknown_expand = :raise)
     # @raise [Versponse::VersionNotFoundError] when no declared version matches
     # @raise [Versponse::ViewNotFoundError] for an unknown view
     # @raise [Versponse::ExtractionError] when reading a value fails
-    def serialize(object, version: nil, view: :default, context: EMPTY_CONTEXT, root: nil, meta: nil)
+    def serialize(object, version: nil, view: :default, context: EMPTY_CONTEXT, root: nil, meta: nil, expand: nil)
       raise ArgumentError, "meta: requires root:" if meta && root.nil?
 
       version = version_name(version)
       plan = plan(version:, view:)
+      expansion = expansion_for(expand, version:, view:)
       context = context.frozen? ? context : context.dup.freeze
-      data = object.respond_to?(:to_ary) ? object.to_ary.map { |item| plan.call(item, context) } : plan.call(object, context)
+      data = object.respond_to?(:to_ary) ? object.to_ary.map { |item| plan.call(item, context, expansion) } : plan.call(object, context, expansion)
       OutputValidator.call(self, data, version:, view:) if Versponse.configuration.validate_output
       wrap(data, root:, meta:)
     end
@@ -94,6 +97,8 @@ module Versponse
     # @api private
     def object_schema(version:, view:, context:)
       definition = resolve(version)
+      return ObjectSchema.build(definition.properties_for(:collapsed), context) if view.to_sym == :collapsed
+
       ObjectSchema.build(definition.properties_for(view), context, description: definition.description, schema_options: definition.schema_options)
     end
 
@@ -117,6 +122,18 @@ module Versponse
     def to_ref(view: :default, property: nil)
       base = "#/components/schemas/#{component_name(view:)}"
       property ? "#{base}/properties/#{property}" : base
+    end
+
+    # Every expandable dotted path of a response, for scope checks and expand: validation
+    #
+    # @param version [String, nil] requested version, config.current_version when nil
+    # @param view [Symbol] view name
+    # @return [Array<String>] sorted, frozen paths such as ["deal.stage", "site"]
+    def expandable_paths(version: nil, view: :default)
+      version = version_name(version)
+      expandable_path_cache.fetch([version, view.to_sym]) do
+        References.nested_paths(self, view: view.to_sym, version:, prefix: [], stack: []).map { |path| path.join(".") }.uniq.sort.freeze
+      end
     end
 
     # @param version [String] canonical (declared) version name, as serialize and nested references pass it;
@@ -151,6 +168,7 @@ module Versponse
       plans.clear
       schemas.clear
       schemers.clear
+      expandable_path_cache.clear
       versions.clear_resolved
     end
 
@@ -166,6 +184,10 @@ module Versponse
 
     def schemers
       @schemers ||= Cache.new
+    end
+
+    def expandable_path_cache
+      @expandable_path_cache ||= Cache.new
     end
 
     def property_validation_schema(version, view, key)
@@ -196,6 +218,31 @@ module Versponse
       properties = {root.to_s => collection ? {"type" => "array", "items" => item} : item}
       properties["meta"] = {"$ref" => meta.to_ref} if meta
       {"type" => "object", "required" => properties.keys, "properties" => properties, "additionalProperties" => false}
+    end
+
+    def expansion_for(expand, version:, view:)
+      paths = Array(expand).map(&:to_s)
+      return Expansion.build(paths) if paths.empty? || paths.include?("*")
+
+      unknown = paths.reject { |path| expandable_path?(path, version:, view:) }
+      return Expansion.build(paths) if unknown.empty?
+      raise InvalidExpandError.new(paths: unknown) if Versponse.configuration.unknown_expand == :raise
+
+      Expansion.build(paths - unknown)
+    end
+
+    # Walks the requested path one segment at a time; valid when the last segment is expandable.
+    # Every property with a matching key is tried, because one_of variants can share keys.
+    def expandable_path?(path, version:, view:)
+      path_known?(resolve(version).properties_for(view), path.split("."), version)
+    end
+
+    def path_known?(properties, segments, version)
+      head, *rest = segments
+      properties.select { |property| property.key == head }.any? do |property|
+        target = property.path_target(version)
+        rest.empty? ? target.expandable_path? : path_known?(target.path_children(version), rest, version)
+      end
     end
 
     def wrap(data, root:, meta:)

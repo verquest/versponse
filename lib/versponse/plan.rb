@@ -18,16 +18,17 @@ module Versponse
 
     # @param object [Object] source object or Hash
     # @param context [Hash] frozen serialize context
+    # @param expansion [Versponse::Expansion] expand tree node for this object
     # @return [Hash{String => Object}] rendered object
     # @raise [Versponse::ExtractionError] when a step (extractor, condition, block or formatter)
     #   raises NoMethodError or KeyError; the original error is kept as `cause`
-    def call(object, context)
+    def call(object, context, expansion = Expansion::NONE)
       output = {}
       steps = @steps
       index = 0
       hash = Hash === object
       while index < steps.size
-        steps[index].call(object, hash, context, output)
+        steps[index].call(object, hash, context, output, expansion)
         index += 1
       end
       output

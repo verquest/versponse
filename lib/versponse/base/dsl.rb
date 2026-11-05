@@ -66,6 +66,21 @@ module Versponse
       add_property(Properties::Field, name:, type: type || default_options[:type], block:, **options)
     end
 
+    # Declares a field of the collapsed shape, rendered for expandable associations that aren't expanded
+    #
+    # @param name [Symbol] output key
+    # @param type [Symbol, nil] field type (with_options type:, else :string)
+    # @param options [Hash] map:, nullable: and JSON Schema keywords (no if:/unless:); with_options defaults apply
+    # @return [void]
+    def identifier(name, type: nil, **options, &block)
+      raise DefinitionError, "identifier must be declared inside a version" unless @current_scope.is_a?(Version)
+      raise DefinitionError, "identifier #{name} takes no if: or unless:" if options.key?(:if) || options.key?(:unless)
+
+      defaults = default_options.except(:type, :if, :unless)
+      type ||= default_options[:type] || :string
+      @current_scope.add_identifier(Properties::Field.new(**defaults, name:, type:, block:, **options))
+    end
+
     # Declares a value from a fixed list
     #
     # @param name [Symbol] output key

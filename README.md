@@ -20,6 +20,7 @@ Sponsored by [Stora](https://stora.co)
 - [Properties](#properties)
 - [Versions](#versions)
 - [Views](#views)
+- [Expansion](#expansion)
 - [Schemas](#schemas)
 - [Output validation](#output-validation)
 - [Sharing references with verquest](#sharing-references-with-verquest)
@@ -222,6 +223,41 @@ ProductResponse.serialize(product, version: "2026-01", view: :embedded)
 
 `reference` and `collection` take `view:` to render the nested class in one of its views, which is how cycles are broken (an order embeds its tenancy without the tenancy's order). Redeclaring a view in a later version replaces it.
 
+## Expansion
+
+Mark associations `expandable: true` and give the referenced class an `identifier`. Unless a request expands them, they render collapsed:
+
+```ruby
+class SiteResponse < Versponse::Base
+  version "2025-09" do
+    identifier :id, map: "public_id"
+    field :id, type: :string, map: "public_id"
+    field :name, type: :string
+  end
+end
+
+class UnitResponse < Versponse::Base
+  version "2025-09" do
+    field :id, type: :string
+    reference :site, from: SiteResponse, expandable: true
+    collection :prices, item: PriceResponse, expandable: true
+    reference :deal, from: DealResponse          # DealResponse has an expandable :stage
+  end
+end
+
+UnitResponse.serialize(unit, version: "2025-09")
+# => {"id" => "u1", "site" => {"id" => "site_1"}, "prices" => [{"id" => "p1"}], "deal" => {"id" => "d1", "stage" => {"id" => "s1"}}}
+UnitResponse.serialize(unit, version: "2025-09", expand: ["site", "deal.stage"])
+# => site and deal.stage in full
+```
+
+- `expand:` takes dotted paths through any association, or `"*"` for everything (use it for webhooks and internal renders).
+- An expandable `one_of` collapses each variant. With `discriminator:` the collapsed form keeps the discriminator const (`{"object" => "order", "id" => "o1"}`), but the OpenAPI `discriminator` keyword is left out, because a mapping would send collapsed payloads to the full schema.
+- `expand:` paths through recursive classes go as deep as you like (`children.children`); `expandable_paths` lists each recursive association once.
+- Schemas describe both shapes as `anyOf: [{$ref Site}, {$ref SiteCollapsed}]`, and each class with an identifier gets a `<Name>Collapsed` component.
+- `UnitResponse.expandable_paths(version: "2025-09")` lists every path (`["deal.stage", "prices", "site"]`), for scope checks.
+- An unknown path raises `Versponse::InvalidExpandError` (its `paths` lists them), unless `config.unknown_expand = :ignore`.
+
 ## Schemas
 
 ```ruby
@@ -324,6 +360,7 @@ end
 | `validate_output` | `false` |
 | `formatters` | `date-time` and `date`, keyed by JSON Schema format |
 | `default_additional_properties` | `false` |
+| `unknown_expand` | `:raise` (or `:ignore`) |
 
 Plans and schemas are cached. Change settings at boot, or call `Versponse.reset_caches!` after changing them.
 

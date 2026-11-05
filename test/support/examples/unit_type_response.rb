@@ -12,7 +12,7 @@ module Examples
       enum :status, values: %w[active archived]
       array :selling_points, type: :string
       field :created_at, type: :string, format: "date-time"
-      reference :site, from: SiteResponse
+      reference :site, from: SiteResponse, expandable: true
       reference :security_deposit, from: MoneyResponse, nullable: true
       collection :prices, item: PriceResponse do |unit_type|
         unit_type.prices.reject { |price| price.amount.nil? }

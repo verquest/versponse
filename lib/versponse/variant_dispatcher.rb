@@ -16,12 +16,13 @@ module Versponse
 
     # @param value [Object] value to render
     # @param context [Hash] serialize context
+    # @param expansion [Versponse::Expansion] expand tree node for the value
     # @return [Hash, nil] the value rendered by its variant
     # @raise [KeyError] when no variant matches (the plan wraps it in an ExtractionError)
-    def call(value, context)
+    def call(value, context, expansion = Expansion::NONE)
       return nil if value.nil? && @nullable
 
-      plan_for(value).call(value, context)
+      plan_for(value).call(value, context, expansion)
     end
 
     private

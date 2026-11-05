@@ -3,6 +3,7 @@
 module Examples
   class SiteResponse < Versponse::Base
     version "2025-09" do
+      identifier :id, map: "public_id"
       field :id, type: :string, map: "public_id"
       field :name, type: :string
 

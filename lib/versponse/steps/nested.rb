@@ -12,14 +12,16 @@ module Versponse
       # @param key [String] output key
       # @param extractor [#call] value reader
       # @param condition [Versponse::Condition, nil] if:/unless:
-      # @param plan [Versponse::Plan, Versponse::LazyPlan] child plan
+      # @param plan [#call] child plan
       # @param collection [Boolean] render each item
-      def initialize(key:, extractor:, condition:, plan:, collection:)
+      # @param collapsed_plan [#call, nil] plan used when the association is expandable and not expanded
+      def initialize(key:, extractor:, condition:, plan:, collection:, collapsed_plan: nil)
         @key = key
         @extractor = extractor
         @condition = condition
         @plan = plan
         @collection = collection
+        @collapsed_plan = collapsed_plan
         freeze
       end
 
@@ -27,27 +29,28 @@ module Versponse
       # @param hash [Boolean] whether the source is a Hash
       # @param context [Hash] serialize context
       # @param output [Hash] Hash being built
+      # @param expansion [Versponse::Expansion] expand tree node of the parent
       # @return [void]
       # @raise [Versponse::ExtractionError] with the item index in its keys when a collection item fails
-      def call(object, hash, context, output)
+      def call(object, hash, context, output, expansion)
         return if @condition && !@condition.call(object, context)
 
         value = @extractor.call(object, hash, context)
         output[@key] = if value.nil?
           nil
-        elsif @collection
-          render_items(value.to_ary, context)
         else
-          @plan.call(value, context)
+          plan = (@collapsed_plan && !expansion.expand?(@key)) ? @collapsed_plan : @plan
+          node = expansion.child(@key)
+          @collection ? render_items(value.to_ary, context, plan, node) : plan.call(value, context, node)
         end
       end
 
       private
 
-      def render_items(items, context)
+      def render_items(items, context, plan, node)
         index = 0
         items.map do |item|
-          rendered = @plan.call(item, context)
+          rendered = plan.call(item, context, node)
           index += 1
           rendered
         end

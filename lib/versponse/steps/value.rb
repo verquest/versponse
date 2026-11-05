@@ -26,8 +26,9 @@ module Versponse
       # @param hash [Boolean] whether the source is a Hash
       # @param context [Hash] serialize context
       # @param output [Hash] Hash being built
+      # @param _expansion [Versponse::Expansion] unused
       # @return [void]
-      def call(object, hash, context, output)
+      def call(object, hash, context, output, _expansion)
         return if @condition && !@condition.call(object, context)
 
         value = @extractor.call(object, hash, context)

@@ -35,5 +35,54 @@ module Versponse
 
       klass.to_validation_schema(version: context.version, property:)
     end
+
+    # @param klass [Class] Versponse response class
+    # @param version [String] canonical version name
+    # @return [void]
+    # @raise [Versponse::DefinitionError] when the class has no identifier in that version (a class that
+    #   lacks the version entirely is left alone, like a plain $ref)
+    def self.ensure_identifier!(klass, version)
+      definition = klass.resolve(version)
+    rescue VersionNotFoundError
+      nil
+    else
+      return if definition.identifiers?
+
+      raise DefinitionError, "#{klass.name} has no identifier in #{version}; expandable associations need one"
+    end
+
+    # @param klass [Class] Versponse response class
+    # @param version [String] canonical version name
+    # @return [Versponse::LazyPlan] plan of the class's collapsed view
+    # @raise [Versponse::DefinitionError] when the class has no identifier
+    def self.collapsed_plan(klass, version)
+      ensure_identifier!(klass, version)
+      LazyPlan.new(klass, version:, view: :collapsed)
+    end
+
+    # @param klass [Class] Versponse response class
+    # @param view [Symbol] view of the full form
+    # @param context [Versponse::SchemaContext] schema generation context
+    # @return [Array(Hash, Hash)] the full and the collapsed schema
+    # @raise [Versponse::DefinitionError] when the class has no identifier
+    def self.expandable_schemas(klass, view:, context:)
+      ensure_identifier!(klass, context.version)
+      [schema(klass, view:, property: nil, context:), schema(klass, view: :collapsed, property: nil, context:)]
+    end
+
+    # @param klass [Class] referenced class
+    # @param view [Symbol] view to walk
+    # @param version [String] canonical version name
+    # @param prefix [Array<String>] output keys leading here
+    # @param stack [Array<Array(Class, Symbol)>] classes and views being walked, to stop recursion
+    # @return [Array<Array<String>>] expandable paths under the class's view
+    def self.nested_paths(klass, view:, version:, prefix:, stack:)
+      return [] unless versponse?(klass)
+      return [] if stack.include?([klass, view])
+
+      klass.resolve(version).properties_for(view).flat_map do |property|
+        property.expandable_paths(version:, prefix:, stack: [*stack, [klass, view]])
+      end
+    end
   end
 end

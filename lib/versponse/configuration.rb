@@ -37,12 +37,15 @@ module Versponse
     attr_reader :formatters
     # @return [Symbol] JSON Schema version of generated schemas (default :openapi31)
     attr_reader :json_schema_version
+    # @return [Symbol] :raise (default) or :ignore for expand paths that match no expandable association
+    attr_reader :unknown_expand
 
     # @return [Configuration] configuration with default settings
     def initialize
       @validate_output = false
       @default_additional_properties = false
       @json_schema_version = :openapi31
+      @unknown_expand = :raise
       @version_resolver = VersionResolver
       @json_generator = JSON.method(:generate)
       @formatters = Formatters::DEFAULTS
@@ -73,6 +76,14 @@ module Versponse
       raise ArgumentError, "Unsupported JSON Schema version: #{value}. Use one of #{SCHEMAS.keys.join(", ")}" unless SCHEMAS.key?(value)
 
       @json_schema_version = value
+    end
+
+    # @param value [Symbol] :raise or :ignore
+    # @raise [ArgumentError] for any other value
+    def unknown_expand=(value)
+      raise ArgumentError, "unknown_expand must be :raise or :ignore" unless %i[raise ignore].include?(value)
+
+      @unknown_expand = value
     end
 
     # @param value [Hash{String, Symbol => #call}] formatters keyed by JSON Schema format

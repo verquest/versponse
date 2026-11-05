@@ -6,7 +6,7 @@ module Examples
       field :id, type: :string
       field :title, type: :string
 
-      one_of :resource, discriminator: "object", nullable: true do
+      one_of :resource, discriminator: "object", nullable: true, expandable: true do
         reference from: OrderResponse, view: :embedded, match: Order
         reference from: TenancyResponse, view: :embedded, match: Tenancy
       end

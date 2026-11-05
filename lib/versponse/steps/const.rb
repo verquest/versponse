@@ -23,8 +23,9 @@ module Versponse
       # @param _hash [Boolean] unused
       # @param context [Hash] serialize context
       # @param output [Hash] Hash being built
+      # @param _expansion [Versponse::Expansion] unused
       # @return [void]
-      def call(object, _hash, context, output)
+      def call(object, _hash, context, output, _expansion)
         return if @condition && !@condition.call(object, context)
 
         output[@key] = @value

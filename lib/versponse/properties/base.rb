@@ -83,6 +83,31 @@ module Versponse
         raise NotImplementedError
       end
 
+      # @param version [String] canonical version name
+      # @param prefix [Array<String>] output keys leading to this property
+      # @param stack [Array<Array(Class, Symbol)>] classes and views being walked, to stop recursion
+      # @return [Array<Array<String>>] expandable paths under this property
+      def expandable_paths(version:, prefix:, stack:)
+        []
+      end
+
+      # @return [Boolean] true when a request may expand the association under this property
+      def expandable_path?
+        false
+      end
+
+      # @param version [String] canonical version name
+      # @return [Array<Versponse::Properties::Base>] properties one path segment below this one
+      def path_children(version)
+        []
+      end
+
+      # @param version [String] canonical version name
+      # @return [Versponse::Properties::Base] the property a path segment resolves to (self, or a reused copy)
+      def path_target(version)
+        self
+      end
+
       protected
 
       # @param name [Symbol, String] new name and output key
@@ -110,6 +135,7 @@ module Versponse
       end
 
       def check_options!(options)
+        raise DefinitionError, "#{key}: expandable: only works on reference, collection item: and one_of" if options.key?(:expandable)
         raise DefinitionError, "#{key}: required is computed automatically, use if: or unless: for optional keys" if options.key?(:required)
         raise DefinitionError, "#{key}: use either a block or map:, not both" if block && map
       end
@@ -140,6 +166,13 @@ module Versponse
         return {"allOf" => [schema], "nullable" => true} if nullable_keyword?(context)
 
         {"anyOf" => [schema, NULL_SCHEMA]}
+      end
+
+      def nullable_choice(keyword, schemas, context)
+        return {keyword => schemas} unless nullable?
+        return {keyword => schemas, "nullable" => true} if nullable_keyword?(context)
+
+        {keyword => [*schemas, NULL_SCHEMA]}
       end
     end
   end

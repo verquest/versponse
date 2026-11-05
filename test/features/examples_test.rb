@@ -69,7 +69,7 @@ class ExamplesTest < Minitest::Test
       "prices" => [{"id" => "price_1", "amount" => {"amount" => 5000, "currency" => "GBP"}, "interval" => "month"}]
     }
 
-    assert_equal expected, Examples::UnitTypeResponse.serialize(unit_type, version: "2025-09")
+    assert_equal expected, Examples::UnitTypeResponse.serialize(unit_type, version: "2025-09", expand: ["site"])
   end
 
   def test_unit_type_views_and_versions
@@ -117,5 +117,20 @@ class ExamplesTest < Minitest::Test
     expected = {"order" => "#/components/schemas/OrderResponseEmbedded", "tenancy" => "#/components/schemas/TenancyResponseEmbedded"}
 
     assert_equal expected, discriminator["mapping"]
+  end
+
+  def test_unit_type_site_is_collapsed_by_default
+    assert_equal({"id" => "site_1"}, Examples::UnitTypeResponse.serialize(unit_type, version: "2025-09")["site"])
+  end
+
+  def test_expandable_paths
+    assert_equal %w[site], Examples::UnitTypeResponse.expandable_paths(version: "2025-09")
+    assert_equal %w[resource], Examples::TaskResponse.expandable_paths(version: "2025-09")
+  end
+
+  def test_task_resource_expanded
+    task = Examples::Task.new(id: "task_1", title: "Call", resource: order_with_tenancy.tenancy)
+
+    assert_equal({"object" => "tenancy", "id" => "t1"}, Examples::TaskResponse.serialize(task, version: "2025-09", expand: ["resource"])["resource"])
   end
 end

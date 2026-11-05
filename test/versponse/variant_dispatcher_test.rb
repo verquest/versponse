@@ -4,7 +4,7 @@ require "test_helper"
 
 class Versponse::VariantDispatcherTest < Minitest::Test
   FakePlan = Struct.new(:tag) do
-    def call(value, _context) = {tag => value}
+    def call(value, _context, _expansion = nil) = {tag => value}
   end
 
   def dispatcher(nullable: false)

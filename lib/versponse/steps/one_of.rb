@@ -13,11 +13,13 @@ module Versponse
       # @param extractor [#call] value reader
       # @param condition [Versponse::Condition, nil] if:/unless:
       # @param dispatcher [Versponse::VariantDispatcher] variant matching
-      def initialize(key:, extractor:, condition:, dispatcher:)
+      # @param collapsed_dispatcher [Versponse::VariantDispatcher, nil] matching to collapsed variants (expandable one_of)
+      def initialize(key:, extractor:, condition:, dispatcher:, collapsed_dispatcher: nil)
         @key = key
         @extractor = extractor
         @condition = condition
         @dispatcher = dispatcher
+        @collapsed_dispatcher = collapsed_dispatcher
         freeze
       end
 
@@ -25,13 +27,17 @@ module Versponse
       # @param hash [Boolean] whether the source is a Hash
       # @param context [Hash] serialize context
       # @param output [Hash] Hash being built
+      # @param expansion [Versponse::Expansion] expand tree node of the parent
       # @return [void]
       # @raise [KeyError] when no variant matches (the plan wraps it in an ExtractionError)
-      def call(object, hash, context, output)
+      def call(object, hash, context, output, expansion)
         return if @condition && !@condition.call(object, context)
 
         value = @extractor.call(object, hash, context)
-        output[@key] = value.nil? ? nil : @dispatcher.call(value, context)
+        return output[@key] = nil if value.nil?
+
+        dispatcher = (@collapsed_dispatcher && !expansion.expand?(@key)) ? @collapsed_dispatcher : @dispatcher
+        output[@key] = dispatcher.call(value, context, expansion.child(@key))
       end
     end
   end

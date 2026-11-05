@@ -12,6 +12,20 @@ module Versponse
         (@properties ||= {})[property.key] = property
       end
 
+      # @param version [String] canonical version name
+      # @param prefix [Array<String>] output keys leading to this container
+      # @param stack [Array<Array(Class, Symbol)>] classes and views being walked
+      # @return [Array<Array<String>>] expandable paths of the child properties
+      def expandable_paths(version:, prefix:, stack:)
+        child_properties.flat_map { |property| property.expandable_paths(version:, prefix: prefix + [key], stack:) }
+      end
+
+      # @param version [String] canonical version name
+      # @return [Array<Versponse::Properties::Base>] the child properties
+      def path_children(version)
+        child_properties
+      end
+
       private
 
       def child_properties

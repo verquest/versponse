@@ -77,6 +77,18 @@ module Versponse
     end
   end
 
+  # Raised when expand: names paths that match no expandable association (config.unknown_expand = :raise)
+  class InvalidExpandError < Error
+    # @return [Array<String>] the unknown paths
+    attr_reader :paths
+
+    # @param paths [Array<String>] unknown paths
+    def initialize(paths:)
+      @paths = paths
+      super("Unknown expand paths: #{paths.join(", ")}")
+    end
+  end
+
   class << self
     # @return [Versponse::Configuration] global configuration
     def configuration
