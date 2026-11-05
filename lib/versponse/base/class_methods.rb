@@ -9,14 +9,33 @@ module Versponse
     # @return [Versponse::Versions] declared versions
     # @api private
     def versions
-      @versions ||= Versions.new
+      @versions ||= Versions.new(owner: name || "AnonymousResponse")
     end
 
     # @param version [String] requested version
     # @return [Versponse::Version] closest declared version at or before it
-    # @raise [Versponse::VersionNotFoundError] when there is none
+    # @raise [Versponse::VersionNotFoundError] when there is none, or supported_versions leaves it out
+    # @raise [Versponse::DefinitionError] when supported_versions max sorts before every declared version
     def resolve(version)
-      versions.resolve(version.to_s)
+      versions.resolve(version.to_s, supported: supported_version_range)
+    end
+
+    # @return [Versponse::SupportedVersions, nil] range declared with supported_versions on this class
+    #   or its closest ancestor, nil when every declared version is served
+    def supported_version_range
+      return @supported_versions if defined?(@supported_versions)
+
+      superclass.supported_version_range if superclass.respond_to?(:supported_version_range)
+    end
+
+    # Names that resolve within supported_versions: the declared versions in range plus min,
+    # so a min: "preview" class whose only block is 2025-09 compiles that block as "preview"
+    #
+    # @return [Array<String>] canonical version names; every declared version without a range
+    # @raise [Versponse::DefinitionError] when supported_versions max sorts before every declared version
+    # @api private
+    def supported_version_names
+      versions.supported_names(supported_version_range)
     end
 
     # Renders an object, or each item of an Array-like collection, to a Hash with String keys
@@ -31,7 +50,7 @@ module Versponse
     # @param expand [Array<String, Symbol>, nil] dotted paths of expandable associations to expand, or "*"
     # @raise [ArgumentError] without a version or with meta: but no root:
     # @raise [Versponse::InvalidExpandError] for unknown expand paths (config.unknown_expand = :raise)
-    # @raise [Versponse::VersionNotFoundError] when no declared version matches
+    # @raise [Versponse::VersionNotFoundError] when no declared version matches, or supported_versions leaves it out
     # @raise [Versponse::ViewNotFoundError] for an unknown view
     # @raise [Versponse::ExtractionError] when reading a value fails
     def serialize(object, version: nil, view: :default, context: EMPTY_CONTEXT, root: nil, meta: nil, expand: nil)

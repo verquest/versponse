@@ -22,6 +22,21 @@ module Versponse
       target.schema_options = target.schema_options.merge(Naming.camelize_keys(options))
     end
 
+    # Limits the versions the class serves; resolving a version outside the range raises
+    # VersionNotFoundError. Subclasses inherit the range; no arguments removes an inherited one.
+    #
+    # @param min [String, nil] first supported version (inclusive), defaults to the first declared version
+    # @param max [String, nil] last supported version (inclusive), defaults to no upper bound
+    # @return [void]
+    # @raise [Versponse::DefinitionError] when min sorts after max, inside a version, or after the first version
+    def supported_versions(min: nil, max: nil)
+      raise DefinitionError, "supported_versions must come before the first version" unless versions.empty?
+      raise DefinitionError, "supported_versions can only be set on the class" if @current_scope
+
+      @supported_versions = (min.nil? && max.nil?) ? nil : SupportedVersions.new(min:, max:)
+      Versponse.reset_caches!
+    end
+
     # Declares a version
     #
     # @param name [String] version name, compared as a String

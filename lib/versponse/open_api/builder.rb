@@ -72,8 +72,11 @@ module Versponse
         end
       end
 
+      # Wrapper schemas only $ref the class, so skip classes that don't cover the version (supported_versions)
       def add_wrappers(set)
         @declarations.wrappers.each do |wrapper|
+          next unless Components.resolved(wrapper.klass, @version)
+
           schema = wrapper.klass.to_schema(version: @version, view: wrapper.view, root: wrapper.root, meta: wrapper.meta, collection: wrapper.collection)
           set.add(wrapper.name, schema, "wrapper #{wrapper.name}")
         end

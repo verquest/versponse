@@ -116,17 +116,20 @@ module Versponse
       Components.call(version:, classes:)
     end
 
-    # Compiles every plan and schema of every version and view, surfacing definition errors at boot
+    # Compiles every plan and schema of every supported version and view, surfacing definition errors at boot.
+    # A class with supported_versions compiles the names its range serves, such as "preview" for a
+    # min: "preview" class whose only block is 2025-09.
     #
     # @param classes [Array<Class>] response classes (default: every loaded one)
     # @return [Array<Class>] the classes
+    # @raise [Versponse::DefinitionError] when a supported_versions max sorts before every declared version
     def eager_load!(classes: Registry.classes)
       classes.each do |klass|
-        klass.versions.each do |definition|
-          definition.view_names.each do |view|
-            klass.plan(version: definition.name, view:)
-            klass.to_schema(version: definition.name, view:)
-            klass.to_validation_schema(version: definition.name, view:)
+        klass.supported_version_names.each do |version|
+          klass.resolve(version).view_names.each do |view|
+            klass.plan(version:, view:)
+            klass.to_schema(version:, view:)
+            klass.to_validation_schema(version:, view:)
           end
         end
       end

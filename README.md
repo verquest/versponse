@@ -183,6 +183,27 @@ end
 
 A request for any version resolves to the closest declared version at or before it, so `"2025-12"` uses `"2025-09"`. A request older than every version raises `Versponse::VersionNotFoundError`. Each referenced class resolves the requested version on its own, so a `MoneyResponse` with only `2025-01` serves every later request.
 
+`supported_versions` limits the versions a class serves. Both bounds are inclusive and optional:
+
+```ruby
+class OverlockResponse < Versponse::Base
+  supported_versions min: "2025-09", max: "2026-03"
+
+  version "2025-09" do
+    field :reason, type: :string
+  end
+end
+
+OverlockResponse.serialize(overlock, version: "2025-12") # uses 2025-09
+OverlockResponse.serialize(overlock, version: "2026-06") # raises Versponse::VersionNotFoundError
+```
+
+- `min` defaults to the first declared version. Set it when a class should appear later than its first `version` block. The range applies to the requested version, not to the blocks: with `supported_versions min: "preview"` and a single `version "2025-09"` block, `"preview"` is served by the 2025-09 block and `"2025-09"` raises. `max` defaults to no upper bound.
+- A version outside the range raises `Versponse::VersionNotFoundError`, like a version older than every declared one. `serialize`, schemas, references and `expandable_paths` raise it. `Versponse.components` and OpenAPI documents leave the class, and its wrappers, out of that version. `Versponse.eager_load!` compiles only the versions the range serves.
+- Versions are compared with `config.version_resolver`, so with the default resolver `"preview"` sorts after dated versions. Versponse first maps the request to the closest version any response class declares, then checks the range. So `"2026-04"` counts as `"2026-03"` until some class declares a later version. For the same reason, `min: "preview"` only takes effect once some response class declares a `version "preview"` block.
+- `min` after `max` raises `Versponse::DefinitionError` when declared. A `max` before the first declared version would leave nothing to serve, so it raises `Versponse::DefinitionError` the first time the class resolves a version, and from `eager_load!`.
+- Declare it on the class before the first `version` block. Subclasses of an abstract base class inherit the range and can declare their own. `supported_versions` with no arguments removes an inherited range.
+
 Set `current_version` to drop the `version:` argument:
 
 ```ruby
