@@ -15,13 +15,16 @@ module Versponse
       # @param plan [#call] child plan
       # @param collection [Boolean] render each item
       # @param collapsed_plan [#call, nil] plan used when the association is expandable and not expanded
-      def initialize(key:, extractor:, condition:, plan:, collection:, collapsed_plan: nil)
+      # @param collapse_if [#call, nil] the referenced identifier's condition; when it is false for the value
+      #   (for a collection: for any item) the full plan is used instead of collapsed_plan
+      def initialize(key:, extractor:, condition:, plan:, collection:, collapsed_plan: nil, collapse_if: nil)
         @key = key
         @extractor = extractor
         @condition = condition
         @plan = plan
         @collection = collection
         @collapsed_plan = collapsed_plan
+        @collapse_if = collapse_if
         freeze
       end
 
@@ -39,13 +42,21 @@ module Versponse
         output[@key] = if value.nil?
           nil
         else
-          plan = (@collapsed_plan && !expansion.expand?(@key)) ? @collapsed_plan : @plan
+          collapse = @collapsed_plan && !expansion.expand?(@key) && (@collapse_if.nil? || collapse?(value, context))
+          plan = collapse ? @collapsed_plan : @plan
           node = expansion.child(@key)
           @collection ? render_items(value.to_ary, context, plan, node) : plan.call(value, context, node)
         end
       end
 
       private
+
+      # A collection collapses only when every item passes, so its items share one shape
+      def collapse?(value, context)
+        return @collapse_if.call(value, context) unless @collection
+
+        value.to_ary.all? { |item| @collapse_if.call(item, context) }
+      end
 
       def render_items(items, context, plan, node)
         index = 0

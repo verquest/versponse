@@ -275,6 +275,7 @@ UnitResponse.serialize(unit, version: "2025-09", expand: ["site", "deal.stage"])
 
 - `expand:` takes dotted paths through any association, or `"*"` for everything (use it for webhooks and internal renders).
 - An expandable `one_of` collapses each variant. With `discriminator:` the collapsed form keeps the discriminator const (`{"object" => "order", "id" => "o1"}`), but the OpenAPI `discriminator` keyword is left out, because a mapping would send collapsed payloads to the full schema.
+- `identifier :id, map: "public_id", collapse_if: ->(stage) { !stage.archived? }` renders the association in full when the condition is false, for objects with no identifier to show. A `collection item:` renders in full when any item fails. An expandable `one_of` decides for each value, so each item of a polymorphic collection decides for itself. Schemas don't change, because the `anyOf` already includes the full shape. The condition takes `(object)` or `(object, context)`. Only one identifier per version can declare it, and later versions inherit it until they redeclare their identifiers.
 - `expand:` paths through recursive classes go as deep as you like (`children.children`); `expandable_paths` lists each recursive association once.
 - Schemas describe both shapes as `anyOf: [{$ref Site}, {$ref SiteCollapsed}]`, and each class with an identifier gets a `<Name>Collapsed` component.
 - `UnitResponse.expandable_paths(version: "2025-09")` lists every path (`["deal.stage", "prices", "site"]`), for scope checks.

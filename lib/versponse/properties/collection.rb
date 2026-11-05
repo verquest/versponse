@@ -60,7 +60,8 @@ module Versponse
         plan = items_plan(version)
         return value_step if plan.nil?
 
-        Steps::Nested.new(key:, extractor:, condition:, plan:, collapsed_plan: items_collapsed_plan(version), collection: true)
+        collapse_if = (References.collapse_if(@item, version) if expandable?)
+        Steps::Nested.new(key:, extractor:, condition:, plan:, collapsed_plan: items_collapsed_plan(version), collapse_if:, collection: true)
       end
 
       # @param version [String] canonical version name

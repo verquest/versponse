@@ -13,6 +13,9 @@ module Versponse
     attr_reader :views
     # @return [Hash{String => Versponse::Properties::Field}] identifier fields, the implicit :collapsed view
     attr_reader :identifiers
+    # @return [#call, nil] identifier condition called with (object, context); when it returns false,
+    #   an expandable association that isn't expanded renders in full
+    attr_reader :collapse_if
     # @return [String, nil] schema description
     attr_accessor :description
     # @return [Hash{String => Object}] camelized schema keywords of the version
@@ -26,6 +29,7 @@ module Versponse
       @properties = {}
       @views = {}
       @identifiers = {}
+      @collapse_if = nil
       @schema_options = {}
     end
 
@@ -35,14 +39,22 @@ module Versponse
       properties[property.key] = property
     end
 
-    # The first identifier declared in a version replaces the inherited ones; later ones add to it
+    # The first identifier declared in a version replaces the inherited ones (and their collapse_if); later ones add to it
     #
     # @param property [Versponse::Properties::Field] identifier field
+    # @param collapse_if [#call, nil] normalized condition, at most one per version
     # @return [Versponse::Properties::Field] the field
-    def add_identifier(property)
+    # @raise [Versponse::DefinitionError] when another identifier of the version already declares collapse_if
+    def add_identifier(property, collapse_if: nil)
       if @inherited_identifiers
         @identifiers = {}
+        @collapse_if = nil
         @inherited_identifiers = false
+      end
+      if collapse_if
+        raise DefinitionError, "#{label}: collapse_if is already declared by another identifier" if @collapse_if
+
+        @collapse_if = collapse_if
       end
       identifiers[property.key] = property
     end
@@ -80,6 +92,7 @@ module Versponse
       @properties = other.properties.except(*excluded)
       @views = other.views.transform_values(&:for_next_version)
       @identifiers = other.identifiers.dup
+      @collapse_if = other.collapse_if
       @inherited_identifiers = true
     end
 

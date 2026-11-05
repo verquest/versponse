@@ -68,7 +68,7 @@ module Versponse
       end
 
       # @param version [String] canonical version name
-      # @return [Versponse::VariantDispatcher] matching to the variants' collapsed plans
+      # @return [Versponse::VariantDispatcher] matching to the variants' collapsed plans (full plans when a variant's collapse_if is false)
       # @raise [Versponse::DefinitionError] when a variant class has no identifier
       def collapsed_dispatcher(version)
         variants = @variants.map { |variant| [Array(variant.match).freeze, collapsed_variant_plan(variant, version)] }
@@ -119,11 +119,14 @@ module Versponse
         schema.merge("required" => [@discriminator, *schema["required"]], "properties" => discriminator.merge(schema["properties"]))
       end
 
+      # Decides per value: an item one_of lets each item pick its own variant and shape
       def collapsed_variant_plan(variant, version)
         plan = References.collapsed_plan(variant.from, version)
-        return plan unless @discriminator
+        plan = DiscriminatedPlan.new(plan, key: @discriminator, value: discriminator_property(variant, version).value) if @discriminator
+        collapse_if = References.collapse_if(variant.from, version)
+        return plan unless collapse_if
 
-        DiscriminatedPlan.new(plan, key: @discriminator, value: discriminator_property(variant, version).value)
+        CollapseIfPlan.new(collapse_if, collapsed: plan, full: LazyPlan.new(variant.from, version:, view: variant.view))
       end
 
       def discriminator_mapping(version)

@@ -49,7 +49,8 @@ module Versponse
         return value_step unless References.versponse?(@from)
 
         collapsed_plan = (References.collapsed_plan(@from, version) if expandable?)
-        Steps::Nested.new(key:, extractor:, condition:, plan: LazyPlan.new(@from, version:, view: @view), collapsed_plan:, collection: false)
+        collapse_if = (References.collapse_if(@from, version) if expandable?)
+        Steps::Nested.new(key:, extractor:, condition:, plan: LazyPlan.new(@from, version:, view: @view), collapsed_plan:, collapse_if:, collection: false)
       end
 
       # @param version [String] canonical version name

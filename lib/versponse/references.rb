@@ -61,6 +61,15 @@ module Versponse
     end
 
     # @param klass [Class] Versponse response class
+    # @param version [String] canonical version name
+    # @return [#call, nil] the class's identifier collapse_if in that version; nil without one or without the version
+    def self.collapse_if(klass, version)
+      klass.resolve(version).collapse_if
+    rescue VersionNotFoundError
+      nil
+    end
+
+    # @param klass [Class] Versponse response class
     # @param view [Symbol] view of the full form
     # @param context [Versponse::SchemaContext] schema generation context
     # @return [Array(Hash, Hash)] the full and the collapsed schema
