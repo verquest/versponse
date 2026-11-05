@@ -83,6 +83,14 @@ class OpenapiComponentsTest < Minitest::Test
     assert_equal %w[ApiMetaResponse ApiSiteCreateRequest], schemas(document).keys.sort
   end
 
+  def test_schema_collisions_raise
+    document = Class.new(ApiDocument) { schema "ApiMetaResponse", {"type" => "object"} }
+
+    error = assert_raises(Versponse::DefinitionError) { schemas(document) }
+
+    assert_equal "Component ApiMetaResponse from schema ApiMetaResponse collides with OpenapiComponentsTest::Api::MetaResponse", error.message
+  end
+
   def test_collisions_raise
     document = Class.new(ApiDocument) { wrapper :ApiSiteResponse, Api::SiteResponse, root: "site" }
 

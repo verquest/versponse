@@ -33,11 +33,11 @@ module Versponse
       end
 
       def inline_plan(version)
-        Plan.new(label: key, steps: child_properties.map { |property| property.step(version:) })
+        Plan.new(label: key, steps: FieldOrder.call(child_properties).map { |property| property.step(version:) })
       end
 
       def inline_schema(context)
-        ObjectSchema.build(child_properties, context)
+        ObjectSchema.build(FieldOrder.call(child_properties), context)
       end
     end
   end

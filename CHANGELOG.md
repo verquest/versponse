@@ -20,3 +20,5 @@
 - OpenAPI documents: `Versponse::OpenAPI::Document` class DSL (base sections, `responses`/`requests` by namespace or list, named `wrapper` components, `finalize` hooks), `build`, `validate`, and `Versponse::OpenAPI.rswag_specs` for rswag's `openapi_specs`.
 - `config.custom_field_types` in verquest's shape (`type` and `schema_options`), used by `field` and `array`.
 - Output validation compiles each validation schema into Ruby checks and calls json_schemer only for errors and unsupported keywords, making validation-on rendering about as fast as blueprinter without validation.
+- `config.field_order = :alphabetical` orders output and schemas like blueprinter's `sort_fields_by :name_asc`.
+- OpenAPI documents: `schema` for hand-written components and a `webhooks` section.

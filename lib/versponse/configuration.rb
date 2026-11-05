@@ -39,6 +39,9 @@ module Versponse
     attr_reader :json_schema_version
     # @return [Symbol] :raise (default) or :ignore for expand paths that match no expandable association
     attr_reader :unknown_expand
+    # @return [Symbol] :declaration (default) or :alphabetical (identifiers first, then by output key,
+    #   like blueprinter's sort_fields_by :name_asc)
+    attr_reader :field_order
     # @return [Hash{String => Hash}] custom field types, normalized by {FieldType.normalize} (default {})
     attr_reader :custom_field_types
 
@@ -48,6 +51,7 @@ module Versponse
       @default_additional_properties = false
       @json_schema_version = :openapi31
       @unknown_expand = :raise
+      @field_order = :declaration
       @version_resolver = VersionResolver
       @json_generator = JSON.method(:generate)
       @formatters = Formatters::DEFAULTS
@@ -87,6 +91,14 @@ module Versponse
       raise ArgumentError, "unknown_expand must be :raise or :ignore" unless %i[raise ignore].include?(value)
 
       @unknown_expand = value
+    end
+
+    # @param value [Symbol] :declaration or :alphabetical
+    # @raise [ArgumentError] for any other value
+    def field_order=(value)
+      raise ArgumentError, "field_order must be one of #{FieldOrder::VALUES.join(", ")}" unless FieldOrder::VALUES.include?(value)
+
+      @field_order = value
     end
 
     # @param value [Hash{String, Symbol => #call}] formatters keyed by JSON Schema format

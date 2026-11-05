@@ -128,5 +128,6 @@ class ExamplesTest < Minitest::Test
     assert_includes schemas.keys, "UnitTypeResponse"
     assert_includes schemas.keys, "SiteResponseCollapsed"
     assert_equal %w[unit_types meta], schemas["unit_type_list"]["required"]
+    assert_includes schemas.keys, "Error"
   end
 end

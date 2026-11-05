@@ -16,5 +16,12 @@ module Examples
     responses namespace: "Examples"
     wrapper :unit_type_list, UnitTypeResponse, root: "unit_types", collection: true, meta: MetaResponse
     wrapper :unit_type_single, UnitTypeResponse, root: "unit_type", meta: MetaResponse
+    schema "Error", {
+      "type" => "object", "additionalProperties" => false,
+      "properties" => {"error" => {"type" => "object", "properties" => {"code" => {"type" => "string"}, "message" => {"type" => "string"}}}}
+    }
+    webhooks do |version|
+      {"unit_type.updated" => {"post" => {"summary" => "Unit type updated (#{version})", "responses" => {"200" => {"description" => "Received"}}}}}
+    end
   end
 end

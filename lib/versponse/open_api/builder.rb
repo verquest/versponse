@@ -40,7 +40,8 @@ module Versponse
           "servers" => presence(resolve(@declarations.servers)),
           "tags" => presence(resolve(@declarations.tags)),
           "security" => resolve(@declarations.security),
-          "paths" => {}
+          "paths" => {},
+          "webhooks" => resolve(@declarations.webhooks)
         }.compact
       end
 
@@ -54,6 +55,7 @@ module Versponse
         add_responses(set)
         add_requests(set)
         add_wrappers(set)
+        add_schemas(set)
         set.to_h
       end
 
@@ -75,6 +77,10 @@ module Versponse
           schema = wrapper.klass.to_schema(version: @version, view: wrapper.view, root: wrapper.root, meta: wrapper.meta, collection: wrapper.collection)
           set.add(wrapper.name, schema, "wrapper #{wrapper.name}")
         end
+      end
+
+      def add_schemas(set)
+        @declarations.schemas.each { |schema| set.add(schema.name, resolve(schema.value), "schema #{schema.name}") }
       end
 
       def response_classes

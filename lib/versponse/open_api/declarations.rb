@@ -10,6 +10,8 @@ module Versponse
       Source = Data.define(:classes, :namespace)
       # One named wrapper component
       Wrapper = Data.define(:name, :klass, :root, :collection, :meta, :view)
+      # One hand-written component
+      Schema = Data.define(:name, :value)
 
       # @return [String, nil] rswag key prefix
       attr_accessor :document_name
@@ -21,6 +23,8 @@ module Versponse
       attr_accessor :external_docs
       # @return [Array, Proc, nil] top-level security
       attr_accessor :security
+      # @return [Hash, Proc, nil] top-level webhooks
+      attr_accessor :webhooks
       # @return [Array<String>] versions exposed to rswag (empty = any version)
       attr_accessor :versions
       # @return [Array<Hash>] servers
@@ -35,6 +39,8 @@ module Versponse
       attr_reader :request_sources
       # @return [Array<Wrapper>] wrapper components
       attr_reader :wrappers
+      # @return [Array<Schema>] hand-written components
+      attr_reader :schemas
       # @return [Array<Proc>] finalize hooks
       attr_reader :finalizers
 
@@ -48,6 +54,7 @@ module Versponse
         @response_sources = []
         @request_sources = []
         @wrappers = []
+        @schemas = []
         @finalizers = []
       end
 
@@ -62,6 +69,7 @@ module Versponse
         @response_sources = other.response_sources.dup
         @request_sources = other.request_sources.dup
         @wrappers = other.wrappers.dup
+        @schemas = other.schemas.dup
         @finalizers = other.finalizers.dup
       end
     end

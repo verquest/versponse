@@ -108,6 +108,14 @@ module Versponse
           declarations.wrappers << Declarations::Wrapper.new(name: name.to_s, klass:, root:, collection:, meta:, view:)
         end
 
+        def schema(name, value = nil, &block)
+          declarations.schemas << Declarations::Schema.new(name: name.to_s, value: required_value(:schema, value, block))
+        end
+
+        def webhooks(value = nil, &block)
+          declarations.webhooks = required_value(:webhooks, value, block)
+        end
+
         def source(keyword, classes, namespace)
           raise DefinitionError, "#{keyword} needs a list of classes or namespace:" if classes.nil? == namespace.nil?
 

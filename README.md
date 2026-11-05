@@ -315,6 +315,9 @@ class PublicApiDocument < Versponse::OpenAPI::Document
   requests namespace: "PublicApi"              # verquest body requests
   wrapper :contact_list, PublicApi::ContactResponse, root: "contacts", collection: true, meta: PublicApi::MetaResponse
 
+  schema "Error", ERROR_SCHEMA                  # hand-written components, collision-checked
+  webhooks { |version| Webhooks.openapi(version) }
+
   finalize { |document, version| document["info"]["x-build-date"] = Date.current.iso8601 }
 end
 
@@ -401,6 +404,7 @@ end
 | `custom_field_types` | `{}`; verquest-shaped custom types (see below) |
 | `default_additional_properties` | `false` |
 | `unknown_expand` | `:raise` (or `:ignore`) |
+| `field_order` | `:declaration` (or `:alphabetical`: identifier fields first, then by key, like blueprinter's `sort_fields_by :name_asc`) |
 
 Plans and schemas are cached. Change settings at boot, or call `Versponse.reset_caches!` after changing them.
 

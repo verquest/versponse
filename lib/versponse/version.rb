@@ -110,11 +110,7 @@ module Versponse
     # @raise [Versponse::ViewNotFoundError] for an unknown view
     # @raise [Versponse::DefinitionError] for :collapsed without an identifier
     def properties_for(view_name)
-      view_name = view_name.to_sym
-      return properties.values if view_name == :default
-      return collapsed_properties if view_name == :collapsed
-
-      fetch_view(view_name).resolve(self)
+      FieldOrder.call(declared_properties_for(view_name.to_sym), identifiers: identifiers.keys)
     end
 
     # @param view_name [Symbol, String] declared view name
@@ -132,6 +128,13 @@ module Versponse
     end
 
     private
+
+    def declared_properties_for(view_name)
+      return properties.values if view_name == :default
+      return collapsed_properties if view_name == :collapsed
+
+      fetch_view(view_name).resolve(self)
+    end
 
     def collapsed_properties
       raise DefinitionError, "#{label} has no identifier, so it has no collapsed view" unless identifiers?

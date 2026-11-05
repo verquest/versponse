@@ -15,12 +15,16 @@ class OpenapiDocumentTest < Minitest::Test
     end
     security [{"OAuth2" => []}]
     finalize { |document, version| document["x-built-for"] = version }
+    schema "Error", {type: "object", properties: {message: {type: "string"}}}
+    schema("VersionedError") { |version| {"type" => "object", "description" => "Error in #{version}"} }
+    webhooks { |version| {"site.created" => {"post" => {"summary" => "Site created (#{version})"}}} }
   end
 
   class SubDocument < ApiDocument
     document_name "sub"
     info "title" => "Sub API"
     tag "Extra"
+    webhooks "site.deleted" => {"post" => {"summary" => "Site deleted"}}
   end
 
   def build(document = ApiDocument, version: "2025-09") = document.build(version:)
@@ -65,6 +69,26 @@ class OpenapiDocumentTest < Minitest::Test
 
     assert_equal %w[openapi info paths components], document.keys
     assert_equal({"schemas" => {}}, document["components"])
+  end
+
+  def test_hand_written_schemas
+    schemas = build(version: "preview")["components"]["schemas"]
+
+    assert_equal({"type" => "object", "properties" => {"message" => {"type" => "string"}}}, schemas["Error"])
+    assert_equal "Error in preview", schemas["VersionedError"]["description"]
+  end
+
+  def test_webhooks_follow_paths
+    document = build
+
+    assert_equal %w[paths webhooks components], document.keys.drop_while { |key| key != "paths" }.first(3)
+    assert_equal "Site created (2025-09)", document["webhooks"]["site.created"]["post"]["summary"]
+    assert_equal ["site.deleted"], build(SubDocument)["webhooks"].keys
+  end
+
+  def test_schema_and_webhooks_need_a_value
+    assert_raises(Versponse::DefinitionError) { Class.new(Versponse::OpenAPI::Document) { schema "Error" } }
+    assert_raises(Versponse::DefinitionError) { Class.new(Versponse::OpenAPI::Document) { webhooks } }
   end
 
   def test_info_needs_a_value
