@@ -152,13 +152,18 @@ module Versponse
         return schema unless nullable?
         return schema.merge("nullable" => true) if nullable_keyword?(context)
 
-        schema.merge("type" => [schema["type"], "null"])
+        schema.merge("type" => [*schema["type"], "null"])
       end
 
       # OpenAPI 3.0's `nullable` is not honoured next to allOf/enum/oneOf by validators,
       # so validation schemas always use the 3.1 forms
       def nullable_keyword?(context)
         Versponse.configuration.nullable_keyword? && !context&.validation?
+      end
+
+      # OpenAPI 3.0 documents (where nullable_keyword? holds) have no type arrays, so a union becomes an anyOf
+      def openapi30_union?(type, context)
+        type.is_a?(::Array) && nullable_keyword?(context)
       end
 
       def nullable_ref(schema, context)

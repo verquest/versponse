@@ -6,10 +6,10 @@ module Versponse
     #
     # @api private
     class Field < Base
-      # @param type [Symbol, String] a built-in type ({FieldType::BUILT_IN}; "object" is a free-form map whose
-      #   value passes through) or a custom one from config.custom_field_types
+      # @param type [Symbol, String, Array<Symbol, String>] a built-in type ({FieldType::BUILT_IN}; "object" is a free-form map whose
+      #   value passes through), a custom one from config.custom_field_types, or a union of two or more built-in types
       # @param options [Hash] see {Base#initialize}; they win over the custom type's schema options
-      # @raise [Versponse::DefinitionError] for an unknown type
+      # @raise [Versponse::DefinitionError] for an unknown type or an invalid union
       def initialize(type:, **options)
         super(**options)
         @type, type_options = FieldType.resolve(type, key)
@@ -17,9 +17,13 @@ module Versponse
       end
 
       # @param context [Versponse::SchemaContext, nil] schema generation context
-      # @return [Hash] JSON Schema of the field
+      # @return [Hash] JSON Schema of the field; a type union is a type array, or an anyOf of single types in
+      #   OpenAPI 3.0 documents, with keywords and nullable on the outer node. nullable: never changes a
+      #   declared any_of, so a nullable field's any_of must list {"type" => "null"} itself.
       def schema(context)
-        nullable_type({"type" => @type}.merge(schema_options), context)
+        return nullable_type({"type" => @type}.merge(schema_options), context) unless openapi30_union?(@type, context)
+
+        nullable_type(FieldType.openapi30_union(@type, schema_options), context)
       end
 
       # @param version [String] unused by scalars

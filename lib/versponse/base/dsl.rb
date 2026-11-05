@@ -72,7 +72,7 @@ module Versponse
     # Declares a scalar field
     #
     # @param name [Symbol] output key
-    # @param type [Symbol] string, number, integer or boolean
+    # @param type [Symbol, Array<Symbol>] string, number, integer, boolean, object, a custom type, or a union like [:integer, :string]
     # @param options [Hash] map:, nullable:, if:, unless:, JSON Schema keywords
     # @yieldparam object [Object] serialized object
     # @yieldparam context [Hash] serialize context
@@ -123,7 +123,7 @@ module Versponse
     # Declares an array of scalars
     #
     # @param name [Symbol] output key
-    # @param type [Symbol] item type
+    # @param type [Symbol, Array<Symbol>] item type, or a union like [:integer, :string]
     # @param item_schema_options [Hash] JSON Schema keywords of each item
     # @param options [Hash] see {#field}
     # @return [void]

@@ -21,11 +21,13 @@ module Versponse
       DeepFreeze.call({"type" => definition[:type].to_s, "schema_options" => Naming.camelize_keys(options)})
     end
 
-    # @param type [Symbol, String] built-in or custom type name
+    # @param type [Symbol, String, Array<Symbol, String>] built-in or custom type name, or a union of built-in types
     # @param key [String] property key, for the error message
-    # @return [Array(String, Hash)] the base type and the custom type's schema options
-    # @raise [Versponse::DefinitionError] for an unknown type
+    # @return [Array(String, Hash), Array(Array<String>, Hash)] the base type (or the union's types) and the custom type's schema options
+    # @raise [Versponse::DefinitionError] for an unknown type or an invalid union
     def self.resolve(type, key)
+      return [union(type, key), {}] if type.is_a?(Array)
+
       type = type.to_s
       return [type, {}] if BUILT_IN.include?(type)
 
@@ -33,6 +35,33 @@ module Versponse
         raise DefinitionError, "#{key}: type must be one of #{names.join(", ")}"
       end
       custom.values_at("type", "schema_options")
+    end
+
+    # Null comes from nullable:, and custom types can't take part, because their schema options would apply to every type
+    #
+    # @param types [Array<Symbol, String>] two or more distinct built-in types
+    # @param key [String] property key, for the error message
+    # @return [Array<String>] frozen type names in declaration order, without duplicates
+    # @raise [Versponse::DefinitionError] for fewer than two distinct types, or a type that isn't built in
+    def self.union(types, key)
+      names = types.map(&:to_s).uniq
+      invalid = names - BUILT_IN
+      raise DefinitionError, "#{key}: type unions take only built-in types (#{BUILT_IN.join(", ")}), not #{invalid.join(", ")}" unless invalid.empty?
+      raise DefinitionError, "#{key}: a type union needs at least two distinct types" if names.size < 2
+
+      names.freeze
+    end
+
+    # The union's anyOf and a declared anyOf can't share the anyOf key, so both go under allOf
+    #
+    # @param types [Array<String>] union types
+    # @param options [Hash{String => Object}] the property's (or its items') schema keywords
+    # @return [Hash] OpenAPI 3.0 schema: an anyOf of single types with the keywords alongside
+    def self.openapi30_union(types, options)
+      union = {"anyOf" => types.map { |type| {"type" => type} }}
+      return union.merge(options) unless options.key?("anyOf")
+
+      {"allOf" => [union, {"anyOf" => options["anyOf"]}]}.merge(options.except("anyOf"))
     end
 
     # @return [Array<String>] built-in and custom type names

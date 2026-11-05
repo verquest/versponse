@@ -16,6 +16,7 @@ class ValidatorDifferentialTest < Minitest::Test
     {"notice_period" => 1}, {"notice_period" => 0}, {"notice_period" => "send_immediately"}, {"notice_period" => nil},
     {"notice_period" => "x"}, (1..21).to_h { |index| ["k#{index}", "v"] }
   ].freeze
+  UNION_VALUES = [1, 0, 1.0, 1.5, "x", "other", "now", "2025-09-01T12:30:00Z", "send_immediately", nil, true, [], {}].freeze
 
   def cases
     [
@@ -84,5 +85,23 @@ class ValidatorDifferentialTest < Minitest::Test
     end
 
     assert_empty found
+  end
+
+  def test_checker_agrees_on_type_unions
+    klass = Class.new(Versponse::Base) do
+      version("2025-09") do
+        field :notice_period, type: %i[integer string], nullable: true
+        field :starts_at, type: %i[string integer], format: "date-time"
+        field :stora_notice_period, type: %i[integer string], nullable: true,
+          any_of: [{"type" => "integer"}, {"enum" => ["send_immediately"]}, {"type" => "null"}]
+        array :sizes, type: %i[integer string]
+      end
+    end
+    base = {"notice_period" => 1, "starts_at" => 5, "stora_notice_period" => 5, "sizes" => [1]}
+    keys = %w[notice_period starts_at stora_notice_period]
+    payloads = UNION_VALUES.flat_map { |value| keys.map { |key| base.merge(key => value) } + [base.merge("sizes" => [value])] }
+
+    refute_nil klass.checker(version: "2025-09", view: :default)
+    assert_empty disagreements(klass, "2025-09", :default, payloads)
   end
 end

@@ -21,6 +21,15 @@ class Versponse::Validator::CompilerTest < Minitest::Test
     assert_checks({"type" => "boolean"}, valid: [true, false], invalid: [0, nil])
   end
 
+  def test_type_unions
+    assert_checks({"type" => %w[integer string null]}, valid: [1, 1.0, "x", nil], invalid: [1.5, true, [], {}])
+    assert_checks({"type" => %w[string integer], "format" => "date-time"}, valid: ["2025-09-01T12:30:00Z", 5], invalid: ["now", 1.5])
+    assert_checks(
+      {"type" => %w[integer string null], "anyOf" => [{"type" => "integer"}, {"enum" => ["send_immediately"]}, {"type" => "null"}]},
+      valid: [5, "send_immediately", nil], invalid: ["other", 1.5, true]
+    )
+  end
+
   def test_objects
     schema = {"type" => "object", "required" => ["a"], "properties" => {"a" => {"type" => "string"}}, "additionalProperties" => false}
 
