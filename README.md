@@ -22,6 +22,7 @@ Sponsored by [Stora](https://stora.co)
 - [Views](#views)
 - [Expansion](#expansion)
 - [Schemas](#schemas)
+- [OpenAPI documents and rswag](#openapi-documents-and-rswag)
 - [Output validation](#output-validation)
 - [Sharing references with verquest](#sharing-references-with-verquest)
 - [Formats and validation notes](#formats-and-validation-notes)
@@ -294,6 +295,42 @@ PriceListResponse.to_schema(version: "2025-09")
 
 ```ruby
 components: {schemas: Versponse.components(version: "2025-09")}
+```
+
+## OpenAPI documents and rswag
+
+Declare a whole OpenAPI document in Ruby. Response components (views and collapsed shapes included), verquest request components and named wrappers are collected for each version:
+
+```ruby
+class PublicApiDocument < Versponse::OpenAPI::Document
+  document_name "public_api"
+  versions "2025-09", "preview"
+  info "title" => "Public API", "termsOfService" => "https://example.com/terms"
+  external_docs { |version| {"url" => "https://docs.example.com/#{version}/"} }
+  server "https://api.example.com", description: "Production"
+  tag "Contacts", description: "People who rent storage"
+  security_scheme("OAuth2") { {"type" => "oauth2", "flows" => {...}} }   # blocks run at build time
+
+  responses namespace: "PublicApi"
+  requests namespace: "PublicApi"              # verquest body requests
+  wrapper :contact_list, PublicApi::ContactResponse, root: "contacts", collection: true, meta: PublicApi::MetaResponse
+
+  finalize { |document, version| document["info"]["x-build-date"] = Date.current.iso8601 }
+end
+
+PublicApiDocument.build(version: "2025-09")      # => String-keyed Hash
+PublicApiDocument.validate(version: "2025-09")   # => [] when valid OpenAPI 3.1
+```
+
+- Values use OpenAPI's own key names, which are never camelized. A block that takes an argument receives the version.
+- Subclasses inherit declarations, which is handy for sharing a base between documents.
+- Two components with the same name raise `Versponse::DefinitionError`.
+
+In rswag's `swagger_helper.rb`:
+
+```ruby
+config.openapi_specs = Versponse::OpenAPI.rswag_specs(PublicApiDocument)
+# keys: "public_api/2025-09.json", "public_api/preview.json"
 ```
 
 ## Output validation

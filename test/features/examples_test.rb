@@ -133,4 +133,18 @@ class ExamplesTest < Minitest::Test
 
     assert_equal({"object" => "tenancy", "id" => "t1"}, Examples::TaskResponse.serialize(task, version: "2025-09", expand: ["resource"])["resource"])
   end
+
+  def test_public_api_document_is_valid_openapi
+    %w[2025-09 2026-03].each do |version|
+      assert_empty Examples::PublicApiDocument.validate(version:), "document #{version}"
+    end
+  end
+
+  def test_public_api_document_components
+    schemas = Examples::PublicApiDocument.build(version: "2025-09")["components"]["schemas"]
+
+    assert_includes schemas.keys, "UnitTypeResponse"
+    assert_includes schemas.keys, "SiteResponseCollapsed"
+    assert_equal %w[unit_types meta], schemas["unit_type_list"]["required"]
+  end
 end

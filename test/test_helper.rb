@@ -21,5 +21,5 @@ Versponse.configuration.validate_output = true
 
 %w[
   models money_response site_response price_response unit_type_response
-  orders task_response activity_feed_response category_response meta_response
+  orders task_response activity_feed_response category_response meta_response public_api_document
 ].each { |file| require_relative "support/examples/#{file}" }
