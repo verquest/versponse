@@ -61,7 +61,7 @@ class NestedTest < Minitest::Test
   def test_extraction_errors_include_nested_keys
     error = assert_raises(Versponse::ExtractionError) { serialize(unit_type(features: [Struct.new(:name).new("Dry")])) }
 
-    assert_match(/\.features\.highlighted: /, error.message)
+    assert_match(/\.features\.0\.highlighted: /, error.message)
   end
 
   def test_definition_errors
@@ -86,5 +86,12 @@ class NestedTest < Minitest::Test
     assert_raises(Versponse::DefinitionError) do
       Class.new(Versponse::Base).class_exec(only_ref) { |item| version("2025-09") { collection :a, item: } }
     end
+  end
+
+  def test_extraction_errors_name_the_item_index
+    broken = Struct.new(:name).new("Wet")
+    error = assert_raises(Versponse::ExtractionError) { serialize(unit_type(features: [Feature.new("Dry", true), broken])) }
+
+    assert_match(/\.features\.1\.highlighted: /, error.message)
   end
 end

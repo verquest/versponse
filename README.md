@@ -116,7 +116,7 @@ Options shared by every property:
 
 `required` is computed for you: every property without `if:`/`unless:` is always emitted, so it's required.
 
-`one_of` picks a variant with `match:` (a class, a lambda or an array of them, compared with `===`) and can compute its value with `source`:
+`one_of` picks a variant with `match:` (a class, a lambda or an array of them, compared with `===`):
 
 ```ruby
 one_of :creator, discriminator: "object" do
@@ -125,6 +125,31 @@ one_of :creator, discriminator: "object" do
   reference from: CustomerResponse, match: Customer
 end
 ```
+
+`source { |object, context| }` computes the value of an inline `object`, an inline `collection` or a `one_of`, and can't be combined with `map:`. A `collection` with `item:` takes its computed value from its block instead, so `source` doesn't apply there.
+
+### Polymorphic collections
+
+An unnamed `one_of` inside a `collection` block types each item separately:
+
+```ruby
+collection :activity do
+  one_of discriminator: "object" do
+    reference from: OrderResponse, view: :embedded, match: Order
+    reference from: TenancyResponse, view: :embedded, match: Tenancy
+  end
+end
+```
+
+An item that matches no variant raises `Versponse::ExtractionError` with its index (`...activity.3: no one_of variant matches Note`), and `nullable: true` on the item `one_of` allows `nil` items.
+
+### Reusing a property
+
+```ruby
+reference :billing_address, from: ContactResponse, property: :address, map: "billing"
+```
+
+This renders as if `ContactResponse`'s `address` were declared here. A `map:` or block on the reference overrides the source. The referenced property's `if:`/`unless:` don't carry over, and `nullable:` comes from the referenced property.
 
 ## Versions
 
@@ -226,6 +251,7 @@ PriceListResponse.to_schema(version: "2025-09")
 - `to_validation_schema(version:, view:, property: nil)` inlines every reference. A class that recurses into itself gets an `$anchor`.
 - `component_name(view:)` is the class name without its first namespace, squashed, plus the view: `PriceListResponse`, `PriceListResponseEmbedded` (`Api::V1::UserResponse` becomes `V1UserResponse`). Override `self.base_component_name` to rename, for example `def self.base_component_name = super.delete_suffix("Response")`.
 - `to_ref(view:, property: nil)` returns `"#/components/schemas/<name>"`.
+- With `discriminator:`, `one_of` emits an OpenAPI `mapping` built from each variant's `const`, such as `{"order" => "#/components/schemas/OrderResponse"}`. A variant without that `const`, or two variants with the same value, raise `DefinitionError` when the schema is built.
 - `to_schema(root: "unit_types", meta: MetaResponse, collection: true)` returns a wrapper schema for the whole response body.
 
 `Versponse.components(version:)` returns every component of every loaded class and view for an OpenAPI document. In rswag's `swagger_helper.rb`:

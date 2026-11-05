@@ -16,6 +16,11 @@ module Versponse
         @constant = value.frozen? ? value : value.dup.freeze
       end
 
+      # @return [Object] the frozen constant value
+      def value
+        @constant
+      end
+
       # @param _context [Versponse::SchemaContext] unused
       # @return [Hash] const schema, or a one-value enum for OpenAPI 3.0
       def schema(_context)

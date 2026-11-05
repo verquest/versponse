@@ -2,7 +2,7 @@
 
 module Versponse
   module Steps
-    # Renders a value with the plan of the first variant whose matcher === the value
+    # Renders a value with the plan of the variant its dispatcher picks
     #
     # @api private
     class OneOf
@@ -12,12 +12,12 @@ module Versponse
       # @param key [String] output key
       # @param extractor [#call] value reader
       # @param condition [Versponse::Condition, nil] if:/unless:
-      # @param variants [Array<Array(Array<#===>, Versponse::LazyPlan)>] matchers and plan pairs
-      def initialize(key:, extractor:, condition:, variants:)
+      # @param dispatcher [Versponse::VariantDispatcher] variant matching
+      def initialize(key:, extractor:, condition:, dispatcher:)
         @key = key
         @extractor = extractor
         @condition = condition
-        @variants = variants
+        @dispatcher = dispatcher
         freeze
       end
 
@@ -31,14 +31,7 @@ module Versponse
         return if @condition && !@condition.call(object, context)
 
         value = @extractor.call(object, hash, context)
-        output[@key] = value.nil? ? nil : plan_for(value).call(value, context)
-      end
-
-      private
-
-      def plan_for(value)
-        @variants.each { |matchers, plan| return plan if matchers.any? { |matcher| matcher === value } }
-        raise KeyError, "no one_of variant matches #{value.class}"
+        output[@key] = value.nil? ? nil : @dispatcher.call(value, context)
       end
     end
   end

@@ -43,13 +43,13 @@ module Versponse
       @current_scope = nil
     end
 
-    # Computes the value of the enclosing one_of
+    # Computes the value of the enclosing inline object, inline collection or one_of
     #
     # @yieldparam object [Object] serialized object
     # @yieldparam context [Hash] serialize context
     # @return [void]
     def source(&block)
-      raise DefinitionError, "source can only be used inside one_of" unless @current_scope.is_a?(Properties::OneOf)
+      raise DefinitionError, "source can only be used inside object, collection or one_of" unless @current_scope.is_a?(Properties::Base)
 
       @current_scope.source = block
     end
@@ -138,17 +138,20 @@ module Versponse
       raise DefinitionError, "reference needs a name outside one_of" if name.nil?
       raise DefinitionError, "#{name}: match: is only used for one_of variants" if match
 
-      add_property(Properties::Reference, name:, from:, view:, property:, block:, **options)
+      ignore_defaults = (property && References.versponse?(from)) ? %i[nullable] : []
+      add_property(Properties::Reference, name:, from:, view:, property:, block:, ignore_defaults:, **options)
     end
 
-    # Declares a polymorphic value; the block declares variants with reference from:, match:
+    # Declares a polymorphic value; the block declares variants with reference from:, match:.
+    # Without a name, inside a collection block, it types each item of the collection.
     #
-    # @param name [Symbol] output key
+    # @param name [Symbol, nil] output key; nil for the item one_of of a collection
     # @param discriminator [String, Symbol, nil] OpenAPI discriminator property
-    # @param options [Hash] see {#field}
+    # @param options [Hash] see {#field}; an item one_of takes only nullable: and schema keywords
     # @return [void]
-    def one_of(name, discriminator: nil, **options, &block)
-      raise DefinitionError, "one_of #{name} needs a block declaring its variants" unless block
+    def one_of(name = nil, discriminator: nil, **options, &block)
+      raise DefinitionError, "#{"one_of #{name}".strip} needs a block declaring its variants" unless block
+      return item_one_of(discriminator:, **options, &block) if name.nil?
 
       property = add_property(Properties::OneOf, name:, discriminator:, **options)
       nested(property, &block)
@@ -233,6 +236,17 @@ module Versponse
       raise DefinitionError, "one_of variants take no name, options or block (use source inside one_of)" if name || extra
 
       @current_scope.add_variant(from:, match:, view:)
+    end
+
+    def item_one_of(discriminator:, **options, &block)
+      collection = @current_scope
+      raise DefinitionError, "one_of without a name is only allowed inside a collection block" unless collection.is_a?(Properties::Collection)
+      raise DefinitionError, "#{collection.key}: the item one_of takes no map:, if: or unless:" if options.key?(:map) || options.key?(:if) || options.key?(:unless)
+
+      property = Properties::ItemOneOf.new(name: collection.key, discriminator:, **options)
+      collection.items_one_of = property
+      nested(property, &block)
+      raise DefinitionError, "#{collection.key}: one_of needs at least one variant" unless property.variants?
     end
 
     def add_property(klass, ignore_defaults: [], **options)

@@ -163,9 +163,10 @@ class ReferenceTest < Minitest::Test
   end
 
   def test_definition_errors
-    assert_raises(Versponse::DefinitionError) do
-      Class.new(Versponse::Base) { version("2025-09") { reference :amount, from: MoneyResponse, property: :amount } }
+    error = assert_raises(Versponse::DefinitionError) do
+      Class.new(Versponse::Base) { version("2025-09") { reference :amount, from: MoneyResponse, property: :amount, nullable: true } }
     end
+    assert_match(/nullable comes from the referenced property/, error.message)
     assert_raises(Versponse::DefinitionError) do
       Class.new(Versponse::Base) { version("2025-09") { reference :amount, from: String } }
     end

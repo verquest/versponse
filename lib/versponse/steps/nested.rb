@@ -28,6 +28,7 @@ module Versponse
       # @param context [Hash] serialize context
       # @param output [Hash] Hash being built
       # @return [void]
+      # @raise [Versponse::ExtractionError] with the item index in its keys when a collection item fails
       def call(object, hash, context, output)
         return if @condition && !@condition.call(object, context)
 
@@ -35,10 +36,25 @@ module Versponse
         output[@key] = if value.nil?
           nil
         elsif @collection
-          value.to_ary.map { |item| @plan.call(item, context) }
+          render_items(value.to_ary, context)
         else
           @plan.call(value, context)
         end
+      end
+
+      private
+
+      def render_items(items, context)
+        index = 0
+        items.map do |item|
+          rendered = @plan.call(item, context)
+          index += 1
+          rendered
+        end
+      rescue ExtractionError => e
+        raise ExtractionError.new(label: e.label, keys: [index.to_s, *e.keys], detail: e.detail)
+      rescue NoMethodError, KeyError => e
+        raise ExtractionError.new(label: "", keys: [index.to_s], detail: e.message)
       end
     end
   end

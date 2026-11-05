@@ -61,7 +61,10 @@ class OneOfTest < Minitest::Test
         {"$ref" => "#/components/schemas/TenancyResponse"},
         {"type" => "null"}
       ],
-      "discriminator" => {"propertyName" => "object"}
+      "discriminator" => {
+        "propertyName" => "object",
+        "mapping" => {"order" => "#/components/schemas/OrderResponse", "tenancy" => "#/components/schemas/TenancyResponse"}
+      }
     }
 
     assert_equal expected, TaskResponse.to_schema(version: "2025-09")["properties"]["resource"]

@@ -9,4 +9,5 @@ module Examples
   Tenancy = Struct.new(:id, :order)
   Task = Struct.new(:id, :title, :resource)
   Category = Struct.new(:name, :children)
+  Feed = Struct.new(:id, :activity, :site)
 end

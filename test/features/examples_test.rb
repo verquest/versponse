@@ -6,7 +6,7 @@ require "json_schemer"
 class ExamplesTest < Minitest::Test
   CLASSES = [
     Examples::MoneyResponse, Examples::SiteResponse, Examples::PriceResponse, Examples::UnitTypeResponse,
-    Examples::OrderResponse, Examples::TenancyResponse, Examples::TaskResponse, Examples::CategoryResponse,
+    Examples::OrderResponse, Examples::TenancyResponse, Examples::TaskResponse, Examples::ActivityFeedResponse, Examples::CategoryResponse,
     Examples::MetaResponse
   ].freeze
 
@@ -97,5 +97,25 @@ class ExamplesTest < Minitest::Test
     tree = Examples::Category.new(name: "Root", children: [Examples::Category.new(name: "Leaf", children: [])])
 
     assert_equal "Leaf", Examples::CategoryResponse.serialize(tree, version: "2025-09")["children"].first["name"]
+  end
+
+  def test_activity_feed
+    tenancy = order_with_tenancy.tenancy
+    site = Examples::Site.new(public_id: "site_1", name: "Leeds", city: "Leeds", postcode: "LS1")
+    feed = Examples::Feed.new(id: "feed_1", activity: [tenancy.order, tenancy], site:)
+    expected = {
+      "id" => "feed_1",
+      "site_address" => {"city" => "Leeds", "postcode" => "LS1"},
+      "activity" => [{"object" => "order", "id" => "o1"}, {"object" => "tenancy", "id" => "t1"}]
+    }
+
+    assert_equal expected, Examples::ActivityFeedResponse.serialize(feed, version: "2025-09")
+  end
+
+  def test_activity_feed_mapping
+    discriminator = Examples::ActivityFeedResponse.to_schema(version: "2025-09")["properties"]["activity"]["items"]["discriminator"]
+    expected = {"order" => "#/components/schemas/OrderResponseEmbedded", "tenancy" => "#/components/schemas/TenancyResponseEmbedded"}
+
+    assert_equal expected, discriminator["mapping"]
   end
 end
