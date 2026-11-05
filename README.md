@@ -396,10 +396,35 @@ end
 | `json_schema_version` | `:openapi31` (also `:openapi30`, `:draft2020_12`, `:draft2019_09`, `:draft7`) |
 | `validate_output` | `false` |
 | `formatters` | `date-time` and `date`, keyed by JSON Schema format |
+| `custom_field_types` | `{}`; verquest-shaped custom types (see below) |
 | `default_additional_properties` | `false` |
 | `unknown_expand` | `:raise` (or `:ignore`) |
 
 Plans and schemas are cached. Change settings at boot, or call `Versponse.reset_caches!` after changing them.
+
+### Custom field types
+
+Custom types use verquest's shape, so one Hash can configure both gems:
+
+```ruby
+FIELD_TYPES = {
+  email: {type: "string", schema_options: {format: "email"}},
+  site_id: {type: "string", schema_options: {pattern: "^site_"}},
+  metadata: {type: "object", schema_options: {additionalProperties: {"type" => "string"}, maxProperties: 20}}
+}.freeze
+
+Verquest.configure { |config| config.custom_field_types = FIELD_TYPES }
+Versponse.configure { |config| config.custom_field_types = FIELD_TYPES }
+
+field :id, type: :site_id                 # {"type" => "string", "pattern" => "^site_"}
+array :site_ids, type: :site_id           # items use the custom schema
+field :email, type: :email, description: "Contact email"   # field options win on conflict
+```
+
+- `type` must be a built-in type, and a custom name can't replace a built-in one.
+- `required:` is ignored, because it only means something for requests.
+- A custom type with a `format` gets that format's formatter, so `type: :datetime` with `format: "date-time"` renders Times as ISO 8601.
+- Types resolve when a field is defined, so set them in an initializer before response classes load.
 
 ## Rails
 

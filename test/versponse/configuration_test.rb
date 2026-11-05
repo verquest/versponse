@@ -16,6 +16,16 @@ class Versponse::ConfigurationTest < Minitest::Test
     assert_equal %w[date-time date], @config.formatters.keys
   end
 
+  def test_custom_field_types
+    assert_empty @config.custom_field_types
+
+    @config.custom_field_types = {email: {type: :string, schema_options: {format: "email"}}}
+
+    assert_equal({"email" => {"type" => "string", "schema_options" => {"format" => "email"}}}, @config.custom_field_types)
+    assert_predicate @config.custom_field_types, :frozen?
+    assert_raises(ArgumentError) { @config.custom_field_types = [:email] }
+  end
+
   def test_default_json_generator
     assert_equal '{"a":1}', @config.json_generator.call({"a" => 1})
   end

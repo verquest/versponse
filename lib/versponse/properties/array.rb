@@ -6,16 +6,14 @@ module Versponse
     #
     # @api private
     class Array < Base
-      # @param type [Symbol, String] item type, one of {Field::TYPES}
-      # @param item_schema_options [Hash] JSON Schema keywords of each item
+      # @param type [Symbol, String] item type, built-in ({FieldType::BUILT_IN}) or custom
+      # @param item_schema_options [Hash] JSON Schema keywords of each item; they win over the custom type's
       # @param options [Hash] see {Base#initialize}
       # @raise [Versponse::DefinitionError] for an unknown item type
       def initialize(type:, item_schema_options: {}, **options)
         super(**options)
-        @item_type = type.to_s
-        raise DefinitionError, "#{key}: type must be one of #{Field::TYPES.join(", ")}" unless Field::TYPES.include?(@item_type)
-
-        @item_schema_options = Naming.camelize_keys(item_schema_options)
+        @item_type, type_options = FieldType.resolve(type, key)
+        @item_schema_options = type_options.merge(Naming.camelize_keys(item_schema_options))
       end
 
       # @param context [Versponse::SchemaContext, nil] schema generation context

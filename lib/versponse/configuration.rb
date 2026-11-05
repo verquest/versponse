@@ -39,6 +39,8 @@ module Versponse
     attr_reader :json_schema_version
     # @return [Symbol] :raise (default) or :ignore for expand paths that match no expandable association
     attr_reader :unknown_expand
+    # @return [Hash{String => Hash}] custom field types, normalized by {FieldType.normalize} (default {})
+    attr_reader :custom_field_types
 
     # @return [Configuration] configuration with default settings
     def initialize
@@ -49,6 +51,7 @@ module Versponse
       @version_resolver = VersionResolver
       @json_generator = JSON.method(:generate)
       @formatters = Formatters::DEFAULTS
+      @custom_field_types = {}.freeze
     end
 
     # @param value [#call, nil] returns the current version, or nil to clear it
@@ -92,6 +95,16 @@ module Versponse
       raise ArgumentError, "formatters must be a Hash of callables" unless value.is_a?(Hash) && value.each_value.all? { |formatter| formatter.respond_to?(:call) }
 
       @formatters = value.transform_keys(&:to_s).freeze
+    end
+
+    # Types resolve when a field is defined, so set them before response classes load
+    #
+    # @param value [Hash{Symbol, String => Hash}] verquest-shaped types, e.g. {site_id: {type: "string", schema_options: {pattern: "^site_"}}}
+    # @raise [ArgumentError] when value is not a Hash or a type is invalid
+    def custom_field_types=(value)
+      raise ArgumentError, "custom_field_types must be a Hash" unless value.is_a?(Hash)
+
+      @custom_field_types = value.to_h { |name, definition| [name.to_s, FieldType.normalize(name, definition)] }.freeze
     end
 
     # @return [Boolean] true when nullable is written as `nullable: true` (OpenAPI 3.0)
