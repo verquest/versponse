@@ -16,6 +16,7 @@ class ValidatorDifferentialTest < Minitest::Test
     {"notice_period" => 1}, {"notice_period" => 0}, {"notice_period" => "send_immediately"}, {"notice_period" => nil},
     {"notice_period" => "x"}, (1..21).to_h { |index| ["k#{index}", "v"] }
   ].freeze
+  ENUM_VALUES = ["a", "b", "site_1", "site_2", "", 0, 1, 2, 1.0, 1.5, true, false, nil, [], {}, {"a" => 1}].freeze
   UNION_VALUES = [1, 0, 1.0, 1.5, "x", "other", "now", "2025-09-01T12:30:00Z", "send_immediately", nil, true, [], {}].freeze
 
   def cases
@@ -103,5 +104,30 @@ class ValidatorDifferentialTest < Minitest::Test
 
     refute_nil klass.checker(version: "2025-09", view: :default)
     assert_empty disagreements(klass, "2025-09", :default, payloads)
+  end
+
+  def test_checker_agrees_on_typed_enums
+    found = with_configuration(custom_field_types: STORA_FIELD_TYPES) do
+      klass = Class.new(Versponse::Base) do
+        version("2025-09") do
+          enum :string, type: :string, values: %w[a b]
+          enum :nullable_string, type: :string, values: %w[a], nullable: true
+          enum :integer, type: :integer, values: [1, 2]
+          enum :number, type: :number, values: [1, 1.5]
+          enum :boolean, type: :boolean, values: [true]
+          enum :object, type: :object, values: [{"a" => 1}]
+          enum :union, type: %i[integer string], values: [1, "a"], nullable: true
+          enum :custom, type: :site_id, values: %w[site_1]
+        end
+      end
+      base = {"string" => "a", "nullable_string" => nil, "integer" => 1, "number" => 1.5, "boolean" => true,
+              "object" => {"a" => 1}, "union" => 1, "custom" => "site_1"}
+      payloads = ENUM_VALUES.flat_map { |value| base.keys.map { |key| base.merge(key => value) } }
+
+      refute_nil klass.checker(version: "2025-09", view: :default)
+      disagreements(klass, "2025-09", :default, [base] + payloads)
+    end
+
+    assert_empty found
   end
 end

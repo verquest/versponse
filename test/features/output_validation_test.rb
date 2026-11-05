@@ -45,7 +45,7 @@ class OutputValidationTest < Minitest::Test
   class NullableResponse < Versponse::Base
     version "2025-09" do
       reference :strict, from: StrictResponse, nullable: true
-      enum :status, values: %w[on off], nullable: true
+      enum :status, type: :string, values: %w[on off], nullable: true
       one_of :either, nullable: true do
         reference from: StrictResponse, match: Hash
       end

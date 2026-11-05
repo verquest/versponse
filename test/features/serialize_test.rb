@@ -12,7 +12,7 @@ class SerializeTest < Minitest::Test
       field :id, type: :string, map: "public_id"
       field :name, type: :string
       field :stripe_product_id, type: :string, map: "billing_id", nullable: true
-      enum :status, values: %w[active archived]
+      enum :status, type: :string, values: %w[active archived]
       array :selling_points, type: :string
       field :created_at, type: :string, format: "date-time"
       field :secret, type: :string, nullable: true do |unit_type, context|

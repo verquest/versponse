@@ -37,18 +37,75 @@ class Versponse::Properties::ScalarsTest < Minitest::Test
   end
 
   def test_enum
-    enum = Versponse::Properties::Enum.new(name: :status, values: %w[active archived])
-    nullable = Versponse::Properties::Enum.new(name: :status, values: %w[active], nullable: true)
+    enum = Versponse::Properties::Enum.new(name: :status, type: :string, values: %w[active archived])
+    nullable = Versponse::Properties::Enum.new(name: :status, type: :string, values: %w[active], nullable: true)
 
-    assert_equal({"enum" => %w[active archived]}, enum.schema(nil))
-    assert_equal({"enum" => ["active", nil]}, nullable.schema(nil))
+    assert_equal({"type" => "string", "enum" => %w[active archived]}, enum.schema(nil))
+    assert_equal({"type" => %w[string null], "enum" => ["active", nil]}, nullable.schema(nil))
     with_configuration(json_schema_version: :openapi30) do
-      assert_equal({"enum" => %w[active], "nullable" => true}, nullable.schema(nil))
+      assert_equal({"type" => "string", "enum" => %w[active], "nullable" => true}, nullable.schema(nil))
     end
   end
 
+  def test_enum_keeps_schema_keywords
+    enum = Versponse::Properties::Enum.new(name: :status, type: :string, values: %w[a], description: "State")
+
+    assert_equal({"type" => "string", "enum" => %w[a], "description" => "State"}, enum.schema(nil))
+  end
+
   def test_enum_requires_values
-    assert_raises(Versponse::DefinitionError) { Versponse::Properties::Enum.new(name: :status, values: []) }
+    assert_raises(Versponse::DefinitionError) { Versponse::Properties::Enum.new(name: :status, type: :string, values: []) }
+  end
+
+  def test_enum_requires_a_type
+    error = assert_raises(Versponse::DefinitionError) { Versponse::Properties::Enum.new(name: :status, values: %w[a]) }
+
+    assert_equal "status: enum needs type: (one of string, number, integer, boolean, object, a custom type or a union)", error.message
+    assert_raises(Versponse::DefinitionError) { Versponse::Properties::Enum.new(name: :status, type: nil, values: %w[a]) }
+    assert_raises(Versponse::DefinitionError) { Versponse::Properties::Enum.new(name: :status, type: :text, values: %w[a]) }
+  end
+
+  def test_enum_values_must_match_the_type
+    error = assert_raises(Versponse::DefinitionError) do
+      Versponse::Properties::Enum.new(name: :level, type: :integer, values: [1, "2"])
+    end
+
+    assert_equal 'level: enum value "2" is not of type integer', error.message
+  end
+
+  def test_enum_rejects_values_of_another_type
+    [[:string, [:a]], [:integer, [1.5]], [:boolean, [true, "false"]], [:object, [[]]], [:string, ["a", nil]],
+      [%i[integer string], [1.5]]].each do |type, values|
+      assert_raises(Versponse::DefinitionError) { Versponse::Properties::Enum.new(name: :a, type:, values:) }
+    end
+  end
+
+  def test_enum_accepts_values_of_each_type
+    {integer: [1, 2], number: [1, 1.5], boolean: [true, false], object: [{"a" => 1}]}.each do |type, values|
+      enum = Versponse::Properties::Enum.new(name: :a, type:, values:)
+
+      assert_equal({"type" => type.to_s, "enum" => values}, enum.schema(nil))
+    end
+  end
+
+  def test_enum_type_union
+    enum = Versponse::Properties::Enum.new(name: :period, type: %i[integer string], values: [0, "now"], nullable: true)
+
+    assert_equal({"type" => %w[integer string null], "enum" => [0, "now", nil]}, enum.schema(nil))
+    with_configuration(json_schema_version: :openapi30) do
+      expected = {"anyOf" => [{"type" => "integer"}, {"type" => "string"}], "enum" => [0, "now"], "nullable" => true}
+
+      assert_equal(expected, enum.schema(nil))
+    end
+  end
+
+  def test_enum_takes_only_the_base_type_of_a_custom_type
+    with_configuration(custom_field_types: {site_id: {type: "string", schema_options: {pattern: "^site_"}}}) do
+      enum = Versponse::Properties::Enum.new(name: :site, type: :site_id, values: %w[site_1])
+
+      assert_equal({"type" => "string", "enum" => %w[site_1]}, enum.schema(nil))
+      assert_raises(Versponse::DefinitionError) { Versponse::Properties::Enum.new(name: :site, type: :site_id, values: [1]) }
+    end
   end
 
   def test_const
@@ -82,7 +139,7 @@ class Versponse::Properties::ScalarsTest < Minitest::Test
 
   def test_enum_accepts_falsy_values_and_does_not_freeze_the_callers_array
     values = [false, true]
-    Versponse::Properties::Enum.new(name: :flag, values:)
+    Versponse::Properties::Enum.new(name: :flag, type: :boolean, values:)
 
     refute_predicate values, :frozen?
   end
@@ -109,8 +166,8 @@ class Versponse::Properties::ScalarsTest < Minitest::Test
   end
 
   def test_nullable_enum_does_not_duplicate_nil
-    enum = Versponse::Properties::Enum.new(name: :status, values: ["a", nil], nullable: true)
+    enum = Versponse::Properties::Enum.new(name: :status, type: :string, values: ["a", nil], nullable: true)
 
-    assert_equal({"enum" => ["a", nil]}, enum.schema(nil))
+    assert_equal({"type" => %w[string null], "enum" => ["a", nil]}, enum.schema(nil))
   end
 end

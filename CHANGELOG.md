@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** `enum` requires `type:` and writes it next to `enum`, so `enum :status, type: :string, values: %w[a b]` renders `{"type" => "string", "enum" => ["a", "b"]}`. It takes built-in types, unions and custom types (only their base type), and falls back to `with_options type:`. Leaving it out, or a value that isn't of the type, raises `Versponse::DefinitionError`. `nullable: true` adds `"null"` to `type` and `nil` to the values, or writes `nullable: true` under OpenAPI 3.0.
+
 ### Added
 
 - Response DSL shared with verquest: `field`, `enum`, `const`, `array`, `object`, `collection`, `reference`, `one_of`, `with_options`.

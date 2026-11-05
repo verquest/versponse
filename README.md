@@ -47,7 +47,7 @@ class UnitTypeResponse < Versponse::Base
     field :id, type: :string, map: "public_id"
     field :name, type: :string
     field :stripe_product_id, type: :string, map: "billing_id", nullable: true
-    enum :status, values: %w[active archived]
+    enum :status, type: :string, values: %w[active archived]
     array :selling_points, type: :string
     field :created_at, type: :string, format: "date-time"
     reference :site, from: SiteResponse
@@ -94,7 +94,7 @@ UnitTypeResponse.serialize(unit_types, version: "2025-09", view: :embedded, root
 | Method | What it renders |
 |---|---|
 | `field` | A scalar: `string`, `number`, `integer`, `boolean`, `object` for a free-form map, or a union such as `[:integer, :string]` |
-| `enum` | A value from a fixed list (`values:`) |
+| `enum` | A value from a fixed list (`type:`, `values:`) |
 | `const` | A constant (`value:`) |
 | `array` | An array of scalars (`type:`, `item_schema_options:`) |
 | `object` | An inline object; its block declares the properties |
@@ -116,6 +116,13 @@ Options shared by every property:
 - `type:` on `field` and `array` takes a union of two or more built-in types. `field :notice_period, type: [:integer, :string], nullable: true` writes `"type": ["integer", "string", "null"]`, and under `json_schema_version = :openapi30` an `anyOf` of single types with `nullable: true`. `format:` and its formatter still apply.
 - A union can be narrowed with `any_of:`, as in `field :notice_period, type: [:integer, :string], nullable: true, any_of: [{"type" => "integer"}, {"enum" => ["send_immediately"]}, {"type" => "null"}]`. Under OpenAPI 3.0 the two `anyOf`s are combined with `allOf`. `nullable:` adds `"null"` to `type` but never adds a null branch to your `any_of:`, so list `{"type" => "null"}` yourself when the field is nullable. Otherwise `nil` matches no alternative.
 - A user-supplied `any_of:` is written verbatim, in documents and validation schemas alike. `{"type" => "null"}` isn't valid OpenAPI 3.0, so under `:openapi30` it ends up in the document as is, but leaving it out makes `nil` fail output validation. For a nullable union under OpenAPI 3.0, `enum:` with `nil` in its values avoids the problem.
+- `enum` needs `type:`, like `field`: a built-in type, a union or a custom type, of which only the base type is used. Every value must be of that type, or `enum` raises `Versponse::DefinitionError`. `with_options type:` applies too. `nullable: true` adds `"null"` to `type` and `nil` to the values, or writes `nullable: true` under OpenAPI 3.0:
+  ```ruby
+  enum :status, type: :string, values: %w[active archived], nullable: true
+  # => {"type" => ["string", "null"], "enum" => ["active", "archived", nil]}
+  enum :notice_period, type: [:integer, :string], values: [7, 30, "send_immediately"]
+  # => {"type" => ["integer", "string"], "enum" => [7, 30, "send_immediately"]}
+  ```
 - Other options are JSON Schema keywords in snake case, such as `description:`, `format:` or `max_length:`. They're written in camel case (`maxLength`).
 - `with_options type: :string, nullable: true do ... end` applies options to every property in the block. Explicit options win.
 

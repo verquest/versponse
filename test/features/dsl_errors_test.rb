@@ -44,6 +44,27 @@ class DslErrorsTest < Minitest::Test
     assert_equal({"a" => nil, "k" => "x"}, klass.serialize({a: nil}, version: "2025-09"))
   end
 
+  def test_enum_takes_type_from_with_options
+    klass = define do
+      version "2025-09" do
+        with_options type: :integer, nullable: true do
+          enum :level, values: [1, 2]
+          enum :status, type: :string, values: %w[a]
+        end
+      end
+    end
+    properties = klass.to_schema(version: "2025-09")["properties"]
+
+    assert_equal({"type" => %w[integer null], "enum" => [1, 2, nil]}, properties["level"])
+    assert_equal({"type" => %w[string null], "enum" => ["a", nil]}, properties["status"])
+  end
+
+  def test_enum_without_type
+    error = assert_raises(Versponse::DefinitionError) { define { version("2025-09") { enum :status, values: %w[a] } } }
+
+    assert_match "enum needs type:", error.message
+  end
+
   def test_class_level_options_must_come_before_versions
     assert_raises(Versponse::DefinitionError) do
       define do

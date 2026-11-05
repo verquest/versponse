@@ -103,11 +103,13 @@ module Versponse
     # Declares a value from a fixed list
     #
     # @param name [Symbol] output key
-    # @param values [Array] allowed values
+    # @param type [Symbol, Array<Symbol>, nil] type of the values, as for {#field} (with_options type:); required
+    # @param values [Array] allowed values, each of the type
     # @param options [Hash] see {#field}
     # @return [void]
-    def enum(name, values:, **options, &block)
-      add_property(Properties::Enum, name:, values:, block:, **options)
+    # @raise [Versponse::DefinitionError] without a type, or with a value that isn't of the type
+    def enum(name, values:, type: nil, **options, &block)
+      add_property(Properties::Enum, name:, values:, type: type || default_options[:type], block:, **options)
     end
 
     # Declares a constant
