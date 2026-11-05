@@ -29,3 +29,7 @@
 - `supported_versions min:, max:` limits the versions a class serves (both inclusive, both optional; `min` defaults to the first declared version). Resolving a version outside the range raises `Versponse::VersionNotFoundError`, so `Versponse.components` and OpenAPI documents leave the class and its wrappers out of that version, and `eager_load!` compiles only the versions the range serves. Only the requested version is checked, so `min: "preview"` can be served by an earlier block. `min` after `max`, or a `max` before the first declared version, raises `Versponse::DefinitionError`. Versions are compared with `config.version_resolver`, and subclasses inherit the range.
 - `identifier collapse_if:` renders an expandable association in full instead of collapsed when the condition is false for its value. A `collection item:` renders in full when it is false for any item; an expandable `one_of` decides per value. Schemas don't change, and associations without it cost nothing extra.
 - Type unions: `field` and `array` take `type: [:integer, :string]`, written as a JSON Schema `type` array with `"null"` added for `nullable: true`, or as an `anyOf` of single types under OpenAPI 3.0. Built-in types only; `format:` and its formatter still apply, and the compiled validator checks them. A union combines with `any_of:` (an `allOf` of both under OpenAPI 3.0). `nullable:` doesn't add a null branch to `any_of:`.
+
+### Fixed
+
+- `Versponse::OpenAPI.rswag_specs` writes security scheme `type` and `in` as symbols, so rswag sends API key headers.

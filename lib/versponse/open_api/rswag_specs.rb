@@ -3,7 +3,8 @@
 module Versponse
   module OpenAPI
     # rswag's config.openapi_specs: maps "name/version.json" keys to lazily built, memoized,
-    # symbol-keyed documents (rswag merges paths with symbol keys)
+    # symbol-keyed documents (rswag merges paths with symbol keys). Security scheme "type" and "in"
+    # values are symbols too: rswag compares them with :apiKey and :header to send API key headers.
     class RswagSpecs
       include Enumerable
 
@@ -24,7 +25,7 @@ module Versponse
         key = normalize(key)
         return unless @entries.key?(key)
 
-        @built[key] ||= symbolize(build(key))
+        @built[key] ||= symbolize_security_schemes(symbolize(build(key)))
       end
 
       # @param key [String] document key
@@ -73,6 +74,13 @@ module Versponse
       def build(key)
         document, version = @entries.fetch(key)
         document.build(version:)
+      end
+
+      def symbolize_security_schemes(document)
+        document.dig(:components, :securitySchemes)&.each_value do |scheme|
+          scheme.slice(:type, :in).each { |name, value| scheme[name] = value.to_sym }
+        end
+        document
       end
 
       def symbolize(value)

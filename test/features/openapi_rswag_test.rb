@@ -7,6 +7,8 @@ class OpenapiRswagTest < Minitest::Test
     document_name "api"
     versions "2025-09", "preview"
     info "title" => "API"
+    security_scheme "ApiKey", {"type" => "apiKey", "in" => "header", "name" => "X-API-Key"}
+    security_scheme "Bearer", {"type" => "http", "scheme" => "bearer"}
   end
 
   class BrokenDocument < Versponse::OpenAPI::Document
@@ -29,6 +31,14 @@ class OpenapiRswagTest < Minitest::Test
     assert_equal "3.1.1", document[:openapi]
     assert_equal "2025-09", document[:info][:version]
     assert_same document, adapter["api/2025-09.json"]
+  end
+
+  def test_security_scheme_type_and_in_are_symbols_for_rswag
+    schemes = specs["api/2025-09.json"][:components][:securitySchemes]
+
+    assert_equal({type: :apiKey, in: :header, name: "X-API-Key"}, schemes[:ApiKey])
+    assert_equal({type: :http, scheme: "bearer"}, schemes[:Bearer])
+    assert_equal "apiKey", ApiDocument.build(version: "2025-09").dig("components", "securitySchemes", "ApiKey", "type")
   end
 
   def test_yaml_keys_and_unknown_keys
