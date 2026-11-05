@@ -4,6 +4,8 @@ require "test_helper"
 require "json_schemer"
 
 class ExamplesTest < Minitest::Test
+  include ExampleObjects
+
   CLASSES = [
     Examples::MoneyResponse, Examples::SiteResponse, Examples::PriceResponse, Examples::UnitTypeResponse,
     Examples::OrderResponse, Examples::TenancyResponse, Examples::TaskResponse, Examples::ActivityFeedResponse, Examples::CategoryResponse,
@@ -12,26 +14,6 @@ class ExamplesTest < Minitest::Test
 
   def valid_schema?(schema)
     JSONSchemer.valid_schema?(schema, meta_schema: Versponse.configuration.json_schema_uri)
-  end
-
-  def money = Examples::Money.new(amount: 5000, currency: "GBP")
-
-  def unit_type
-    Examples::UnitType.new(
-      public_id: "ut_1", name: "Small", billing_id: "prod_1", status: "active", selling_points: ["Dry"],
-      created_at: Time.utc(2025, 9, 1, 10), security_deposit: nil,
-      site: Examples::Site.new(public_id: "site_1", name: "Leeds", city: "Leeds", postcode: nil),
-      prices: [
-        Examples::Price.new(id: "price_1", amount: money, interval: "month"),
-        Examples::Price.new(id: "price_2", amount: nil, interval: "week")
-      ]
-    )
-  end
-
-  def order_with_tenancy
-    order = Examples::Order.new(id: "o1")
-    order.tenancy = Examples::Tenancy.new(id: "t1", order:)
-    order
   end
 
   def test_component_schemas_are_valid_openapi

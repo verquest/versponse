@@ -12,6 +12,8 @@ module Versponse
     # @return [void]
     # @raise [Versponse::InvalidOutputError] when the output does not match
     def self.call(klass, data, version:, view:)
+      return if valid?(klass.checker(version:, view:), data)
+
       schemer = klass.schemer(version:, view:)
       errors = if data.is_a?(Array)
         data.each_with_index.flat_map { |item, index| errors_for(schemer, item, "/#{index}") }
@@ -21,6 +23,17 @@ module Versponse
       return if errors.empty?
 
       raise InvalidOutputError.new("#{klass.name} output does not match its #{version}/#{view} schema", errors:)
+    end
+
+    # The compiled checker is the fast path; json_schemer runs only when it fails or is missing
+    #
+    # @param checker [#valid?, nil] compiled checker of the schema
+    # @param data [Hash, Array<Hash>] rendered output
+    # @return [Boolean] true when the checker accepts every item
+    def self.valid?(checker, data)
+      return false unless checker
+
+      data.is_a?(Array) ? data.all? { |item| checker.valid?(item) } : checker.valid?(data)
     end
 
     # @param schemer [JSONSchemer::Schema] compiled schema

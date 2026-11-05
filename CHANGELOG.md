@@ -19,3 +19,4 @@
 - Expansion: `expandable: true` on `reference`, `collection item:` and `one_of`, `identifier` for the collapsed shape, `serialize(expand: [...])` with dotted paths and `"*"`, `anyOf` full/collapsed schemas with `<Name>Collapsed` components, `expandable_paths`, and `config.unknown_expand`.
 - OpenAPI documents: `Versponse::OpenAPI::Document` class DSL (base sections, `responses`/`requests` by namespace or list, named `wrapper` components, `finalize` hooks), `build`, `validate`, and `Versponse::OpenAPI.rswag_specs` for rswag's `openapi_specs`.
 - `config.custom_field_types` in verquest's shape (`type` and `schema_options`), used by `field` and `array`.
+- Output validation compiles each validation schema into Ruby checks and calls json_schemer only for errors and unsupported keywords, making validation-on rendering about as fast as blueprinter without validation.

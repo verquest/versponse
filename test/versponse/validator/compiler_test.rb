@@ -1,0 +1,89 @@
+# frozen_string_literal: true
+
+require "test_helper"
+require "json_schemer"
+
+class Versponse::Validator::CompilerTest < Minitest::Test
+  def compile(schema)
+    Versponse::Validator::Compiler.call(schema, JSONSchemer.schema(schema, meta_schema: JSONSchemer::OpenAPI31::BASE_URI.to_s))
+  end
+
+  def assert_checks(schema, valid: [], invalid: [])
+    checker = compile(schema)
+
+    valid.each { |data| assert checker.valid?(data), "expected #{data.inspect} to be valid for #{schema}" }
+    invalid.each { |data| refute checker.valid?(data), "expected #{data.inspect} to be invalid for #{schema}" }
+  end
+
+  def test_types
+    assert_checks({"type" => ["integer", "null"]}, valid: [1, 1.0, nil], invalid: [1.5, "1", true])
+    assert_checks({"type" => "number"}, valid: [1, 1.5, Float::NAN], invalid: ["1", nil])
+    assert_checks({"type" => "boolean"}, valid: [true, false], invalid: [0, nil])
+  end
+
+  def test_objects
+    schema = {"type" => "object", "required" => ["a"], "properties" => {"a" => {"type" => "string"}}, "additionalProperties" => false}
+
+    assert_checks(schema, valid: [{"a" => "x"}], invalid: [{}, {"a" => 1}, {"a" => "x", "b" => 1}, {a: "x"}])
+    assert_checks({"required" => ["a"]}, valid: ["not an object"])
+  end
+
+  def test_additional_properties_schema_and_sizes
+    schema = {"type" => "object", "additionalProperties" => {"type" => "string"}, "minProperties" => 1, "maxProperties" => 2}
+
+    assert_checks(schema, valid: [{"a" => "x"}, {"a" => "x", "b" => "y"}], invalid: [{}, {"a" => 1}, {"a" => "x", "b" => "y", "c" => "z"}])
+  end
+
+  def test_arrays
+    assert_checks({"type" => "array", "items" => {"type" => "integer"}, "minItems" => 1, "maxItems" => 2}, valid: [[1], [1, 2]], invalid: [[], [1, 2, 3], ["1"]])
+  end
+
+  def test_strings
+    assert_checks({"minLength" => 2, "maxLength" => 2}, valid: ["éé", 5], invalid: ["é", "abc"])
+    assert_checks({"pattern" => "^site_"}, valid: ["site_1", "x\nsite_1"], invalid: ["unit_1"])
+  end
+
+  def test_formats
+    assert_checks({"format" => "email"}, valid: ["a@b.co", 1], invalid: ["nope"])
+    assert_checks({"format" => "date-time"}, valid: ["2025-09-01T12:30:00Z"], invalid: ["2025-09-01"])
+    assert_checks({"format" => "int32"}, valid: [1], invalid: [2**40])
+  end
+
+  def test_numbers
+    assert_checks({"minimum" => 1, "exclusiveMaximum" => 3}, valid: [1, 2.5, "x"], invalid: [0, 3])
+    assert_checks({"multipleOf" => 0.1}, valid: [0.3, 1], invalid: [0.35])
+  end
+
+  def test_const_and_enum
+    assert_checks({"const" => nil}, valid: [nil], invalid: [false])
+    assert_checks({"const" => 1}, valid: [1.0], invalid: ["1"])
+    assert_checks({"enum" => %w[a b]}, valid: ["a"], invalid: ["c"])
+  end
+
+  def test_combinators
+    assert_checks({"anyOf" => [{"type" => "string"}, {"type" => "integer"}]}, valid: ["a", 1], invalid: [1.5])
+    assert_checks({"oneOf" => [{"type" => "integer"}, {"type" => "number"}]}, valid: [1.5], invalid: [1])
+    assert_checks({"allOf" => [{"minimum" => 1}, {"maximum" => 2}]}, valid: [1], invalid: [3])
+  end
+
+  def test_recursive_anchor
+    schema = {
+      "$anchor" => "Node", "type" => "object", "required" => ["children"], "additionalProperties" => false,
+      "properties" => {"children" => {"type" => "array", "items" => {"$ref" => "#Node"}}}
+    }
+
+    assert_checks(schema, valid: [{"children" => [{"children" => []}]}], invalid: [{"children" => [{}]}])
+  end
+
+  def test_annotations_and_boolean_schemas
+    assert_checks({"description" => "d", "title" => "t", "examples" => [1], "deprecated" => true}, valid: [1, nil])
+    assert_checks({"properties" => {"a" => false}}, valid: [{}], invalid: [{"a" => 1}])
+  end
+
+  def test_unsupported_schemas_compile_to_nil
+    assert_nil compile({"type" => "object", "patternProperties" => {"^a" => {"type" => "string"}}})
+    assert_nil compile({"$ref" => "#/$defs/thing", "$defs" => {"thing" => {"type" => "string"}}})
+    assert_nil compile({"$ref" => "#Missing"})
+    assert_nil compile({"type" => "string", "contentEncoding" => "base64"})
+  end
+end

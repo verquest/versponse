@@ -72,4 +72,22 @@ class OutputValidationTest < Minitest::Test
       assert_equal "Leaf", NodeResponse.serialize(tree, version: "2025-09")["children"].first["name"]
     end
   end
+
+  def test_json_schemer_decides_when_the_checker_rejects
+    StrictResponse.stubs(:checker).returns(Versponse::Validator::Constant::INVALID)
+
+    with_configuration(validate_output: true) do
+      assert_equal "a", StrictResponse.serialize({id: "a", count: 1}, version: "2025-09")["id"]
+      assert_raises(Versponse::InvalidOutputError) { StrictResponse.serialize({id: "a", count: "many"}, version: "2025-09") }
+    end
+  end
+
+  def test_uncompiled_schemas_validate_with_json_schemer
+    klass = Class.new(Versponse::Base) { version("2025-09") { field :code, type: :string, content_encoding: "base64" } }
+
+    with_configuration(validate_output: true) do
+      assert_nil klass.checker(version: "2025-09")
+      assert_raises(Versponse::InvalidOutputError) { klass.serialize({code: 1}, version: "2025-09") }
+    end
+  end
 end

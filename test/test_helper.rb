@@ -15,6 +15,7 @@ require "minitest/autorun"
 require "mocha/minitest"
 
 require_relative "support/configuration_test_helper"
+require_relative "support/example_objects"
 
 # Every render in the suite is checked against its schema
 Versponse.configuration.validate_output = true

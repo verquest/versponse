@@ -160,7 +160,17 @@ module Versponse
       end
     end
 
-    # Clears compiled plans, schemas, schemers and resolved versions
+    # @param version [String] canonical (declared) version name
+    # @param view [Symbol] view name
+    # @return [#valid?, nil] fast checker compiled from the validation schema, nil when it uses keywords the compiler does not support
+    # @api private
+    def checker(version:, view: :default)
+      checkers.fetch([version, view.to_sym]) do
+        Validator::Compiler.call(to_validation_schema(version:, view:), schemer(version:, view:))
+      end
+    end
+
+    # Clears compiled plans, schemas, schemers, checkers and resolved versions
     #
     # @return [void]
     # @api private
@@ -168,6 +178,7 @@ module Versponse
       plans.clear
       schemas.clear
       schemers.clear
+      checkers.clear
       expandable_path_cache.clear
       versions.clear_resolved
     end
@@ -184,6 +195,10 @@ module Versponse
 
     def schemers
       @schemers ||= Cache.new
+    end
+
+    def checkers
+      @checkers ||= Cache.new
     end
 
     def expandable_path_cache
