@@ -109,6 +109,17 @@ class ReferenceTest < Minitest::Test
     end
   end
 
+  # OpenAPI 3.0 ignores keywords next to a $ref, so they go beside an allOf instead
+  def test_openapi30_reference_keywords_wrap_the_ref
+    klass = Class.new(Versponse::Base) { version("2025-09") { reference :price, from: MoneyResponse, description: "Price" } }
+    ref = {"$ref" => "#/components/schemas/MoneyResponse"}
+
+    assert_equal ref.merge("description" => "Price"), klass.to_schema(version: "2025-09")["properties"]["price"]
+    with_configuration(json_schema_version: :openapi30) do
+      assert_equal({"allOf" => [ref], "description" => "Price"}, klass.to_schema(version: "2025-09")["properties"]["price"])
+    end
+  end
+
   def test_validation_schema_inlines_references
     schema = UnitTypeResponse.to_validation_schema(version: "2025-09")
 

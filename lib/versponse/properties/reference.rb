@@ -32,13 +32,16 @@ module Versponse
       end
 
       # @param context [Versponse::SchemaContext] schema generation context
-      # @return [Hash] $ref or inlined schema (anyOf full/collapsed when expandable); keywords sit on the outer node
+      # @return [Hash] $ref or inlined schema (anyOf full/collapsed when expandable); keywords sit on the outer node,
+      #   beside an allOf around a bare $ref in OpenAPI 3.0 documents, which ignore $ref siblings
       # @raise [Versponse::DefinitionError] when a versponse property: does not exist
       def schema(context)
         return referenced_property_schema(context).merge(schema_options) if versponse_property?
         return nullable_choice("anyOf", References.expandable_schemas(@from, view: @view, context:), context).merge(schema_options) if expandable?
 
-        nullable_ref(References.schema(@from, view: @view, property: @property, context:), context).merge(schema_options)
+        schema = nullable_ref(References.schema(@from, view: @view, property: @property, context:), context)
+        schema = {"allOf" => [schema]} if schema.key?("$ref") && schema_options.any? && nullable_keyword?(context)
+        schema.merge(schema_options)
       end
 
       # @param version [String] canonical version name
