@@ -28,9 +28,10 @@ module Versponse
       end
 
       # @param version [String] unused by scalars
+      # @param formatters [Hash{String => #call}] formatters by JSON Schema format, for the compiling class and version
       # @return [Versponse::Steps::Value] compiled step with the formatter of its format
-      def step(version:)
-        value_step(formatter: Versponse.configuration.formatters[schema_options["format"]])
+      def step(version:, formatters:)
+        value_step(formatter: formatters[schema_options["format"]])
       end
     end
   end

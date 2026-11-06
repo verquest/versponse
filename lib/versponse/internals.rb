@@ -25,6 +25,7 @@ module Versponse
       @checkers = Cache.new
       @expandable_paths = Cache.new
       @expansions = Cache.new(limit: EXPANSION_LIMIT)
+      @time_precisions = {}
       @generation = Versponse.cache_generation
     end
 
@@ -49,6 +50,32 @@ module Versponse
       return @supported_version_range if defined?(@supported_version_range)
 
       ancestor&.supported_version_range
+    end
+
+    # @param digits [Integer] fraction digits
+    # @param from [String, nil] first version it applies to
+    # @return [void]
+    # @raise [Versponse::DefinitionError] when the class already sets the precision from that version
+    def add_time_precision(digits, from:)
+      raise DefinitionError, "#{@klass.name || "AnonymousResponse"} sets time_precision #{from ? "from: #{from}" : "without from:"} twice" if @time_precisions.key?(from)
+
+      @time_precisions = @time_precisions.merge(from => digits).freeze
+    end
+
+    # @return [Hash{String, nil => Integer}] time_precision settings of the ancestors and this class, keyed by from:
+    def time_precisions
+      ancestor ? ancestor.time_precisions.merge(@time_precisions) : @time_precisions
+    end
+
+    # @param version [String] canonical version name
+    # @return [Hash{String => #call}] config.formatters, with the date-time formatter of the class's time_precision for the version
+    def formatters(version)
+      precisions = time_precisions
+      from = Versponse.configuration.version_resolver.call(version, precisions.keys.compact.sort)
+      precision = precisions.fetch(from) { precisions[nil] }
+      return Versponse.configuration.formatters if precision.nil?
+
+      Versponse.configuration.formatters.merge("date-time" => Formatters.date_time(precision))
     end
 
     # Names that resolve within supported_versions: the declared versions in range plus min,
@@ -106,7 +133,8 @@ module Versponse
       # version before the outer entry is stored, so client strings can't grow the cache.
       @plans.fetch(version) { resolve(version) && Cache.new }.fetch(view.to_sym) do
         definition = resolve(version)
-        steps = definition.properties_for(view).map { |property| property.step(version:) }
+        formatters = formatters(version)
+        steps = definition.properties_for(view).map { |property| property.step(version:, formatters:) }
         Plan.new(label: "#{@klass.name}[#{definition.name}/#{view}]", steps:)
       end
     end

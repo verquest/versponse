@@ -33,6 +33,18 @@ module Versponse
       versponse.builder.supported_versions(min:, max:)
     end
 
+    # Sets the fraction digits of date-time values, replacing the date-time formatter of config.formatters.
+    # With from:, it applies from that version on. Subclasses inherit the settings and can add or replace them.
+    #
+    # @param digits [Integer] fraction digits from 0 (whole seconds) to 9
+    # @param from [String, nil] first version it applies to; nil for every version without a later setting
+    # @return [void]
+    # @raise [Versponse::DefinitionError] inside a version, after the first version, for invalid digits,
+    #   or when the class already sets the precision from that version
+    def time_precision(digits, from: nil)
+      versponse.builder.time_precision(digits, from:)
+    end
+
     # Declares a version
     #
     # @param name [String] version name, compared as a String

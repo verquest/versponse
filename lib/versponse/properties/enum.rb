@@ -43,8 +43,9 @@ module Versponse
       end
 
       # @param version [String] unused by scalars
+      # @param formatters [Hash{String => #call}] unused by enums
       # @return [Versponse::Steps::Value] compiled step
-      def step(version:)
+      def step(version:, formatters:)
         value_step
       end
 

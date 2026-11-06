@@ -58,9 +58,10 @@ module Versponse
       end
 
       # @param version [String] canonical version name
+      # @param formatters [Hash{String => #call}] formatters by JSON Schema format, for the compiling class and version
       # @return [Versponse::Steps::Nested, Versponse::Steps::Value] compiled step; items of non-Versponse classes pass through
-      def step(version:)
-        plan = items_plan(version)
+      def step(version:, formatters:)
+        plan = items_plan(version, formatters)
         return value_step if plan.nil?
 
         collapse_if = (References.collapse_if(@item, version) if expandable?)
@@ -109,9 +110,9 @@ module Versponse
         @items_one_of.collapsed_dispatcher(version) if @items_one_of&.expandable?
       end
 
-      def items_plan(version)
+      def items_plan(version, formatters)
         return @items_one_of.dispatcher(version) if @items_one_of
-        return inline_plan(version) if @item.nil?
+        return inline_plan(version, formatters) if @item.nil?
 
         References.lazy_plan(@item, version:, view: @view, key:) if References.versponse?(@item)
       end

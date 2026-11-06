@@ -32,8 +32,9 @@ module Versponse
       end
 
       # @param version [String] unused by constants
+      # @param formatters [Hash{String => #call}] unused by constants
       # @return [Versponse::Steps::Const] compiled step
-      def step(version:)
+      def step(version:, formatters:)
         Steps::Const.new(key:, value: @constant, condition:)
       end
     end

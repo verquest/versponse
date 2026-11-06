@@ -97,8 +97,9 @@ module Versponse
       end
 
       # @param version [String] requested version name, used by nested classes
+      # @param formatters [Hash{String => #call}] formatters by JSON Schema format, for the compiling class and version
       # @return [#call] compiled plan step
-      def step(version:)
+      def step(version:, formatters:)
         raise NotImplementedError
       end
 

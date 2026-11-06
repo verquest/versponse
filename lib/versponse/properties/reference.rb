@@ -45,10 +45,12 @@ module Versponse
       end
 
       # @param version [String] canonical version name
+      # @param formatters [Hash{String => #call}] formatters of the compiling class, used by a property: reference;
+      #   a nested class compiles with its own
       # @return [Versponse::Steps::Nested, Versponse::Steps::Value, #call] compiled step
       # @raise [Versponse::DefinitionError] when a versponse property: does not exist
-      def step(version:)
-        return referenced_property(version).step(version:) if versponse_property?
+      def step(version:, formatters:)
+        return referenced_property(version).step(version:, formatters:) if versponse_property?
         return value_step unless References.versponse?(@from)
 
         collapsed_plan = (References.collapsed_plan(@from, version) if expandable?)

@@ -18,9 +18,10 @@ module Versponse
       end
 
       # @param version [String] requested version name
+      # @param formatters [Hash{String => #call}] formatters by JSON Schema format, for the compiling class and version
       # @return [Versponse::Steps::Nested] compiled step with an inline child plan
-      def step(version:)
-        Steps::Nested.new(key:, extractor:, condition:, plan: inline_plan(version), collection: false)
+      def step(version:, formatters:)
+        Steps::Nested.new(key:, extractor:, condition:, plan: inline_plan(version, formatters), collection: false)
       end
     end
   end

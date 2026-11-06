@@ -8,7 +8,7 @@ class Versponse::Properties::ScalarsTest < Minitest::Test
   Item = Struct.new(:title, :status, :tags, :created_at)
 
   def render(property, object)
-    Versponse::Plan.new(label: "Item", steps: [property.step(version: "2025-09")]).call(object, {})
+    Versponse::Plan.new(label: "Item", steps: [property.step(version: "2025-09", formatters: Versponse.configuration.formatters)]).call(object, {})
   end
 
   def test_field_schema

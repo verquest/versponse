@@ -51,6 +51,24 @@ module Versponse
       Versponse.reset_caches!
     end
 
+    # Sets the fraction digits of date-time values, from a version on when from: is given
+    #
+    # @param digits [Integer] fraction digits from 0 (whole seconds) to 9
+    # @param from [String, nil] first version it applies to
+    # @return [void]
+    # @raise [Versponse::DefinitionError] inside a version, after the first version, for invalid digits,
+    #   or when the class already sets the precision from that version
+    def time_precision(digits, from: nil)
+      raise DefinitionError, "time_precision can only be set on the class" if @current_scope
+      raise DefinitionError, "time_precision must come before the first version" unless @klass.versponse.versions.empty?
+      raise DefinitionError, "time_precision must be an Integer from 0 to 9, got #{digits.inspect}" unless digits.is_a?(Integer) && digits.between?(0, 9)
+
+      from = from&.to_s
+      @klass.versponse.add_time_precision(digits, from:)
+      Registry.add_version_name(from) if from
+      Versponse.reset_caches!
+    end
+
     # Declares a version
     #
     # @param name [String] version name, compared as a String

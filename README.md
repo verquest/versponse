@@ -224,6 +224,22 @@ Set `current_version` to drop the `version:` argument:
 Versponse.configure { |config| config.current_version = -> { Current.api_version } }
 ```
 
+### Time precision
+
+`time_precision` sets the fraction digits of `date-time` values, from 0 (whole seconds) to 9. With `from:`, it applies from that version on, so an API can change precision in a new version:
+
+```ruby
+class BaseResponse < Versponse::Base
+  time_precision 0                    # 2025-09-01T10:00:00Z
+  time_precision 3, from: "2026-03"   # 2025-09-01T10:00:00.000Z
+end
+```
+
+- A request uses the setting with the closest `from:` at or before it, compared with `config.version_resolver`, or the one without `from:`. Without any, `config.formatters` applies (milliseconds by default).
+- Each `from:` is registered like a `supported_versions` bound, so it takes effect even when no class declares that version.
+- It replaces the `date-time` formatter of `config.formatters`, and applies to the class's fields, arrays, inline objects and `reference property:`. A nested class (`reference from:`, `collection item:`, `one_of` variants) renders with its own setting, so declare it on a shared base class.
+- Declare it on the class before the first `version` block. Subclasses inherit the settings and can add their own or replace one with the same `from:`. Schemas don't change.
+
 ## Views
 
 Views live inside a version. Every view starts from all of the version's properties:
@@ -431,7 +447,7 @@ Definitions can be copied between the gems (`one_of name:` and `inherit:` behave
 ## Formats and validation notes
 
 - Only properties with a `format:` are formatted. Blueprinter formats every Time, but here a Time field without `format: "date-time"` is emitted as is, and output validation fails it.
-- `date-time` formats Time, DateTime and Date (as midnight) as ISO 8601 in UTC with milliseconds, like Rails' JSON (`2025-09-01T10:00:00.000Z`); `date` formats Date and Time as an ISO 8601 date. For whole seconds, set `config.formatters = Versponse::Formatters::DEFAULTS.merge("date-time" => ->(time) { time.utc.iso8601 })`. `date` keeps the value's own calendar day while `date-time` converts to UTC, so 23:30 at -05:00 gives `2025-01-01` and `2025-01-02T04:30:00.000Z`.
+- `date-time` formats Time, DateTime and Date (as midnight) as ISO 8601 in UTC with milliseconds, like Rails' JSON (`2025-09-01T10:00:00.000Z`); `date` formats Date and Time as an ISO 8601 date. Set the fraction digits per class and version with `time_precision` (see [Time precision](#time-precision)). `date` keeps the value's own calendar day while `date-time` converts to UTC, so 23:30 at -05:00 gives `2025-01-01` and `2025-01-02T04:30:00.000Z`.
 - Validation checks the rendered data only, not the `root:`/`meta:` envelope.
 - `field :metadata, type: :object, additional_properties: {type: "string"}` describes a free-form map; its value passes through.
 - In apps and test suites with many response classes, pass `classes:` to `Versponse.components`, or keep component names unique.
