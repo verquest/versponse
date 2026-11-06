@@ -20,8 +20,7 @@ gem "yard", "~> 0.9"
 gem "redcarpet", "~> 3.6"
 
 # Interop tests reference verquest request classes.
-# Switch back to a released version once verquest ships schema-only references
-gem "verquest", path: "../verquest"
+gem "verquest", "~> 0.7.1"
 
 group :bench do
   gem "benchmark-ips", "~> 2.14", require: false

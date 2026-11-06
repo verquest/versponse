@@ -1,5 +1,9 @@
 # Versponse
 
+[![Gem Version](https://badge.fury.io/rb/versponse.svg)](https://badge.fury.io/rb/versponse)
+[![CI](https://github.com/verquest/versponse/actions/workflows/main.yml/badge.svg)](https://github.com/verquest/versponse/actions/workflows/main.yml)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
+
 Versponse describes your API's responses with a small Ruby DSL, one definition per API version, with blueprinter-style views. From that definition you get:
 
 - fast rendering of objects and hashes to JSON-ready hashes (or JSON strings);

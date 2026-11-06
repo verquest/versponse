@@ -10,13 +10,13 @@ Gem::Specification.new do |spec|
 
   spec.summary = "Versioned JSON response serializer with views and OpenAPI schemas"
   spec.description = "Versponse describes API responses with a Ruby DSL shared with verquest, one definition per API version, with blueprinter-style views. It renders objects to JSON-ready hashes and generates an OpenAPI schema for every response, version and view."
-  spec.homepage = "https://github.com/CiTroNaK/versponse"
+  spec.homepage = "https://github.com/verquest/versponse"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.2"
 
-  spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = spec.homepage
   spec.metadata["changelog_uri"] = "#{spec.homepage}/blob/main/CHANGELOG.md"
+  spec.metadata["rubygems_mfa_required"] = "true"
 
   gemspec = File.basename(__FILE__)
   spec.files = IO.popen(%w[git ls-files -z], chdir: __dir__, err: IO::NULL) do |ls|
