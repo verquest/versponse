@@ -155,6 +155,16 @@ class SchemaTest < Minitest::Test
     end
   end
 
+  # const allows one value, so nullable turns it into an enum of that value and null
+  def test_nullable_const_option_accepts_null
+    klass = Class.new(Versponse::Base) { version("2025-09") { field :c, type: :string, nullable: true, const: "a" } }
+
+    assert_equal({"type" => %w[string null], "enum" => ["a", nil]}, klass.to_schema(version: "2025-09")["properties"]["c"])
+    with_configuration(validate_output: true) do
+      assert_equal({"c" => nil}, klass.serialize({c: nil}, version: "2025-09"))
+    end
+  end
+
   def test_component_names
     assert_equal "ProductResponse", ProductResponse.component_name
     assert_equal "ProductResponseCompact", ProductResponse.component_name(view: :compact)

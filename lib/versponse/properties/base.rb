@@ -200,6 +200,9 @@ module Versponse
 
       def nullable_type(schema, context = nil)
         return schema unless nullable?
+
+        # const allows one value, so null joins it in an enum
+        schema = schema.except("const").merge("enum" => [schema["const"], nil]) if schema.key?("const")
         return schema.merge("nullable" => true) if nullable_keyword?(context)
 
         schema.merge("type" => [*schema["type"], "null"])
