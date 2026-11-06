@@ -121,4 +121,18 @@ class Versponse::Validator::CompilerTest < Minitest::Test
 
     assert_checks({"type" => "integer"}, valid: [1, 1.0], invalid: [1.5])
   end
+
+  # Draft 4 / OpenAPI 3.0 write exclusive bounds as booleans next to minimum/maximum
+  def test_boolean_exclusive_bounds
+    with_configuration(json_schema_version: :openapi30) do
+      assert_checks({"type" => "number", "minimum" => 0, "exclusiveMinimum" => true}, valid: [1], invalid: [0, -1])
+      assert_checks({"type" => "number", "maximum" => 5, "exclusiveMaximum" => true}, valid: [4], invalid: [5])
+      assert_checks({"type" => "number", "minimum" => 0, "exclusiveMinimum" => false}, valid: [0], invalid: [-1])
+    end
+  end
+
+  # A check that raises leaves the value to json_schemer instead of crashing serialize
+  def test_errors_in_checks_defer
+    refute compile({"type" => "number", "multipleOf" => 0.1}).valid?(Float::INFINITY)
+  end
 end

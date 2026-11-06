@@ -20,8 +20,17 @@ module Versponse
       def self.build(schema, _compiler)
         return unless keywords.any? { |keyword| schema.key?(keyword) }
 
-        new(BOUNDS.filter_map { |keyword, operator| [operator, schema[keyword]] if schema.key?(keyword) }, schema["multipleOf"])
+        new(bounds(schema), schema["multipleOf"])
       end
+
+      # A boolean exclusiveMinimum/exclusiveMaximum (draft 4, OpenAPI 3.0) makes minimum/maximum exclusive
+      def self.bounds(schema)
+        bounds = BOUNDS.filter_map { |keyword, operator| [operator, schema[keyword]] if schema[keyword].is_a?(Numeric) }
+        bounds << [:>, schema["minimum"]] if schema["exclusiveMinimum"] == true && schema["minimum"].is_a?(Numeric)
+        bounds << [:<, schema["maximum"]] if schema["exclusiveMaximum"] == true && schema["maximum"].is_a?(Numeric)
+        bounds
+      end
+      private_class_method :bounds
 
       # @param bounds [Array<Array(Symbol, Numeric)>] comparisons data must pass
       # @param multiple_of [Numeric, nil] divisor, nil without multipleOf

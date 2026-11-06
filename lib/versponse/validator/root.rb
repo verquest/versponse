@@ -19,8 +19,11 @@ module Versponse
 
       # @param data [Object] value to check
       # @return [Boolean] true when the value matches; false when it doesn't or json_schemer has to decide
+      #   (a check deferred, or raised, e.g. comparing Infinity)
       def valid?(data)
         catch(DEFER) { return @checker.valid?(data) }
+        false
+      rescue
         false
       end
     end
