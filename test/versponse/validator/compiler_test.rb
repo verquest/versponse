@@ -4,8 +4,10 @@ require "test_helper"
 require "json_schemer"
 
 class Versponse::Validator::CompilerTest < Minitest::Test
+  include ConfigurationTestHelper
+
   def compile(schema)
-    Versponse::Validator::Compiler.call(schema, JSONSchemer.schema(schema, meta_schema: JSONSchemer::OpenAPI31::BASE_URI.to_s))
+    Versponse::Validator::Compiler.call(schema, JSONSchemer.schema(schema, meta_schema: Versponse.configuration.json_schema_uri))
   end
 
   def assert_checks(schema, valid: [], invalid: [])
@@ -106,5 +108,17 @@ class Versponse::Validator::CompilerTest < Minitest::Test
 
     refute JSONSchemer.schema(schema, meta_schema: JSONSchemer::OpenAPI31::BASE_URI.to_s).valid?(data)
     refute compile(schema).valid?(data)
+  end
+
+  # Draft 4 and OpenAPI 3.0 count only Integers as integers; later versions accept 1.0
+  def test_integer_follows_the_json_schema_version
+    require "bigdecimal"
+    %i[draft4 openapi30].each do |version|
+      with_configuration(json_schema_version: version) do
+        assert_checks({"type" => "integer"}, valid: [1], invalid: [1.0, BigDecimal(5)])
+      end
+    end
+
+    assert_checks({"type" => "integer"}, valid: [1, 1.0], invalid: [1.5])
   end
 end

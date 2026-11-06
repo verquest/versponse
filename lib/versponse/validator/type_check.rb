@@ -17,9 +17,17 @@ module Versponse
         "object" => ->(data) { data.is_a?(Hash) }
       }.freeze
 
+      # Draft 4 and OpenAPI 3.0 (based on it) accept only Integers; later versions also accept 1.0
+      INTEGER_ONLY = %i[draft4 openapi30].freeze
+
+      # Integer test of draft 4 and OpenAPI 3.0
+      STRICT_INTEGER = ->(data) { data.is_a?(Integer) }
+
       # @return [Array<String>] keywords this check owns
       def self.keywords = %w[type]
 
+      # Reads config.json_schema_version; checkers are cached per class, and setting it resets them
+      #
       # @param schema [Hash] schema
       # @param _compiler [Versponse::Validator::Compiler] unused
       # @return [TypeCheck, nil] the check, nil without type
@@ -27,8 +35,15 @@ module Versponse
       def self.build(schema, _compiler)
         return unless schema.key?("type")
 
-        new(Array(schema["type"]).map { |type| TESTS.fetch(type) { raise Compiler::Unsupported, "type #{type}" } })
+        new(Array(schema["type"]).map { |type| test_for(type) })
       end
+
+      def self.test_for(type)
+        return STRICT_INTEGER if type == "integer" && INTEGER_ONLY.include?(Versponse.configuration.json_schema_version)
+
+        TESTS.fetch(type) { raise Compiler::Unsupported, "type #{type}" }
+      end
+      private_class_method :test_for
 
       # @param tests [Array<Proc>] tests of the allowed types
       def initialize(tests)
