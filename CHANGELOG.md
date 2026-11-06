@@ -5,7 +5,7 @@
 ### Added
 
 - Response DSL shared with verquest: `field`, `enum`, `const`, `array`, `object`, `collection`, `reference`, `one_of`, `with_options` (a nested block replaces the outer options and ignores `map:`, as in verquest; `view:` and `discriminator:` apply).
-- Class-level `description` and `schema_options` reach subclasses unless they set their own, like `supported_versions`.
+- Class-level `description` and `schema_options` reach subclasses, looked up when schemas are built like `supported_versions`; a subclass's `schema_options` merge with its ancestors' (the subclass wins per key).
 - `field type: :object` for free-form maps, and `one_of` with `source` and `match:` arrays.
 - Versions with inheritance and closest-earlier resolution.
 - Blueprinter-style views (`view`, `include_view`, `exclude_properties`) that later versions inherit.
@@ -33,4 +33,4 @@
 - `identifier` also declares its field in the full shape, so it needs no matching `field :id`. A property with an identifier's key raises `Versponse::DefinitionError`. With `collapse_if:`, the full shape leaves the identifier out when the condition is false.
 - `Versponse::OpenAPI.rswag_specs` writes security scheme `type` and `in` as symbols, so rswag sends API key headers.
 - The class registry replaces a class when one with the same name is defined again, so code reloading in development doesn't grow it.
-- `time_precision digits, from:` sets the fraction digits of `date-time` values per class, from a version on, so an API can keep whole seconds in released versions and change precision in a new one. Subclasses inherit it, and each `from:` is registered like a `supported_versions` bound.
+- `time_precision digits, from:` sets the fraction digits of `date-time` values per class, from a version on, so an API can keep whole seconds in released versions and change precision in a new one. A subclass without `time_precision` inherits its closest ancestor's settings; one that declares any uses only its own. Each `from:` is registered like a `supported_versions` bound.

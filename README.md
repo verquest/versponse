@@ -86,7 +86,7 @@ UnitTypeResponse.serialize(unit_type, version: "2025-09")
 # }
 ```
 
-`serialize` takes an object, a Hash (symbol or string keys), or anything that responds to `to_ary`, such as an Array or an ActiveRecord relation, or a Set. A `collection` property takes the same; any other value raises `Versponse::ExtractionError`. It returns String keys. `serialize_json` takes the same arguments and returns a String.
+`serialize` takes an object, a Hash (symbol or string keys), or anything that responds to `to_ary`, such as an Array or an ActiveRecord relation, or a Set. A `collection` or `array` property takes the same; any other value raises `Versponse::ExtractionError`. It returns String keys. `serialize_json` takes the same arguments and returns a String.
 
 ```ruby
 UnitTypeResponse.serialize(unit_types, version: "2025-09", view: :embedded, root: "unit_types", meta: {"request_id" => "r1"})
@@ -128,7 +128,7 @@ Options shared by every property:
   # => {"type" => ["integer", "string"], "enum" => [7, 30, "send_immediately"]}
   ```
 - Other options are JSON Schema keywords in snake case, such as `description:`, `format:` or `max_length:`. They're written in camel case (`maxLength`). OpenAPI extensions go in as written (`"x-internal": true`). Anything else raises `Versponse::DefinitionError`, with a suggestion for typos such as `nulable:`.
-- `with_options type: :string, nullable: true do ... end` applies options to every property in the block, `view:` and `discriminator:` included. Explicit options win. As in verquest, a nested `with_options` replaces the outer options, and `map:` is ignored.
+- `with_options type: :string, nullable: true do ... end` applies options to every property in the block, `view:` and `discriminator:` included. Explicit options win. As in verquest, a nested `with_options` replaces the outer options, `map:` is ignored, and each `version` block starts without defaults.
 
 `required` is computed for you: every property without `if:`/`unless:` is always emitted, so it's required.
 
@@ -273,7 +273,7 @@ ProductResponse.serialize(product, version: "2026-01", view: :embedded)
 # => {"id" => "p1", "title" => "Box"}
 ```
 
-`reference` and `collection` take `view:` to render the nested class in one of its views, which is how cycles are broken (an order embeds its tenancy without the tenancy's order). Redeclaring a view in a later version replaces it.
+`reference` and `collection` take `view:` to render the nested class in one of its views, which is how cycles are broken (an order embeds its tenancy without the tenancy's order). Redeclaring a view in a later version replaces it. A property declared at version level replaces an inherited view's view-only property with the same key, so promoting a view-only field to every view takes one line.
 
 Mistakes in a definition raise `Versponse::DefinitionError` when the version block closes: excluding an unknown property or an identifier (redeclare the identifiers instead), declaring a version or a view twice, `inherit:` naming a version before every declared one, `include_view` of an unknown view, or views including each other in a cycle. `VersionNotFoundError`, `ViewNotFoundError` and `PropertyNotFoundError` are left for what a caller asks for at runtime (a version, a view, or `to_validation_schema(property:)`), so they are safe to map to client errors.
 
@@ -345,7 +345,8 @@ PriceListResponse.to_schema(version: "2025-09")
 - With `discriminator:`, `one_of` emits an OpenAPI `mapping` built from each variant's `const`, such as `{"order" => "#/components/schemas/OrderResponse"}`. A variant without that `const`, or two variants with the same value, raise `DefinitionError` when the schema is built.
 - A `one_of` is a `oneOf`, in documents and validation schemas alike. Without `discriminator:`, its variants need shapes a client can tell apart: if one payload fits two variants, `oneOf` rejects it, so `validate_output` raises and strict consumers such as rswag's response validation fail. For polymorphic responses, prefer `discriminator:`.
 - `to_schema(root: "unit_types", meta: MetaResponse, collection: true)` returns a wrapper schema for the whole response body. The envelope is strict (`additionalProperties: false`) whatever `default_additional_properties` says.
-- `description` and `schema_options` on a class reach its subclasses unless they set their own, so an abstract `ApplicationResponse` can carry them.
+- `description` and `schema_options` on a class reach its subclasses, so an abstract `ApplicationResponse` can carry them. They're looked up when schemas are built, so a parent changed later still applies. A subclass's `schema_options` merge with its ancestors', the subclass winning per key; a version's own `description` and `schema_options` win over both.
+- Collapsed shapes are strict (`additionalProperties: false`) whatever `default_additional_properties` says, so only a real collapsed payload matches them.
 
 `Versponse.components(version:)` returns every component of every loaded class and view for an OpenAPI document. In rswag's `swagger_helper.rb`:
 
@@ -444,6 +445,8 @@ Definitions can be copied between the gems (`one_of name:` and `inherit:` behave
 - `const` takes no `map:`, block or `nullable:`, because a response constant never reads the object. Use `enum` (with `nil` for nullable) for computed values.
 - Response-only DSL: `view`, `include_view`, `view:` on `reference` and `collection`, `match:` on `one_of` variants, `identifier`, `expandable:` and `source`.
 - Request-only DSL: `location`, `parameter_examples:`, `explode:` and conditions (`condition`, `depends_on`).
+
+verquest schemas embedded in versponse follow verquest's `config.json_schema_version`, so it must be compatible with versponse's: the same group of `:draft4`, `:openapi30`, `:draft6`/`:draft7`, or `:draft2019_09`/`:draft2020_12`/`:openapi31` (the defaults, `:draft2020_12` and `:openapi31`, are compatible). Otherwise building a schema that references a verquest request raises `Versponse::DefinitionError`.
 
 ## Formats and validation notes
 
