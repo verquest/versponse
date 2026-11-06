@@ -12,6 +12,18 @@ class Versponse::CacheTest < Minitest::Test
     assert_equal 1, calls
   end
 
+  # Past the limit, values are computed every time instead of growing the cache
+  def test_limit_stops_storing
+    cache = Versponse::Cache.new(limit: 1)
+    calls = 0
+
+    cache.fetch(:a) { 1 }
+    2.times { cache.fetch(:b) { calls += 1 } }
+
+    assert_equal 2, calls
+    assert_equal 1, cache.fetch(:a) { :recomputed }
+  end
+
   def test_clear_forgets_values
     cache = Versponse::Cache.new
     cache.fetch(:a) { 1 }

@@ -7,6 +7,9 @@ module Versponse
   #
   # @api private
   class Internals
+    # Most expand: combinations cached per class; they come from requests, so further ones are rebuilt each time
+    EXPANSION_LIMIT = 256
+
     # @return [Versponse::Versions] declared versions
     attr_reader :versions
     # @return [Versponse::SupportedVersions, nil] range declared with supported_versions, nil to remove an inherited one
@@ -22,6 +25,7 @@ module Versponse
       @checkers = Cache.new
       @expandable_paths = Cache.new
       @wildcards = Cache.new
+      @expansions = Cache.new(limit: EXPANSION_LIMIT)
     end
 
     # @return [Versponse::SupportedVersions, nil] range declared with supported_versions on this class
@@ -143,21 +147,23 @@ module Versponse
       end
     end
 
-    # @param expand [Array<String, Symbol>, String, Symbol, nil] requested paths, or "*"
+    # Validated trees are cached by their sorted paths, up to {EXPANSION_LIMIT} combinations
+    #
+    # @param expand [Array<String, Symbol>, String, Symbol, nil] requested paths: dotted, "*", or ending in ".*"
     # @param version [String] canonical version name
     # @param view [Symbol] view name
     # @return [Versponse::Expansion] the expand tree
     # @raise [Versponse::InvalidExpandError] for unknown paths (config.unknown_expand = :raise)
     def expansion(expand, version:, view:)
-      paths = Array(expand).map(&:to_s)
+      return Expansion::NONE if expand.nil?
+
+      paths = Array(expand).map(&:to_s).uniq
       return Expansion::NONE if paths.empty?
       return wildcard_expansion(version:, view:) if paths.include?("*")
 
-      unknown = paths.reject { |path| expandable_path?(path, version:, view:) }
-      return Expansion.build(paths) if unknown.empty?
-      raise InvalidExpandError.new(paths: unknown) if Versponse.configuration.unknown_expand == :raise
-
-      Expansion.build(paths - unknown)
+      @expansions.fetch([version, view.to_sym, Versponse.configuration.unknown_expand, paths.sort]) do
+        build_expansion(paths, version:, view:)
+      end
     end
 
     # Clears compiled plans, schemas, schemers, checkers and resolved versions
@@ -175,6 +181,21 @@ module Versponse
       raise ArgumentError, "version: is required when config.current_version is not set" unless current
 
       current.call.to_s
+    end
+
+    def build_expansion(paths, version:, view:)
+      unknown = paths.reject { |path| expandable_path?(path.delete_suffix(".*"), version:, view:) }
+      raise InvalidExpandError.new(paths: unknown) if unknown.any? && Versponse.configuration.unknown_expand == :raise
+
+      Expansion.build((paths - unknown).flat_map { |path| with_wildcards(path, version:, view:) })
+    end
+
+    # "<path>.*" is the path plus every expandable path below it
+    def with_wildcards(path, version:, view:)
+      return [path] unless path.end_with?(".*")
+
+      prefix = path.delete_suffix(".*")
+      [prefix, *expandable_paths(version:, view:).select { |known| known.start_with?("#{prefix}.") }]
     end
 
     # "*" expands every path expandable_paths lists, so each recursive association expands once

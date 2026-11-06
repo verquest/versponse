@@ -63,6 +63,22 @@ class ExpandablePathsTest < Minitest::Test
     assert_match(/Unknown expand paths: nope, deal/, error.message)
   end
 
+  # The validated tree is cached, so repeated requests with the same expand: skip the walk
+  def test_expansions_are_cached
+    first = UnitResponse.versponse.expansion(%w[deal.stage category], version: "2025-09", view: :default)
+
+    assert_same first, UnitResponse.versponse.expansion([:category, "deal.stage"], version: "2025-09", view: :default)
+  end
+
+  # "<path>.*" expands the association and every expandable path under it, like "*" does from the top
+  def test_wildcard_under_a_path
+    unit = Unit.new("u1", Deal.new("d1", Stage.new("s1")), Category.new("c1", [Category.new("c2", [])]), {stage: Stage.new("s2")})
+
+    assert_equal [{"id" => "c2"}], UnitResponse.serialize(unit, version: "2025-09", expand: ["category"])["category"]["children"]
+    assert_equal [{"id" => "c2", "children" => []}], UnitResponse.serialize(unit, version: "2025-09", expand: ["category.*"])["category"]["children"]
+    assert_raises(Versponse::InvalidExpandError) { serialize(["nope.*"]) }
+  end
+
   def test_unknown_paths_can_be_ignored
     with_configuration(unknown_expand: :ignore) do
       assert_equal({"id" => "s1"}, serialize(%w[deal.stage nope])["deal"]["stage"])
