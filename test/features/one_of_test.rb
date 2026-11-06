@@ -55,17 +55,17 @@ class OneOfTest < Minitest::Test
   end
 
   def test_schema
-    expected = {
+    variants = {
       "oneOf" => [
         {"$ref" => "#/components/schemas/OrderResponse"},
-        {"$ref" => "#/components/schemas/TenancyResponse"},
-        {"type" => "null"}
+        {"$ref" => "#/components/schemas/TenancyResponse"}
       ],
       "discriminator" => {
         "propertyName" => "object",
         "mapping" => {"order" => "#/components/schemas/OrderResponse", "tenancy" => "#/components/schemas/TenancyResponse"}
       }
     }
+    expected = {"anyOf" => [variants, {"type" => "null"}]}
 
     assert_equal expected, TaskResponse.to_schema(version: "2025-09")["properties"]["resource"]
   end
@@ -75,7 +75,7 @@ class OneOfTest < Minitest::Test
       schema = TaskResponse.to_schema(version: "2025-09")["properties"]["resource"]
 
       assert schema["nullable"]
-      assert_equal 2, schema["oneOf"].size
+      assert_equal 2, schema["allOf"].first["oneOf"].size
     end
   end
 

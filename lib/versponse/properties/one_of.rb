@@ -52,11 +52,18 @@ module Versponse
       #   with a mapping built from each variant's const, is left out of validation schemas and of expandable
       #   one_of schemas (a collapsed payload carries the same value as the full form, so a mapping would
       #   send it to the full schema)
+      #   A nullable one_of with a documented discriminator keeps null outside the discriminated oneOf, which
+      #   would otherwise reject it.
       # @raise [Versponse::DefinitionError] when a variant lacks the discriminator const or two variants share a value
       def schema(context)
         schemas = @variants.flat_map { |variant| variant_schemas(variant, context) }
-        schema = nullable_choice(expandable? ? "anyOf" : "oneOf", schemas, context)
-        schema["discriminator"] = {"propertyName" => @discriminator, "mapping" => discriminator_mapping(context.version)} if @discriminator && !expandable? && !context.validation?
+        keyword = expandable? ? "anyOf" : "oneOf"
+        schema = if @discriminator && !expandable? && !context.validation?
+          discriminator = {"propertyName" => @discriminator, "mapping" => discriminator_mapping(context.version)}
+          nullable_ref({keyword => schemas, "discriminator" => discriminator}, context)
+        else
+          nullable_choice(keyword, schemas, context)
+        end
         schema.merge(schema_options)
       end
 

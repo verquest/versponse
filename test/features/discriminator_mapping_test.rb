@@ -50,6 +50,23 @@ class DiscriminatorMappingTest < Minitest::Test
     assert_equal expected, discriminator(single(OrderResponse))["discriminator"]
   end
 
+  # A null branch inside the discriminated oneOf would fail the discriminator, so null sits beside it
+  def test_nullable_one_of_keeps_null_outside_the_discriminated_variants
+    klass = Class.new(Versponse::Base) do
+      version "2025-09" do
+        one_of :x, discriminator: "object", nullable: true do
+          reference from: OrderResponse, match: ::Object
+        end
+      end
+    end
+    schema = discriminator(klass)
+
+    assert_equal({"type" => "null"}, schema["anyOf"].last)
+    assert_equal [{"$ref" => "#/components/schemas/OrderResponse"}], schema["anyOf"].first["oneOf"]
+    assert_equal "object", schema["anyOf"].first["discriminator"]["propertyName"]
+    assert_nil schema["discriminator"]
+  end
+
   def test_mapping_in_a_collection_uses_variant_views
     klass = Class.new(Versponse::Base) do
       version "2025-09" do
