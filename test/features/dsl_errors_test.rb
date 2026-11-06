@@ -19,6 +19,19 @@ class DslErrorsTest < Minitest::Test
     end
   end
 
+  def test_conditions_must_be_callable
+    assert_raises(Versponse::DefinitionError) { define { version("2025-09") { field :a, type: :string, if: :a? } } }
+    assert_raises(Versponse::DefinitionError) { define { version("2025-09") { field :a, type: :string, unless: "a" } } }
+  end
+
+  def test_symbol_procs_read_from_the_object
+    klass = define do
+      version("2025-09") { field(:name, type: :string, if: :name.to_proc, &:name) }
+    end
+
+    assert_equal({"name" => "Leeds"}, klass.serialize(Struct.new(:name).new("Leeds"), version: "2025-09"))
+  end
+
   def test_view_outside_a_version
     assert_raises(Versponse::DefinitionError) { define { view(:embedded) {} } }
   end

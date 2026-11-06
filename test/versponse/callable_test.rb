@@ -41,6 +41,24 @@ class Versponse::CallableTest < Minitest::Test
     assert_raises(Versponse::DefinitionError) { Versponse::Callable.normalize(->(_object, context:) { context }) }
   end
 
+  def test_symbol_procs_take_the_object_only
+    wrapped = Versponse::Callable.normalize(:upcase.to_proc)
+
+    assert_equal "AB", wrapped.call("ab", {})
+  end
+
+  def test_methods_with_unnamed_rest_parameters_take_the_object_only
+    wrapped = Versponse::Callable.normalize((+"ab").method(:concat))
+
+    assert_equal "abx", wrapped.call(+"x", {})
+  end
+
+  def test_rejects_values_that_are_not_callable
+    error = assert_raises(Versponse::DefinitionError) { Versponse::Callable.normalize(:active?) }
+
+    assert_equal "expected a callable (a Proc, lambda or Method), got :active?", error.message
+  end
+
   def test_rejects_other_arities
     assert_raises(Versponse::DefinitionError) { Versponse::Callable.normalize(->(_name, _object, _options) { true }) }
   end
