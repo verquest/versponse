@@ -33,13 +33,22 @@ module Versponse
       @builder ||= Builder.new(@klass)
     end
 
+    # @return [String, nil] class-level description of this class or its closest ancestor that sets one
+    def description
+      versions.description || ancestor&.description
+    end
+
+    # @return [Hash{String => Object}] class-level schema options of this class, or of its closest ancestor that sets some
+    def schema_options
+      versions.schema_options.empty? ? (ancestor&.schema_options || {}) : versions.schema_options
+    end
+
     # @return [Versponse::SupportedVersions, nil] range declared with supported_versions on this class
     #   or its closest ancestor, nil when every declared version is served
     def supported_version_range
       return @supported_version_range if defined?(@supported_version_range)
 
-      superclass = @klass.superclass
-      superclass.versponse.supported_version_range if superclass < Base
+      ancestor&.supported_version_range
     end
 
     # Names that resolve within supported_versions: the declared versions in range plus min,
@@ -198,6 +207,11 @@ module Versponse
     end
 
     private
+
+    def ancestor
+      superclass = @klass.superclass
+      superclass.versponse if superclass < Base
+    end
 
     # Versponse.reset_caches! bumps a global generation instead of walking every class; each class clears
     # its own caches on next use. One Integer comparison per call.

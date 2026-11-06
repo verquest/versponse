@@ -111,6 +111,23 @@ class SchemaTest < Minitest::Test
     refute_same plan, klass.versponse.plan(version: "2025-09")
   end
 
+  class AppResponse < Versponse::Base
+    description "Shared"
+    schema_options additional_properties: true
+  end
+
+  class InheritingResponse < AppResponse
+    version("2025-09") { field :id, type: :string }
+  end
+
+  # Like supported_versions, class-level settings of an abstract base reach its subclasses
+  def test_subclasses_inherit_description_and_schema_options
+    schema = InheritingResponse.to_schema(version: "2025-09")
+
+    assert_equal "Shared", schema["description"]
+    assert schema["additionalProperties"]
+  end
+
   def test_component_names
     assert_equal "ProductResponse", ProductResponse.component_name
     assert_equal "ProductResponseCompact", ProductResponse.component_name(view: :compact)

@@ -291,8 +291,8 @@ module Versponse
     end
 
     def finish_version(definition)
-      definition.description ||= @klass.versponse.versions.description
-      definition.schema_options = @klass.versponse.versions.schema_options.merge(definition.schema_options)
+      definition.description ||= @klass.versponse.description
+      definition.schema_options = @klass.versponse.schema_options.merge(definition.schema_options)
       @klass.versponse.versions.add(definition.finalize!)
       @last_version = definition
       # Any class may embed this one in a plan or validation schema, so a reopened class (forward
