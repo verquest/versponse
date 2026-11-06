@@ -45,7 +45,7 @@ module Versponse
         raise Unsupported, "unknown anchor" unless (@refs - @anchors.keys).empty?
 
         @anchors.freeze
-        checker
+        Root.new(checker)
       end
 
       # @param schema [Hash, Boolean] schema or subschema

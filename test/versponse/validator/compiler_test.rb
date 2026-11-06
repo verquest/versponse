@@ -95,4 +95,14 @@ class Versponse::Validator::CompilerTest < Minitest::Test
     assert_nil compile({"$ref" => "#Missing"})
     assert_nil compile({"type" => "string", "contentEncoding" => "base64"})
   end
+
+  # A non-String key hands the whole value to json_schemer; inside oneOf, failing just that branch
+  # would let the other branch match alone and accept what json_schemer rejects
+  def test_non_string_keys_defer_to_json_schemer
+    schema = {"oneOf" => [{"additionalProperties" => {"type" => "string"}}, {"type" => "object"}]}
+    data = {x: "s"}
+
+    refute JSONSchemer.schema(schema, meta_schema: JSONSchemer::OpenAPI31::BASE_URI.to_s).valid?(data)
+    refute compile(schema).valid?(data)
+  end
 end

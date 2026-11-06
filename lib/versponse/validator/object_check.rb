@@ -35,7 +35,7 @@ module Versponse
         freeze
       end
 
-      # A Hash with a non-String key is reported invalid, which hands it to json_schemer
+      # A Hash with a non-String key throws {Root::DEFER}, which hands it to json_schemer
       #
       # @param data [Object] value to check; anything but a Hash passes
       # @return [Boolean] true when the Hash matches
@@ -48,7 +48,9 @@ module Versponse
       private
 
       def member_valid?(key, value)
-        key.is_a?(String) && @properties.fetch(key, @additional).valid?(value)
+        throw Root::DEFER unless key.is_a?(String)
+
+        @properties.fetch(key, @additional).valid?(value)
       end
     end
   end
