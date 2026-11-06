@@ -20,15 +20,7 @@ class Versponse::ExpansionTest < Minitest::Test
     refute expansion.child("site").expand?("address")
   end
 
-  def test_all_expands_everything_at_every_depth
-    all = Versponse::Expansion::ALL
-
-    assert all.expand?("anything")
-    assert_same all, all.child("anything")
-  end
-
-  def test_wildcard_empty_and_symbols
-    assert_same Versponse::Expansion::ALL, build(["*", "site"])
+  def test_empty_and_symbols
     assert_same Versponse::Expansion::NONE, build([])
     assert build([:site]).expand?("site")
   end

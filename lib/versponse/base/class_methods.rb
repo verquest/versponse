@@ -199,6 +199,7 @@ module Versponse
       schemers.clear
       checkers.clear
       expandable_path_cache.clear
+      wildcard_cache.clear
       versions.clear_resolved
     end
 
@@ -222,6 +223,10 @@ module Versponse
 
     def expandable_path_cache
       @expandable_path_cache ||= Cache.new
+    end
+
+    def wildcard_cache
+      @wildcard_cache ||= Cache.new
     end
 
     def property_validation_schema(version, view, key)
@@ -254,13 +259,22 @@ module Versponse
 
     def expansion_for(expand, version:, view:)
       paths = Array(expand).map(&:to_s)
-      return Expansion.build(paths) if paths.empty? || paths.include?("*")
+      return Expansion::NONE if paths.empty?
+      return wildcard_expansion(version:, view:) if paths.include?("*")
 
       unknown = paths.reject { |path| expandable_path?(path, version:, view:) }
       return Expansion.build(paths) if unknown.empty?
       raise InvalidExpandError.new(paths: unknown) if Versponse.configuration.unknown_expand == :raise
 
       Expansion.build(paths - unknown)
+    end
+
+    # "*" expands every path expandable_paths lists, so each recursive association expands once
+    # and cyclic object graphs can't recurse forever
+    def wildcard_expansion(version:, view:)
+      wildcard_cache.fetch([version, view.to_sym]) do
+        Expansion.build(expandable_paths(version:, view:))
+      end
     end
 
     # Walks the requested path one segment at a time; valid when the last segment is expandable.

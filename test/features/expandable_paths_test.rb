@@ -114,6 +114,16 @@ class ExpandablePathsTest < Minitest::Test
     assert_equal({"id" => "c1", "children" => []}, serialize(["*"])["category"])
   end
 
+  # "*" expands the paths expandable_paths lists, so a cyclic object graph can't recurse forever
+  def test_wildcard_expands_each_recursive_association_once
+    cyclic = Category.new("c1", [])
+    cyclic.children << cyclic
+
+    result = CategoryResponse.serialize(cyclic, version: "2025-09", expand: ["*"])
+
+    assert_equal({"id" => "c1", "children" => [{"id" => "c1", "children" => [{"id" => "c1"}]}]}, result)
+  end
+
   def test_unknown_expand_setting_is_validated
     assert_raises(ArgumentError) { Versponse::Configuration.new.unknown_expand = :maybe }
   end

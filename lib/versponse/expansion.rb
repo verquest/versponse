@@ -6,14 +6,11 @@ module Versponse
   #
   # @api private
   class Expansion
-    # @param paths [Array<String, Symbol>] dotted paths, or "*" for everything
-    # @return [Expansion] the tree (NONE for no paths, ALL for "*")
+    # @param paths [Array<String, Symbol>] dotted paths
+    # @return [Expansion] the tree (NONE for no paths)
     def self.build(paths)
-      paths = paths.map(&:to_s)
-      return ALL if paths.include?("*")
-
       tree = {}
-      paths.each { |path| path.split(".").reduce(tree) { |node, key| node[key] ||= {} } }
+      paths.map(&:to_s).each { |path| path.split(".").reduce(tree) { |node, key| node[key] ||= {} } }
       from_hash(tree)
     end
 
@@ -26,28 +23,24 @@ module Versponse
     end
 
     # @param children [Hash{String => Expansion}] expanded keys and their nodes
-    # @param all [Boolean] true for the node that expands everything at every depth
-    def initialize(children = {}, all: false)
+    def initialize(children = {})
       @children = children.freeze
-      @all = all
       freeze
     end
 
     # @param key [String] output key
     # @return [Boolean] whether the association under key is expanded
     def expand?(key)
-      @all || @children.key?(key)
+      @children.key?(key)
     end
 
     # @param key [String] output key
     # @return [Expansion] the node for the key's children
     def child(key)
-      @all ? self : @children.fetch(key, NONE)
+      @children.fetch(key, NONE)
     end
 
     # Nothing expanded
     NONE = new
-    # Everything expanded, at every depth
-    ALL = new(all: true)
   end
 end
