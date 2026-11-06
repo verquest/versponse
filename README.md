@@ -360,7 +360,7 @@ class PublicApiDocument < Versponse::OpenAPI::Document
 end
 
 PublicApiDocument.build(version: "2025-09")      # => String-keyed Hash
-PublicApiDocument.validate(version: "2025-09")   # => [] when valid OpenAPI 3.1
+PublicApiDocument.validate(version: "2025-09")   # => [] when valid OpenAPI and every "#/..." $ref resolves
 ```
 
 - Values use OpenAPI's own key names, which are never camelized. A block that takes an argument receives the version.

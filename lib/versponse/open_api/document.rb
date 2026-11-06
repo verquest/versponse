@@ -39,14 +39,19 @@ module Versponse
           Builder.new(declarations, version.to_s).call
         end
 
+        # Validates against the OpenAPI meta-schema, and checks that every local "$ref" ("#/...") resolves,
+        # which the meta-schema can't (a referenced class left out of responses, say)
+        #
         # @param version [String] version to build and validate
         # @return [Array<Hash>] errors with :pointer, :type, :message and :details (empty when valid)
         def validate(version:)
           require "json_schemer"
 
-          JSONSchemer.openapi(build(version:)).validate.map do |error|
+          document = build(version:)
+          errors = JSONSchemer.openapi(document).validate.map do |error|
             {pointer: error["data_pointer"], type: error["type"], message: error["error"], details: error["details"]}
           end
+          errors + RefCheck.call(document)
         end
 
         # @param value [String, Symbol, nil] the prefix to declare, nil to read it

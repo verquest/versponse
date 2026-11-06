@@ -38,6 +38,16 @@ class OpenapiComponentsTest < Minitest::Test
     end
   end
 
+  # Outside the Api namespace; its reference to Api::SiteResponse dangles in a document without it
+  module Elsewhere
+    class OwnerResponse < Versponse::Base
+      version "2025-09" do
+        field :id, type: :string
+        reference :site, from: Api::SiteResponse
+      end
+    end
+  end
+
   class ApiDocument < Versponse::OpenAPI::Document
     info "title" => "API"
     responses namespace: "OpenapiComponentsTest::Api"
@@ -92,6 +102,20 @@ class OpenapiComponentsTest < Minitest::Test
 
     assert_equal "meta", schemas(document)["ApiMetaResponse"]["x-tag"]
     refute Api::MetaResponse.to_schema(version: "2025-09").key?("x-tag")
+  end
+
+  def test_validate_reports_dangling_refs
+    document = Class.new(Versponse::OpenAPI::Document) do
+      info "title" => "API"
+      responses [Elsewhere::OwnerResponse]
+    end
+    errors = document.validate(version: "2025-09")
+    error = errors.first
+
+    assert_equal 1, errors.size
+    assert_equal "/components/schemas/ElsewhereOwnerResponse/properties/site", error[:pointer]
+    assert_equal "ref", error[:type]
+    assert_equal "$ref #/components/schemas/ApiSiteResponse does not resolve in the document", error[:message]
   end
 
   def test_schema_collisions_raise
