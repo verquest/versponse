@@ -140,6 +140,20 @@ class SupportedVersionsTest < Minitest::Test
     assert_raises(Versponse::VersionNotFoundError) { klass.versponse.resolve("2025-07") }
   end
 
+  # The canonical name is an internal detail; errors name what the client asked for
+  def test_errors_name_the_requested_version
+    klass = define do
+      supported_versions max: "2026-03"
+      version("2025-01") { field :a, type: :string }
+    end
+    assert_raises(Versponse::VersionNotFoundError) { klass.serialize({a: "x"}, version: "2026-04") }
+
+    error = assert_raises(Versponse::VersionNotFoundError) { klass.serialize({a: "x"}, version: "2026-05") }
+
+    assert_match(/\AVersion 2026-05 is outside/, error.message)
+    assert_match(/\AVersion 2026-05 /, assert_raises(Versponse::VersionNotFoundError) { klass.to_schema(version: "2026-05") }.message)
+  end
+
   def test_min_defaults_to_the_first_declared_version
     assert_raises(Versponse::VersionNotFoundError) { LegacyResponse.serialize({reason: "x"}, version: "2025-01") }
   end

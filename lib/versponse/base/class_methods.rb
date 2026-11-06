@@ -33,13 +33,14 @@ module Versponse
       raise ArgumentError, "meta: requires root:" if meta && root.nil?
 
       internals = versponse
-      version = internals.version_name(version)
-      plan = internals.plan(version:, view:)
-      expansion = internals.expansion(expand, version:, view:)
-      context = context.frozen? ? context : context.dup.freeze
-      data = Collections.collection?(object) ? Collections.map(Collections.items(object)) { |item| plan.call(item, context, expansion) } : plan.call(object, context, expansion)
-      OutputValidator.call(self, data, version:, view:) if Versponse.configuration.validate_output
-      Wrapper.wrap(data, root:, meta:)
+      internals.requesting(version) do |canonical|
+        plan = internals.plan(version: canonical, view:)
+        expansion = internals.expansion(expand, version: canonical, view:)
+        context = context.frozen? ? context : context.dup.freeze
+        data = Collections.collection?(object) ? Collections.map(Collections.items(object)) { |item| plan.call(item, context, expansion) } : plan.call(object, context, expansion)
+        OutputValidator.call(self, data, version: canonical, view:) if Versponse.configuration.validate_output
+        Wrapper.wrap(data, root:, meta:)
+      end
     end
 
     # @param object [Object] source
@@ -61,10 +62,9 @@ module Versponse
     def to_schema(version: nil, view: :default, root: nil, meta: nil, collection: false)
       raise ArgumentError, "meta: requires root:" if meta && root.nil?
 
-      version = versponse.version_name(version)
       return DeepFreeze.call(Wrapper.schema(self, view:, root:, meta:, collection:)) if root
 
-      versponse.openapi_schema(version:, view:)
+      versponse.requesting(version) { |canonical| versponse.openapi_schema(version: canonical, view:) }
     end
 
     # Schema with every reference inlined, for validation
@@ -75,10 +75,11 @@ module Versponse
     # @return [Hash] frozen schema
     # @raise [Versponse::PropertyNotFoundError] for an unknown property
     def to_validation_schema(version: nil, view: :default, property: nil)
-      version = versponse.version_name(version)
-      return versponse.property_validation_schema(version:, view:, key: property.to_s) if property
+      versponse.requesting(version) do |canonical|
+        next versponse.property_validation_schema(version: canonical, view:, key: property.to_s) if property
 
-      versponse.validation_schema(version:, view:)
+        versponse.validation_schema(version: canonical, view:)
+      end
     end
 
     # Component name without the view suffix: the class name without its first namespace, squashed.
@@ -109,7 +110,7 @@ module Versponse
     # @param view [Symbol] view name
     # @return [Array<String>] sorted, frozen paths such as ["deal.stage", "site"]
     def expandable_paths(version: nil, view: :default)
-      versponse.expandable_paths(version: versponse.version_name(version), view:)
+      versponse.requesting(version) { |canonical| versponse.expandable_paths(version: canonical, view:) }
     end
   end
 end

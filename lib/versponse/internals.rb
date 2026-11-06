@@ -70,6 +70,23 @@ module Versponse
       Registry.canonical(version&.to_s || current_version_name)
     end
 
+    # Yields the canonical name of the requested version. Caches and errors work with canonical names, so a
+    # VersionNotFoundError is re-raised naming what was requested.
+    #
+    # @param version [String, Symbol, nil] requested version, config.current_version when nil
+    # @yieldparam canonical [String] canonical version name
+    # @return [Object] the block's result
+    # @raise [ArgumentError] without a version when config.current_version is not set
+    def requesting(version)
+      requested = version&.to_s || current_version_name
+      canonical = Registry.canonical(requested)
+      yield canonical
+    rescue VersionNotFoundError => e
+      raise if canonical.nil? || requested == canonical
+
+      raise e.exception(e.message.sub("Version #{canonical} ", "Version #{requested} "))
+    end
+
     # @param version [String] canonical (declared) version name, as serialize and nested references pass it;
     #   raw client strings would grow the cache
     # @param view [Symbol] view name
