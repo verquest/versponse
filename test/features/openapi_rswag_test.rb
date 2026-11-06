@@ -33,13 +33,13 @@ class OpenapiRswagTest < Minitest::Test
     assert_same document, adapter["api/2025-09.json"]
   end
 
-  def test_documents_are_rebuilt_after_a_cache_reset
+  # rswag merges its paths into the returned documents, so they're built once and kept
+  def test_documents_keep_what_rswag_adds
     rswag = specs
-    first = rswag["api/2025-09.json"]
+    rswag["api/2025-09.json"][:paths] = {"/users" => {}}
     Versponse.reset_caches!
 
-    refute_same first, rswag["api/2025-09.json"]
-    assert_same rswag["api/2025-09.json"], rswag["api/2025-09.json"]
+    assert_equal({"/users" => {}}, rswag["api/2025-09.json"][:paths])
   end
 
   def test_security_scheme_type_and_in_are_symbols_for_rswag

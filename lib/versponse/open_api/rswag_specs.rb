@@ -17,17 +17,15 @@ module Versponse
           document.document_versions.each { |version| entries["#{document.document_name}/#{version}.json"] = [document, version] }
         end
         @built = {}
-        @generation = Versponse.cache_generation
       end
 
       # @param key [String] e.g. "public_api/2025-09.json" (.yaml and .yml are accepted too)
-      # @return [Hash, nil] the symbol-keyed document, nil for an unknown key (rswag checks for nil);
-      #   built once, and again after {Versponse.reset_caches!}
+      # @return [Hash, nil] the symbol-keyed document, nil for an unknown key (rswag checks for nil); built on
+      #   first access and kept, because rswag merges its paths into it (so load response classes first)
       def [](key)
         key = normalize(key)
         return unless @entries.key?(key)
 
-        forget_stale_documents
         @built[key] ||= symbolize_security_schemes(symbolize(build(key)))
       end
 
@@ -69,13 +67,6 @@ module Versponse
       end
 
       private
-
-      def forget_stale_documents
-        return if @generation == Versponse.cache_generation
-
-        @built = {}
-        @generation = Versponse.cache_generation
-      end
 
       def normalize(key)
         key.to_s.sub(/\.ya?ml\z/, ".json")
