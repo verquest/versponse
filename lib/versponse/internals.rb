@@ -26,6 +26,7 @@ module Versponse
       @expandable_paths = Cache.new
       @wildcards = Cache.new
       @expansions = Cache.new(limit: EXPANSION_LIMIT)
+      @generation = Versponse.cache_generation
     end
 
     # @return [Versponse::SupportedVersions, nil] range declared with supported_versions on this class
@@ -51,6 +52,7 @@ module Versponse
     # @raise [Versponse::VersionNotFoundError] when there is none, or supported_versions leaves it out
     # @raise [Versponse::DefinitionError] when supported_versions max sorts before every declared version
     def resolve(version)
+      fresh!
       versions.resolve(Registry.canonical(version.to_s), supported: supported_version_range)
     end
 
@@ -69,6 +71,7 @@ module Versponse
     # @param view [Symbol] view name
     # @return [Versponse::Plan] compiled, cached plan
     def plan(version:, view: :default)
+      fresh!
       # Keyed by version, then view, so a cached lookup allocates no key Array
       @plans.fetch(version) { Cache.new }.fetch(view.to_sym) do
         definition = resolve(version)
@@ -92,6 +95,7 @@ module Versponse
     # @param view [Symbol] view name
     # @return [Hash] frozen OpenAPI schema
     def openapi_schema(version:, view:)
+      fresh!
       @schemas.fetch([:openapi, version, view.to_sym]) do
         DeepFreeze.call(object_schema(version:, view:, context: SchemaContext.new(version:, validation: false)))
       end
@@ -101,6 +105,7 @@ module Versponse
     # @param view [Symbol] view name
     # @return [Hash] frozen schema with every reference inlined
     def validation_schema(version:, view:)
+      fresh!
       @schemas.fetch([:validation, version, view.to_sym]) do
         context = SchemaContext.new(version:, validation: true)
         DeepFreeze.call(context.inline([@klass, view.to_sym], @klass.component_name(view:)) { object_schema(version:, view:, context:) })
@@ -113,6 +118,7 @@ module Versponse
     # @return [Hash] frozen validation schema of one property
     # @raise [Versponse::PropertyNotFoundError] for an unknown property
     def property_validation_schema(version:, view:, key:)
+      fresh!
       @schemas.fetch([:validation, version, view.to_sym, key]) do
         target = resolve(version).properties_for(view).find { |property| property.key == key } ||
           raise(PropertyNotFoundError, "Property #{key} not found in #{@klass.name} #{version}/#{view}")
@@ -124,6 +130,7 @@ module Versponse
     # @param view [Symbol] view name
     # @return [JSONSchemer::Schema] compiled, cached validation schema
     def schemer(version:, view: :default)
+      fresh!
       @schemers.fetch([version, view.to_sym]) do
         require "json_schemer"
         JSONSchemer.schema(validation_schema(version:, view:), meta_schema: Versponse.configuration.json_schema_uri)
@@ -134,6 +141,7 @@ module Versponse
     # @param view [Symbol] view name
     # @return [#valid?, nil] fast checker compiled from the validation schema, nil when it uses keywords the compiler does not support
     def checker(version:, view: :default)
+      fresh!
       @checkers.fetch([version, view.to_sym]) do
         Validator::Compiler.call(validation_schema(version:, view:), schemer(version:, view:))
       end
@@ -143,6 +151,7 @@ module Versponse
     # @param view [Symbol] view name
     # @return [Array<String>] sorted, frozen expandable paths
     def expandable_paths(version:, view:)
+      fresh!
       @expandable_paths.fetch([version, view.to_sym]) do
         References.nested_paths(@klass, view: view.to_sym, version:, prefix: [], stack: []).map { |path| path.join(".") }.uniq.sort.freeze
       end
@@ -158,6 +167,7 @@ module Versponse
     def expansion(expand, version:, view:)
       return Expansion::NONE if expand.nil?
 
+      fresh!
       paths = Array(expand).map(&:to_s).uniq
       return Expansion::NONE if paths.empty?
       return wildcard_expansion(version:, view:) if paths.include?("*")
@@ -167,15 +177,18 @@ module Versponse
       end
     end
 
-    # Clears compiled plans, schemas, schemers, checkers and resolved versions
-    #
-    # @return [void]
-    def reset_caches!
-      [@plans, @schemas, @schemers, @checkers, @expandable_paths, @wildcards].each(&:clear)
-      versions.clear_resolved
-    end
-
     private
+
+    # Versponse.reset_caches! bumps a global generation instead of walking every class; each class clears
+    # its own caches on next use. One Integer comparison per call.
+    def fresh!
+      generation = Versponse.cache_generation
+      return if @generation == generation
+
+      [@plans, @schemas, @schemers, @checkers, @expandable_paths, @wildcards, @expansions].each(&:clear)
+      versions.clear_resolved
+      @generation = generation
+    end
 
     def current_version_name
       current = Versponse.configuration.current_version

@@ -100,6 +100,17 @@ class SchemaTest < Minitest::Test
     config.default_additional_properties = false
   end
 
+  # Defining a class bumps the cache generation; other classes rebuild on next use instead of eagerly
+  def test_defining_a_class_invalidates_other_classes_lazily
+    klass = Class.new(Versponse::Base) { version("2025-09") { field :id, type: :string } }
+    plan = klass.versponse.plan(version: "2025-09")
+    generation = Versponse.cache_generation
+    Class.new(Versponse::Base) { version("2025-09") { field :x, type: :string } }
+
+    assert_operator Versponse.cache_generation, :>, generation
+    refute_same plan, klass.versponse.plan(version: "2025-09")
+  end
+
   def test_component_names
     assert_equal "ProductResponse", ProductResponse.component_name
     assert_equal "ProductResponseCompact", ProductResponse.component_name(view: :compact)
