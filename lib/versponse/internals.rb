@@ -247,7 +247,14 @@ module Versponse
       generation = Versponse.cache_generation
       return if @generation == generation
 
-      [@plans, @schemas, @schemers, @checkers, @expandable_paths, @expansions].each(&:clear)
+      # New objects, not clear: a compile in flight on this thread holds the old caches' locks,
+      # and finishes into the discarded cache
+      @plans = Cache.new
+      @schemas = Cache.new
+      @schemers = Cache.new
+      @checkers = Cache.new
+      @expandable_paths = Cache.new
+      @expansions = Cache.new(limit: EXPANSION_LIMIT)
       versions.clear_resolved
       @generation = generation
     end

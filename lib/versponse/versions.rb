@@ -102,7 +102,8 @@ module Versponse
 
     # @return [void]
     def clear_resolved
-      @resolved.clear
+      # A new object, not clear: the caller may be inside a resolution holding the old cache's lock
+      @resolved = Cache.new
     end
 
     private
