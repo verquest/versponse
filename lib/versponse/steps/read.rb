@@ -29,9 +29,23 @@ module Versponse
       # @return [void]
       # @raise [KeyError] when a Hash has neither key; NoMethodError when an object has no such method
       def call(object, hash, _context, output, _expansion)
+        output[@key] = hash ? object.fetch(@symbol) { object.fetch(@string) } : object.public_send(@symbol)
+      end
+    end
+
+    # A plain field with a formatter, applied to non-nil values
+    #
+    # @api private
+    class ReadFormatted < Read
+      # @param object [Object] source
+      # @param hash [Boolean] whether the source is a Hash
+      # @param _context [Hash] unused
+      # @param output [Hash] Hash being built
+      # @param _expansion [Versponse::Expansion] unused
+      # @return [void]
+      def call(object, hash, _context, output, _expansion)
         value = hash ? object.fetch(@symbol) { object.fetch(@string) } : object.public_send(@symbol)
-        value = @formatter.call(value) if @formatter && !value.nil?
-        output[@key] = value
+        output[@key] = value.nil? ? nil : @formatter.call(value)
       end
     end
   end

@@ -196,7 +196,7 @@ module Versponse
 
       # A plain field (no block, condition or path map:) compiles to the specialized Steps::Read
       def value_step(formatter: nil)
-        return Steps::Read.new(key:, name: map || name, formatter:) if plain_read?
+        return (formatter ? Steps::ReadFormatted : Steps::Read).new(key:, name: map || name, formatter:) if plain_read?
 
         Steps::Value.new(key:, extractor:, condition:, formatter:)
       end
