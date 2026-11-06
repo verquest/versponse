@@ -128,6 +128,14 @@ class SchemaTest < Minitest::Test
     assert schema["additionalProperties"]
   end
 
+  # nullable: adds nil to an enum: option, as the enum property does
+  def test_nullable_field_enum_lists_nil
+    klass = Class.new(Versponse::Base) { version("2025-09") { field :s, type: :string, enum: %w[a b], nullable: true } }
+
+    assert_equal ["a", "b", nil], klass.to_schema(version: "2025-09")["properties"]["s"]["enum"]
+    assert_equal ["a", "b", nil], klass.to_validation_schema(version: "2025-09")["properties"]["s"]["enum"]
+  end
+
   def test_component_names
     assert_equal "ProductResponse", ProductResponse.component_name
     assert_equal "ProductResponseCompact", ProductResponse.component_name(view: :compact)

@@ -3,6 +3,8 @@
 require "test_helper"
 
 class ReferencePropertyTest < Minitest::Test
+  include ConfigurationTestHelper
+
   Contact = Struct.new(:id, :address, :billing, :show, :note)
   Address = Struct.new(:street, :city)
   Category = Struct.new(:name, :children)
@@ -110,5 +112,16 @@ class ReferencePropertyTest < Minitest::Test
 
     assert_equal({"children" => [{"name" => "Leaf", "children" => []}]}, HolderResponse.serialize(tree, version: "2025-09"))
     assert_equal "CategoryResponse", HolderResponse.to_validation_schema(version: "2025-09")["properties"]["children"]["items"]["$anchor"]
+  end
+
+  # OpenAPI 3.0 ignores keywords next to a $ref, so they go beside an allOf
+  def test_openapi30_keywords_wrap_the_property_ref
+    klass = Class.new(Versponse::Base) { version("2025-09") { reference :billing, from: ContactResponse, property: :address, description: "Billing" } }
+
+    with_configuration(json_schema_version: :openapi30) do
+      schema = klass.to_schema(version: "2025-09")["properties"]["billing"]
+
+      assert_equal({"allOf" => [{"$ref" => "#/components/schemas/ContactResponse/properties/address"}], "description" => "Billing"}, schema)
+    end
   end
 end

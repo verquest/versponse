@@ -15,6 +15,7 @@ module Versponse
       # @raise [Versponse::DefinitionError] for an unknown item type or an invalid union
       def initialize(type:, item_schema_options: {}, **options)
         super(**options)
+        check_keywords!(item_schema_options, label: "#{key} item_schema_options", written_keywords: [])
         @item_type, type_options = FieldType.resolve(type, key)
         @item_schema_options = type_options.merge(Naming.camelize_keys(item_schema_options))
       end

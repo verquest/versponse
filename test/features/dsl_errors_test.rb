@@ -176,6 +176,12 @@ class DslErrorsTest < Minitest::Test
     assert_raises(Versponse::DefinitionError) { Class.new(parent) }
   end
 
+  def test_item_schema_options_are_checked
+    error = assert_raises(Versponse::DefinitionError) { define { version("2025-09") { array :a, type: :string, item_schema_options: {mapp: 1} } } }
+
+    assert_match(/\Aa item_schema_options: unknown options mapp:/, error.message)
+  end
+
   def test_view_cannot_redeclare_an_identifier
     assert_raises(Versponse::DefinitionError) do
       define do

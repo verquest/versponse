@@ -21,9 +21,10 @@ module Versponse
       #   OpenAPI 3.0 documents, with keywords on the outer node and nullable on each branch. nullable: never
       #   changes a declared any_of, so a nullable field's any_of must list {"type" => "null"} itself.
       def schema(context)
-        return nullable_type({"type" => @type}.merge(schema_options), context) unless openapi30_union?(@type, context)
+        options = (nullable? && schema_options["enum"]) ? schema_options.merge("enum" => schema_options["enum"] | [nil]) : schema_options
+        return nullable_type({"type" => @type}.merge(options), context) unless openapi30_union?(@type, context)
 
-        FieldType.openapi30_union(@type, schema_options, nullable: nullable?)
+        FieldType.openapi30_union(@type, options, nullable: nullable?)
       end
 
       # @param version [String] unused by scalars

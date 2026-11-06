@@ -36,14 +36,12 @@ module Versponse
       #   beside an allOf around a bare $ref in OpenAPI 3.0 documents, which ignore $ref siblings
       # @raise [Versponse::DefinitionError] when a property: does not exist
       def schema(context)
-        return referenced_property_schema(context).merge(schema_options) if versponse_property?
+        return with_options(referenced_property_schema(context), context) if versponse_property?
 
         check_foreign_property!(context.version) if @property
         return nullable_choice("anyOf", References.expandable_schemas(@from, view: @view, context:, key:), context).merge(schema_options) if expandable?
 
-        schema = nullable_ref(References.schema(@from, view: @view, property: @property, context:, key:), context)
-        schema = {"allOf" => [schema]} if schema.key?("$ref") && schema_options.any? && nullable_keyword?(context)
-        schema.merge(schema_options)
+        with_options(nullable_ref(References.schema(@from, view: @view, property: @property, context:, key:), context), context)
       end
 
       # @param version [String] canonical version name
@@ -96,6 +94,12 @@ module Versponse
         original = @from.versponse.resolve(version).properties_for(@view).find { |property| property.key == @property } ||
           raise(DefinitionError, "#{key}: property #{@property} not found in #{@from.name} #{version}/#{@view}")
         original.renamed(name:, map:, block:, condition:)
+      end
+
+      # OpenAPI 3.0 ignores keywords next to a $ref, so a bare $ref with keywords is wrapped in allOf
+      def with_options(schema, context)
+        schema = {"allOf" => [schema]} if schema.key?("$ref") && schema_options.any? && nullable_keyword?(context)
+        schema.merge(schema_options)
       end
 
       # A foreign class (a verquest request) answers nil for a property it doesn't have

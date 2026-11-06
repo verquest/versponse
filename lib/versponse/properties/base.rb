@@ -159,9 +159,9 @@ module Versponse
         raise DefinitionError, "#{key}: use either a block or map:, not both" if block && map
       end
 
-      def check_keywords!(options)
-        written = options.keys.find { |option| self.class.written_keywords.include?(Naming.camelize(option)) }
-        raise DefinitionError, "#{key}: #{written}: is written by #{dsl_name} itself" if written
+      def check_keywords!(options, label: key, written_keywords: self.class.written_keywords)
+        written = options.keys.find { |option| written_keywords.include?(Naming.camelize(option)) }
+        raise DefinitionError, "#{label}: #{written}: is written by #{dsl_name} itself" if written
 
         unknown = options.keys.reject do |option|
           keyword = Naming.camelize(option)
@@ -169,7 +169,7 @@ module Versponse
         end
         return if unknown.empty?
 
-        raise DefinitionError, "#{key}: unknown options #{unknown.map { |option| "#{option}:" }.join(", ")}#{suggestions(unknown)}"
+        raise DefinitionError, "#{label}: unknown options #{unknown.map { |option| "#{option}:" }.join(", ")}#{suggestions(unknown)}"
       end
 
       def dsl_name
