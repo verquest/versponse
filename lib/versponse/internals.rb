@@ -145,7 +145,8 @@ module Versponse
     # @return [Hash] object schema of the version and view
     def object_schema(version:, view:, context:)
       definition = resolve(version)
-      return ObjectSchema.build(definition.properties_for(:collapsed), context) if view.to_sym == :collapsed
+      # Collapsed shapes are strict, or any object with an identifier would pass as the full one
+      return ObjectSchema.build(definition.properties_for(:collapsed), context, additional_properties: false) if view.to_sym == :collapsed
 
       ObjectSchema.build(definition.properties_for(view), context, description: definition.description, schema_options: definition.schema_options)
     end

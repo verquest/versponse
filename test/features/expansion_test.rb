@@ -3,6 +3,8 @@
 require "test_helper"
 
 class ExpansionTest < Minitest::Test
+  include ConfigurationTestHelper
+
   Site = Struct.new(:public_id, :name)
   Price = Struct.new(:id, :amount)
   Deal = Struct.new(:id, :stage)
@@ -144,5 +146,15 @@ class ExpansionTest < Minitest::Test
     klass = define { reference :described, from: DescribedResponse, expandable: true }
 
     assert_equal({"described" => {"id" => "d1"}}, klass.serialize({described: {id: "d1", x: "y"}}, version: "2025-09"))
+  end
+
+  # A collapsed shape that allowed extra keys would let any object with an identifier pass as the full one
+  def test_collapsed_shapes_stay_strict_with_additional_properties
+    with_configuration(default_additional_properties: true, validate_output: true) do
+      assert_same false, Versponse.components(version: "2025-09", classes: [SiteResponse])["SiteResponseCollapsed"]["additionalProperties"]
+      assert_raises(Versponse::InvalidOutputError) do
+        UnitResponse.serialize(unit.tap { |value| value.site = {public_id: "s1", name: 5} }, version: "2025-09", expand: ["site"])
+      end
+    end
   end
 end

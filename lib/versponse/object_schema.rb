@@ -9,13 +9,14 @@ module Versponse
     # @param context [Versponse::SchemaContext] schema generation context
     # @param description [String, nil] schema description
     # @param schema_options [Hash] keywords merged last
+    # @param additional_properties [Boolean] additionalProperties (config.default_additional_properties, false for collapsed shapes)
     # @return [Hash] object schema
-    def self.build(properties, context, description: nil, schema_options: {})
+    def self.build(properties, context, description: nil, schema_options: {}, additional_properties: Versponse.configuration.default_additional_properties)
       schema = {"type" => "object"}
       schema["description"] = description if description
       schema["required"] = properties.reject(&:conditional?).map(&:key)
       schema["properties"] = properties.to_h { |property| [property.key, property.schema(context)] }
-      schema["additionalProperties"] = Versponse.configuration.default_additional_properties
+      schema["additionalProperties"] = additional_properties
       schema.merge(schema_options)
     end
   end
