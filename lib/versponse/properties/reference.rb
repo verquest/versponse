@@ -34,9 +34,11 @@ module Versponse
       # @param context [Versponse::SchemaContext] schema generation context
       # @return [Hash] $ref or inlined schema (anyOf full/collapsed when expandable); keywords sit on the outer node,
       #   beside an allOf around a bare $ref in OpenAPI 3.0 documents, which ignore $ref siblings
-      # @raise [Versponse::DefinitionError] when a versponse property: does not exist
+      # @raise [Versponse::DefinitionError] when a property: does not exist
       def schema(context)
         return referenced_property_schema(context).merge(schema_options) if versponse_property?
+
+        check_foreign_property!(context.version) if @property
         return nullable_choice("anyOf", References.expandable_schemas(@from, view: @view, context:), context).merge(schema_options) if expandable?
 
         schema = nullable_ref(References.schema(@from, view: @view, property: @property, context:), context)
@@ -94,6 +96,13 @@ module Versponse
         original = @from.versponse.resolve(version).properties_for(@view).find { |property| property.key == @property } ||
           raise(DefinitionError, "#{key}: property #{@property} not found in #{@from.name} #{version}/#{@view}")
         original.renamed(name:, map:, block:, condition:)
+      end
+
+      # A foreign class (a verquest request) answers nil for a property it doesn't have
+      def check_foreign_property!(version)
+        return unless @from.to_validation_schema(version:, property: @property).nil?
+
+        raise DefinitionError, "#{key}: property #{@property} not found in #{@from.name} #{version}"
       end
 
       def referenced_property_schema(context)

@@ -48,6 +48,15 @@ class VerquestInteropTest < Minitest::Test
     assert_equal ["label"], properties["tags"]["items"]["required"]
   end
 
+  def test_missing_verquest_property_raises
+    klass = Class.new(Versponse::Base) { version("2025-09") { reference :x, from: ContactCreateRequest, property: :missing } }
+
+    error = assert_raises(Versponse::DefinitionError) { klass.to_validation_schema(version: "2025-09") }
+
+    assert_equal "x: property missing not found in VerquestInteropTest::ContactCreateRequest 2025-09", error.message
+    assert_raises(Versponse::DefinitionError) { klass.to_schema(version: "2025-09") }
+  end
+
   def test_values_pass_through
     expected = {"id" => "c1", "address" => {"street" => "Main", "city" => "Leeds"}, "tags" => [{"label" => "vip"}]}
 
