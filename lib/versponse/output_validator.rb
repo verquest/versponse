@@ -22,7 +22,7 @@ module Versponse
       end
       return if errors.empty?
 
-      raise InvalidOutputError.new("#{klass.name} output does not match its #{version}/#{view} schema", errors:)
+      raise InvalidOutputError.new("#{klass.name || "AnonymousResponse"} output does not match its #{version}/#{view} schema", errors:)
     end
 
     # The compiled checker is the fast path; json_schemer runs only when it fails or is missing

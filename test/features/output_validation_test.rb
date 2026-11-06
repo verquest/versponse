@@ -90,4 +90,14 @@ class OutputValidationTest < Minitest::Test
       assert_raises(Versponse::InvalidOutputError) { klass.serialize({code: 1}, version: "2025-09") }
     end
   end
+
+  def test_anonymous_classes_are_named_in_errors
+    klass = Class.new(Versponse::Base) { version("2025-09") { field :a, type: :integer } }
+
+    with_configuration(validate_output: true) do
+      error = assert_raises(Versponse::InvalidOutputError) { klass.serialize({a: "x"}, version: "2025-09") }
+
+      assert_match(/\AAnonymousResponse output/, error.message)
+    end
+  end
 end
