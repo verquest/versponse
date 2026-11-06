@@ -6,6 +6,9 @@ module Versponse
     #
     # @api private
     class Array < Base
+      # @return [Array<String>] keywords this property type writes itself
+      def self.written_keywords = %w[items].freeze
+
       # @param type [Symbol, String, Array<Symbol, String>] item type: built-in ({FieldType::BUILT_IN}), custom, or a union of built-in types
       # @param item_schema_options [Hash] JSON Schema keywords of each item; they win over the custom type's
       # @param options [Hash] see {Base#initialize}

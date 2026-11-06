@@ -51,6 +51,8 @@ module Versponse
     # @raise [Versponse::DefinitionError] when another identifier of the version already declares collapse_if
     def add_identifier(property, property_in_full: property, collapse_if: nil)
       if @inherited_identifiers
+        # The old identifiers' conditional copies (collapse_if) go back to plain fields
+        identifiers.each { |key, field| properties[key] = field if properties.key?(key) }
         @identifiers = {}
         @collapse_if = nil
         @inherited_identifiers = false

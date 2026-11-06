@@ -29,7 +29,9 @@ module Versponse
     # @return [void]
     def schema_options(**options)
       target = class_or_version(:schema_options)
-      target.schema_options = target.schema_options.merge(Naming.camelize_keys(options))
+      keywords = Naming.camelize_keys(options)
+      check_schema_options!(keywords)
+      target.schema_options = target.schema_options.merge(keywords)
     end
 
     # Limits the versions the class serves; resolving a version outside the range raises
@@ -61,14 +63,18 @@ module Versponse
     def version(name, inherit: true, exclude_properties: [], &block)
       raise DefinitionError, "version blocks can not be nested" if @current_scope
 
-      definition = Version.new(name: name.to_s, owner: @klass.name || "AnonymousResponse")
-      source = version_source(inherit)
-      definition.copy_from(source, exclude_properties:) if source
-      @current_scope = definition
-      @klass.instance_exec(&block) if block
-      finish_version(definition)
-    ensure
-      @current_scope = nil
+      begin
+        definition = Version.new(name: name.to_s, owner: @klass.name || "AnonymousResponse")
+        source = version_source(inherit)
+        raise DefinitionError, "#{definition.label}: exclude_properties: needs a version to inherit from" if source.nil? && exclude_properties.any?
+
+        definition.copy_from(source, exclude_properties:) if source
+        @current_scope = definition
+        @klass.instance_exec(&block) if block
+        finish_version(definition)
+      ensure
+        @current_scope = nil
+      end
     end
 
     # Computes the value of the enclosing inline object, inline collection or one_of
@@ -227,7 +233,10 @@ module Versponse
 
       definition = View.new(name:)
       @current_scope.add_view(definition)
+      @view_version = @current_scope
       nested(definition, &block) if block
+    ensure
+      @view_version = nil
     end
 
     # Applies another view's operations inside a view
@@ -325,8 +334,21 @@ module Versponse
     def add_property(klass, ignore_defaults: [], **options)
       scope = @current_scope || raise(DefinitionError, "Properties must be declared inside a version block")
       property = klass.new(**default_options.except(:type, :collapse_if, :view, :discriminator, *ignore_defaults), **options)
+      if scope.is_a?(View) && @view_version&.identifiers&.key?(property.key)
+        raise DefinitionError, "#{@view_version.label}: #{property.key} is declared by identifier"
+      end
+
       scope.add(property)
       property
+    end
+
+    # Class- and version-level keywords: the property keywords and x- extensions, but not the object
+    # keywords the object schema writes itself
+    def check_schema_options!(keywords)
+      unknown = keywords.keys.reject do |keyword|
+        keyword.start_with?("x-") || (Properties::Base::SCHEMA_KEYWORDS.include?(keyword) && !%w[properties required].include?(keyword))
+      end
+      raise DefinitionError, "schema_options: unknown or reserved keywords #{unknown.join(", ")}" if unknown.any?
     end
 
     def nested(scope)

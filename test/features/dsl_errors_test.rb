@@ -3,6 +3,8 @@
 require "test_helper"
 
 class DslErrorsTest < Minitest::Test
+  include ConfigurationTestHelper
+
   def define(&) = Class.new(Versponse::Base, &)
 
   def test_property_outside_a_version
@@ -172,5 +174,81 @@ class DslErrorsTest < Minitest::Test
     parent = define { version("2025-09") { field :a, type: :string } }
 
     assert_raises(Versponse::DefinitionError) { Class.new(parent) }
+  end
+
+  def test_view_cannot_redeclare_an_identifier
+    assert_raises(Versponse::DefinitionError) do
+      define do
+        version "2025-09" do
+          identifier :id
+          view(:slim) { field :id, type: :integer }
+        end
+      end
+    end
+  end
+
+  def test_exclude_properties_without_inheritance_raises
+    assert_raises(Versponse::DefinitionError) { define { version("2025-09", exclude_properties: [:a]) { field :b, type: :string } } }
+    assert_raises(Versponse::DefinitionError) do
+      define do
+        version("2025-09") { field :a, type: :string }
+        version("2025-10", inherit: false, exclude_properties: [:a]) { field :b, type: :string }
+      end
+    end
+  end
+
+  # A keyword the property writes itself would silently replace what the DSL declared
+  def test_keywords_the_property_writes_raise
+    error = assert_raises(Versponse::DefinitionError) { define { version("2025-09") { enum :a, values: %w[x y], enum: %w[z] } } }
+
+    assert_equal "a: enum: is written by enum itself", error.message
+    assert_raises(Versponse::DefinitionError) { define { version("2025-09") { const :a, value: "x", const: "y" } } }
+    assert_raises(Versponse::DefinitionError) { define { version("2025-09") { object(:a, properties: {}) { field :b, type: :string } } } }
+  end
+
+  def test_unknown_class_and_version_schema_options_raise
+    assert_raises(Versponse::DefinitionError) { define { schema_options foo_bar: 1 } }
+    assert_raises(Versponse::DefinitionError) { define { schema_options required: [] } }
+    assert_raises(Versponse::DefinitionError) { define { version("2025-09") { schema_options type: "array" } } }
+  end
+
+  # The old identifier's conditional copy goes back to a plain field once another identifier replaces it
+  def test_redeclared_identifier_drops_the_old_collapse_if
+    klass = define do
+      version("2025-09") { identifier :id, collapse_if: ->(_object) { false } }
+      version("2025-10") { identifier :uuid }
+    end
+
+    assert_equal({"id" => "1", "uuid" => "u"}, klass.serialize({id: "1", uuid: "u"}, version: "2025-10"))
+    assert_includes klass.to_schema(version: "2025-10")["required"], "id"
+  end
+
+  def test_failed_nested_version_keeps_the_outer_scope
+    klass = define do
+      version "2025-09" do
+        begin
+          version("2025-10") {}
+        rescue Versponse::DefinitionError
+          nil
+        end
+        field :a, type: :string
+      end
+    end
+
+    assert_equal({"a" => "x"}, klass.serialize({a: "x"}, version: "2025-09"))
+  end
+
+  def test_current_version_returning_nil_is_a_configuration_error
+    klass = define { version("2025-09") { field :a, type: :string } }
+
+    with_configuration(current_version: -> {}) do
+      assert_raises(ArgumentError) { klass.serialize({a: "x"}) }
+    end
+  end
+
+  def test_anonymous_classes_have_no_ref
+    error = assert_raises(Versponse::DefinitionError) { define { version("2025-09") { field :a, type: :string } }.to_ref }
+
+    assert_match(/anonymous/, error.message)
   end
 end

@@ -99,7 +99,10 @@ module Versponse
     # @param view [Symbol] view name
     # @param property [Symbol, String, nil] points at one property
     # @return [String] "#/components/schemas/<name>" reference
+    # @raise [Versponse::DefinitionError] for an anonymous class, which has no component name
     def to_ref(view: :default, property: nil)
+      raise DefinitionError, "anonymous response classes have no component; name the class or override base_component_name" if base_component_name.empty?
+
       base = "#/components/schemas/#{component_name(view:)}"
       property ? "#{base}/properties/#{property}" : base
     end

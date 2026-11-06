@@ -228,7 +228,10 @@ module Versponse
       current = Versponse.configuration.current_version
       raise ArgumentError, "version: is required when config.current_version is not set" unless current
 
-      current.call.to_s
+      value = current.call
+      raise ArgumentError, "config.current_version returned nil" if value.nil?
+
+      value.to_s
     end
 
     def validated_expansion(paths, version:, view:)

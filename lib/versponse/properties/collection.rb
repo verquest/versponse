@@ -6,6 +6,9 @@ module Versponse
     #
     # @api private
     class Collection < Base
+      # @return [Array<String>] keywords this property type writes itself
+      def self.written_keywords = %w[items properties required].freeze
+
       include Container
 
       # @param item [Class, nil] class implementing the reference protocol

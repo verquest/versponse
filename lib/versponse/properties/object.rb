@@ -6,6 +6,9 @@ module Versponse
     #
     # @api private
     class Object < Base
+      # @return [Array<String>] keywords this property type writes itself
+      def self.written_keywords = %w[properties required].freeze
+
       include Container
 
       # @param context [Versponse::SchemaContext] schema generation context

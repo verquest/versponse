@@ -6,6 +6,9 @@ module Versponse
     #
     # @api private
     class OneOf < Base
+      # @return [Array<String>] keywords this property type writes itself
+      def self.written_keywords = %w[oneOf anyOf discriminator].freeze
+
       # One variant: response class, matcher and view
       Variant = Data.define(:from, :match, :view)
 

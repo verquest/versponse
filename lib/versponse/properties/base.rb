@@ -22,6 +22,9 @@ module Versponse
         allOf anyOf oneOf not if then else
       ].freeze
 
+      # @return [Array<String>] keywords this property type writes itself, so they can't be options
+      def self.written_keywords = [].freeze
+
       # Options the DSL reads itself, suggested for typos
       DSL_OPTIONS = %w[map nullable if unless].freeze
 
@@ -157,6 +160,9 @@ module Versponse
       end
 
       def check_keywords!(options)
+        written = options.keys.find { |option| self.class.written_keywords.include?(Naming.camelize(option)) }
+        raise DefinitionError, "#{key}: #{written}: is written by #{dsl_name} itself" if written
+
         unknown = options.keys.reject do |option|
           keyword = Naming.camelize(option)
           SCHEMA_KEYWORDS.include?(keyword) || keyword.start_with?("x-")
@@ -164,6 +170,10 @@ module Versponse
         return if unknown.empty?
 
         raise DefinitionError, "#{key}: unknown options #{unknown.map { |option| "#{option}:" }.join(", ")}#{suggestions(unknown)}"
+      end
+
+      def dsl_name
+        self.class.name.split("::").last.gsub(/([a-z])([A-Z])/, '\\1_\\2').downcase.delete_prefix("item_")
       end
 
       def suggestions(unknown)

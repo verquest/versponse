@@ -6,6 +6,9 @@ module Versponse
     #
     # @api private
     class Const < Base
+      # @return [Array<String>] keywords this property type writes itself
+      def self.written_keywords = %w[const enum].freeze
+
       # @param value [Object] constant value
       # @param options [Hash] see {Base#initialize}
       # @raise [Versponse::DefinitionError] with a block, map: or nullable:

@@ -6,6 +6,9 @@ module Versponse
     #
     # @api private
     class Enum < Base
+      # @return [Array<String>] keywords this property type writes itself
+      def self.written_keywords = %w[enum].freeze
+
       # Ruby classes a value of each built-in type must be
       VALUE_CLASSES = {
         "string" => [::String],
