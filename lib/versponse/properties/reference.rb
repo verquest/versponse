@@ -86,6 +86,11 @@ module Versponse
         versponse_property? ? referenced_property(version) : self
       end
 
+      # @return [Array<Array(Class, Symbol, String)>] the referenced Versponse class and view (none for property:)
+      def reference_targets
+        (References.versponse?(@from) && @property.nil?) ? [[@from, @view, key]] : []
+      end
+
       private
 
       def versponse_property?

@@ -53,4 +53,23 @@ class ComponentsTest < Minitest::Test
 
     assert_raises(Versponse::DefinitionError) { Versponse.eager_load!(classes: [broken]) }
   end
+
+  class NestedTargetResponse < Versponse::Base
+    version "2025-01" do
+      field :id, type: :string
+      view(:embedded) { exclude_properties :id }
+    end
+    version("2026-01", inherit: false) { field :id, type: :string }
+  end
+
+  class NestingResponse < Versponse::Base
+    version("2025-01") { object(:wrap) { reference :target, from: NestedTargetResponse, view: :embedded } }
+  end
+
+  # The parent never declares 2026-01 but serves it, and its nested class lost the view there
+  def test_eager_load_checks_nested_references_at_every_served_version
+    error = assert_raises(Versponse::DefinitionError) { Versponse.eager_load!(classes: [NestingResponse]) }
+
+    assert_match(/target: view embedded not found in .*NestedTargetResponse 2026-01/, error.message)
+  end
 end

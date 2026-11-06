@@ -114,6 +114,11 @@ module Versponse
         @variants.flat_map { |variant| variant.from.versponse.resolve(version).properties_for(variant.view) }
       end
 
+      # @return [Array<Array(Class, Symbol, String)>] every variant's class and view
+      def reference_targets
+        @variants.filter_map { |variant| [variant.from, variant.view, key] if References.versponse?(variant.from) }
+      end
+
       private
 
       def variant_schemas(variant, context)

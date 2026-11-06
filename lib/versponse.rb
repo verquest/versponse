@@ -137,6 +137,19 @@ module Versponse
             klass.to_validation_schema(version:, view:)
           end
         end
+        check_served_references(klass)
+      end
+    end
+
+    private
+
+    # Nested classes resolve each request on their own, so a reference can break at a version the class
+    # serves but doesn't declare; check every registered one it serves
+    def check_served_references(klass)
+      Registry.version_names.each do |version|
+        klass.versponse.check_references!(version)
+      rescue VersionNotFoundError
+        next
       end
     end
   end

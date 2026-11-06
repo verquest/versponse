@@ -94,6 +94,14 @@ module Versponse
         References.versponse?(@item) ? @item.versponse.resolve(version).properties_for(@view) : []
       end
 
+      # @return [Array<Array(Class, Symbol, String)>] the item class, the item one_of's variants, or the inline children's targets
+      def reference_targets
+        return @items_one_of.reference_targets if @items_one_of
+        return (References.versponse?(@item) ? [[@item, @view, key]] : []) if @item
+
+        super
+      end
+
       private
 
       def items_schema(context)

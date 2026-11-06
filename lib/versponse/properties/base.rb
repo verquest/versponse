@@ -128,6 +128,12 @@ module Versponse
         self
       end
 
+      # @return [Array<Array(Class, Symbol, String)>] Versponse classes this property renders, with their view and
+      #   this property's key, for {Versponse::Internals#check_references!}
+      def reference_targets
+        []
+      end
+
       protected
 
       # @param name [Symbol, String] new name and output key

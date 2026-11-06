@@ -234,6 +234,22 @@ module Versponse
       @expansions[[version, view.to_sym, paths.sort]] || validated_expansion(paths, version:, view:)
     end
 
+    # Checks without compiling that every referenced class serves the version and view, in every view,
+    # so eager_load! catches nested mistakes at versions the class serves but doesn't declare
+    #
+    # @param version [String] canonical version name
+    # @return [void]
+    # @raise [Versponse::DefinitionError] see {References.check_target!}
+    # @raise [Versponse::VersionNotFoundError] when the class (or a referenced class's range) doesn't serve the version
+    def check_references!(version)
+      definition = resolve(version)
+      definition.view_names.each do |view|
+        definition.properties_for(view).flat_map(&:reference_targets).each do |klass, target_view, key|
+          References.check_target!(klass, version:, view: target_view, key:)
+        end
+      end
+    end
+
     private
 
     def ancestor

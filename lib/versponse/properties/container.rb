@@ -26,6 +26,11 @@ module Versponse
         child_properties
       end
 
+      # @return [Array<Array(Class, Symbol, String)>] the reference targets of the child properties
+      def reference_targets
+        child_properties.flat_map(&:reference_targets)
+      end
+
       private
 
       def child_properties
