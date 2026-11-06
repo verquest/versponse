@@ -156,4 +156,24 @@ class Versponse::Validator::CompilerTest < Minitest::Test
     refute_nil compile(schema)
     assert_nil compile(schema.merge("discriminator" => {"propertyName" => "a"}))
   end
+
+  # The fast path accepts only what json_schemer accepts; everything else is left to json_schemer
+  def test_date_time_fast_path_agrees_with_json_schemer
+    schema = {"format" => "date-time"}
+    schemer = JSONSchemer.schema(schema, meta_schema: JSONSchemer::OpenAPI31::BASE_URI.to_s)
+    checker = compile(schema)
+    values = %w[2025-09-01T10:00:00.123Z 2025-09-01T10:00:00+05:30 2024-02-29T10:00:00Z 2025-02-29T10:00:00Z
+      2025-09-31T10:00:00Z 2025-09-01T10:00:00+24:00 2025-09-01t10:00:00z 1990-12-31T23:59:60Z 2025-09-01]
+    values << "2025-09-01T10:00:00Z\n"
+
+    values.each { |value| assert_equal schemer.valid?(value), checker.valid?(value), value.inspect }
+    assert checker.valid?(5)
+  end
+
+  def test_date_time_fast_path_skips_json_schemer_for_plain_timestamps
+    check = Versponse::Validator::DateTimeCheck.new("date-time", ->(*) { raise "json_schemer called" })
+
+    assert check.valid?("2025-09-01T10:00:00.123Z")
+    assert_kind_of Versponse::Validator::DateTimeCheck, compile({"format" => "date-time"}).instance_variable_get(:@checker)
+  end
 end

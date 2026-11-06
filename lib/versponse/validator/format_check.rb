@@ -16,7 +16,9 @@ module Versponse
         return unless schema.key?("format")
 
         check = compiler.format(schema["format"])
-        new(schema["format"], check) if check
+        return unless check
+
+        (schema["format"] == "date-time") ? DateTimeCheck.new(schema["format"], check) : new(schema["format"], check)
       end
 
       # @param name [String] format name
