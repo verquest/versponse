@@ -69,7 +69,8 @@ module Versponse
     # @param view [Symbol] view name
     # @return [Versponse::Plan] compiled, cached plan
     def plan(version:, view: :default)
-      @plans.fetch([version, view.to_sym]) do
+      # Keyed by version, then view, so a cached lookup allocates no key Array
+      @plans.fetch(version) { Cache.new }.fetch(view.to_sym) do
         definition = resolve(version)
         steps = definition.properties_for(view).map { |property| property.step(version:) }
         Plan.new(label: "#{@klass.name}[#{definition.name}/#{view}]", steps:)

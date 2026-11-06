@@ -13,7 +13,15 @@ module Versponse
     # @param versions [Array<String>] declared versions, oldest first
     # @return [String, nil] the resolved version, or nil when the request is older than every version
     def self.call(requested_version, versions)
-      versions.reverse_each.find { |version| version <= requested_version }
+      # An index loop: reverse_each.find would allocate an Enumerator on every request
+      index = versions.size - 1
+      while index >= 0
+        version = versions[index]
+        return version if version <= requested_version
+
+        index -= 1
+      end
+      nil
     end
   end
 end
