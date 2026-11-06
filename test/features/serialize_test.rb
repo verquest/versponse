@@ -35,7 +35,7 @@ class SerializeTest < Minitest::Test
   def test_serializes_an_object
     expected = {
       "id" => "ut_1", "name" => "Small", "stripe_product_id" => nil, "status" => "active",
-      "selling_points" => ["Dry"], "created_at" => "2025-09-01T10:00:00Z", "secret" => nil, "object" => "unit_type"
+      "selling_points" => ["Dry"], "created_at" => "2025-09-01T10:00:00.000Z", "secret" => nil, "object" => "unit_type"
     }
 
     assert_equal expected, serialize

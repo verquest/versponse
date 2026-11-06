@@ -3,14 +3,15 @@
 module Versponse
   # Default formatters, keyed by JSON Schema format, applied to non-nil field values
   module Formatters
-    # Formats times, datetimes and dates (as midnight) as ISO 8601 in UTC, always with a Z suffix, without changing the original object
+    # Formats times, datetimes and dates (as midnight) as ISO 8601 in UTC with milliseconds (like Rails' JSON),
+    # always with a Z suffix, without changing the original object
     DATE_TIME = lambda do |value|
       if value.respond_to?(:getutc)
-        value.getutc.iso8601
+        value.getutc.iso8601(3)
       elsif value.respond_to?(:new_offset)
-        value.new_offset(0).to_time.utc.iso8601
+        value.new_offset(0).to_time.utc.iso8601(3)
       elsif value.is_a?(Date)
-        Time.utc(value.year, value.month, value.day).iso8601
+        Time.utc(value.year, value.month, value.day).iso8601(3)
       else
         value
       end

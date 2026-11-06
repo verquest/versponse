@@ -51,7 +51,7 @@ class CustomFieldTypesTest < Minitest::Test
       end
       time = Time.new(2025, 9, 1, 13, 30, 0, "+01:00")
 
-      assert_equal({"created_at" => "2025-09-01T12:30:00Z", "due_on" => "2025-09-01", "seen_at" => ["2025-09-01T12:30:00Z"]},
+      assert_equal({"created_at" => "2025-09-01T12:30:00.000Z", "due_on" => "2025-09-01", "seen_at" => ["2025-09-01T12:30:00.000Z"]},
         klass.serialize({created_at: time, due_on: time, seen_at: [time]}, version: "2025-09"))
     end
   end

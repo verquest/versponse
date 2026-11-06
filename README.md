@@ -427,7 +427,7 @@ Definitions can be copied between the gems (`one_of name:` and `inherit:` behave
 ## Formats and validation notes
 
 - Only properties with a `format:` are formatted. Blueprinter formats every Time, but here a Time field without `format: "date-time"` is emitted as is, and output validation fails it.
-- `date-time` formats Time, DateTime and Date (as midnight) as ISO 8601 in UTC; `date` formats Date and Time as an ISO 8601 date.
+- `date-time` formats Time, DateTime and Date (as midnight) as ISO 8601 in UTC with milliseconds, like Rails' JSON (`2025-09-01T10:00:00.000Z`); `date` formats Date and Time as an ISO 8601 date. For whole seconds, set `config.formatters = Versponse::Formatters::DEFAULTS.merge("date-time" => ->(time) { time.utc.iso8601 })`.
 - Validation checks the rendered data only, not the `root:`/`meta:` envelope.
 - `field :metadata, type: :object, additional_properties: {type: "string"}` describes a free-form map; its value passes through.
 - In apps and test suites with many response classes, pass `classes:` to `Versponse.components`, or keep component names unique.

@@ -25,7 +25,7 @@ class Versponse::Properties::ScalarsTest < Minitest::Test
   def test_field_uses_the_formatter_of_its_format
     field = Versponse::Properties::Field.new(name: :created_at, type: :string, format: "date-time")
 
-    assert_equal({"created_at" => "2025-09-01T10:00:00Z"}, render(field, Item.new(created_at: Time.utc(2025, 9, 1, 10))))
+    assert_equal({"created_at" => "2025-09-01T10:00:00.000Z"}, render(field, Item.new(created_at: Time.utc(2025, 9, 1, 10))))
   end
 
   def test_field_map_and_block

@@ -45,7 +45,7 @@ class ExamplesTest < Minitest::Test
   def test_unit_type
     expected = {
       "object" => "unit_type", "id" => "ut_1", "name" => "Small", "stripe_product_id" => "prod_1",
-      "status" => "active", "selling_points" => ["Dry"], "created_at" => "2025-09-01T10:00:00Z",
+      "status" => "active", "selling_points" => ["Dry"], "created_at" => "2025-09-01T10:00:00.000Z",
       "site" => {"id" => "site_1", "name" => "Leeds", "address" => {"city" => "Leeds", "postcode" => nil}},
       "security_deposit" => nil,
       "prices" => [{"id" => "price_1", "amount" => {"amount" => 5000, "currency" => "GBP"}, "interval" => "month"}]

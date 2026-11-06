@@ -113,7 +113,7 @@ class TypeUnionsTest < Minitest::Test
 
   def test_format_and_formatter_apply_to_unions
     assert_equal({"type" => %w[string integer null], "format" => "date-time"}, StartsResponse.to_schema(version: "2025-09")["properties"]["starts_at"])
-    assert_equal({"starts_at" => "2025-09-01T10:00:00Z"}, StartsResponse.serialize({starts_at: Time.new(2025, 9, 1, 12, 0, 0, "+02:00")}, version: "2025-09"))
+    assert_equal({"starts_at" => "2025-09-01T10:00:00.000Z"}, StartsResponse.serialize({starts_at: Time.new(2025, 9, 1, 12, 0, 0, "+02:00")}, version: "2025-09"))
     assert_equal({"starts_at" => 5}, StartsResponse.serialize({starts_at: 5}, version: "2025-09"))
   end
 
