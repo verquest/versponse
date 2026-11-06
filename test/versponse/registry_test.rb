@@ -23,4 +23,23 @@ class Versponse::RegistryTest < Minitest::Test
     assert_includes Versponse::Registry.all, first
     assert_includes Versponse::Registry.all, second
   end
+
+  # Canonical names are memoized per requested String, and recomputed once registered names change
+  def test_canonical_results_are_cached_until_names_change
+    cache = -> { Versponse::Registry.instance_variable_get(:@canonical) }
+    Versponse::Registry.canonical("2099-12-31-cached")
+
+    assert cache.call["2099-12-31-cached"]
+    Versponse::Registry.add_version_name("2099-12-31-cached")
+
+    assert_nil cache.call["2099-12-31-cached"]
+    assert_equal "2099-12-31-cached", Versponse::Registry.canonical("2099-12-31-cached")
+  end
+
+  # A request before every registered name maps to itself and isn't stored, so it can't fill the cache
+  def test_requests_before_every_name_are_not_cached
+    Versponse::Registry.canonical("0000-early")
+
+    assert_nil Versponse::Registry.instance_variable_get(:@canonical)["0000-early"]
+  end
 end

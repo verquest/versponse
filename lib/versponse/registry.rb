@@ -10,6 +10,7 @@ module Versponse
     @version_names = [].freeze
     @range_maxes = [].freeze
     @after_max = {}.freeze
+    @canonical = Cache.new(limit: 256)
     @mutex = Mutex.new
 
     class << self
@@ -39,6 +40,7 @@ module Versponse
         @mutex.synchronize do
           @version_names = (@version_names | [name]).sort.freeze
           @after_max = {}.freeze
+          @canonical = Cache.new(limit: 256)
         end
       end
 
@@ -48,7 +50,12 @@ module Versponse
       # @return [void]
       def add_range(range)
         [range.min, range.max].compact.each { |name| add_version_name(name) }
-        @mutex.synchronize { @range_maxes = (@range_maxes | [range.max]).freeze } if range.max
+        return unless range.max
+
+        @mutex.synchronize do
+          @range_maxes = (@range_maxes | [range.max]).freeze
+          @canonical = Cache.new(limit: 256)
+        end
       end
 
       # Maps a requested version to the closest earlier registered name, so arbitrary client-sent
@@ -60,6 +67,20 @@ module Versponse
       # @param name [String] requested version
       # @return [String] canonical version name, or name itself when it precedes every registered one
       def canonical(name)
+        @canonical[name] || memoized_canonical(name)
+      end
+
+      # @param name [String] requested version
+      # @return [String] canonical name, stored when it's a registered name or a representative (a request before
+      #   every registered name maps to itself and isn't stored, so such strings can't fill the cache)
+      def memoized_canonical(name)
+        result = resolve_canonical(name)
+        (result.equal?(name) && !@version_names.include?(name)) ? result : @canonical.fetch(name) { result }
+      end
+
+      # @param name [String] requested version
+      # @return [String] closest registered name, or a representative after a max, or name itself
+      def resolve_canonical(name)
         closest = Versponse.configuration.version_resolver.call(name, @version_names)
         return name if closest.nil?
         return closest if closest == name || !@range_maxes.include?(closest)
@@ -69,11 +90,16 @@ module Versponse
         end
       end
 
+      private :memoized_canonical, :resolve_canonical
+
       # Forgets the representatives of requests after a max, which depend on the version resolver
       #
       # @return [void]
       def clear_canonical
-        @mutex.synchronize { @after_max = {}.freeze }
+        @mutex.synchronize do
+          @after_max = {}.freeze
+          @canonical = Cache.new(limit: 256)
+        end
       end
 
       # @return [Array<Class>] every registered class, including anonymous ones
