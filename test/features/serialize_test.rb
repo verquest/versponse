@@ -153,6 +153,15 @@ class SerializeTest < Minitest::Test
     assert_equal "kind", properties["many"]["discriminator"]["propertyName"]
   end
 
+  # As in verquest, each version block starts without with_options defaults
+  def test_with_options_around_a_version_does_not_reach_it
+    klass = Class.new(Versponse::Base) do
+      with_options(nullable: true) { version("2025-09") { field :x, type: :string } }
+    end
+
+    assert_equal({"type" => "string"}, klass.to_schema(version: "2025-09")["properties"]["x"])
+  end
+
   def test_explicit_options_override_with_options_and_unless
     klass = Class.new(Versponse::Base) do
       version "2025-09" do

@@ -81,6 +81,9 @@ module Versponse
     def version(name, inherit: true, exclude_properties: [], &block)
       raise DefinitionError, "version blocks can not be nested" if @current_scope
 
+      # As in verquest, a version block starts without with_options defaults
+      outer_defaults = @default_options
+      @default_options = nil
       begin
         definition = Version.new(name: name.to_s, owner: @klass.name || "AnonymousResponse")
         source = version_source(inherit)
@@ -92,6 +95,7 @@ module Versponse
         finish_version(definition)
       ensure
         @current_scope = nil
+        @default_options = outer_defaults
       end
     end
 
