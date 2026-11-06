@@ -38,4 +38,16 @@ class Versponse::FormattersTest < Minitest::Test
   def test_date_formats_with_iso8601
     assert_equal "2025-09-01", Versponse::Formatters::DATE.call(Date.new(2025, 9, 1))
   end
+
+  # A UTC Time is formatted without the getutc copy; the output is the same as for any other Time
+  def test_date_time_formats_utc_times_without_copying
+    utc = Time.utc(2025, 9, 1, 10, 0, 0, 123_456)
+    local = Time.new(2025, 9, 1, 12, 0, 0.123456r, "+02:00")
+
+    assert_equal "2025-09-01T10:00:00.123Z", Versponse::Formatters::DATE_TIME.call(utc)
+    assert_equal Versponse::Formatters::DATE_TIME.call(local), Versponse::Formatters::DATE_TIME.call(utc)
+    utc.define_singleton_method(:getutc) { raise "getutc copies a UTC Time" }
+
+    assert_equal "2025-09-01T10:00:00.123Z", Versponse::Formatters::DATE_TIME.call(utc)
+  end
 end

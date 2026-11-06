@@ -10,7 +10,10 @@ module Versponse
     # @return [Proc] date-time formatter
     def self.date_time(precision)
       lambda do |value|
-        if value.respond_to?(:getutc)
+        # A UTC Time needs no getutc copy
+        if value.instance_of?(Time) && value.utc?
+          value.iso8601(precision)
+        elsif value.respond_to?(:getutc)
           value.getutc.iso8601(precision)
         elsif value.respond_to?(:new_offset)
           value.new_offset(0).to_time.utc.iso8601(precision)
