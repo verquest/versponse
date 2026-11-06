@@ -79,6 +79,20 @@ class OneOfTest < Minitest::Test
     end
   end
 
+  # verquest's form, so definitions can be copied between the gems
+  def test_name_keyword
+    klass = Class.new(Versponse::Base) do
+      version "2025-09" do
+        one_of name: :resource, discriminator: "object" do
+          reference from: OrderResponse, match: Order
+        end
+      end
+    end
+
+    assert_equal({"resource" => {"object" => "order", "id" => "o1"}}, klass.serialize({resource: Order.new("o1")}, version: "2025-09"))
+    assert_raises(Versponse::DefinitionError) { Class.new(Versponse::Base) { version("2025-09") { one_of(:a, name: :b) { reference from: OrderResponse } } } }
+  end
+
   def test_validation_schema_has_no_discriminator
     schema = TaskResponse.to_validation_schema(version: "2025-09")["properties"]["resource"]
 

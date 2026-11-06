@@ -42,11 +42,12 @@ module Versponse
     # Declares a version
     #
     # @param name [String] version name, compared as a String
-    # @param inherit [Boolean, String] true copies the previously declared version, a String copies that exact version
+    # @param inherit [Boolean, String, Symbol] true copies the previously declared version, a name copies the
+    #   closest version at or before it
     # @param exclude_properties [Array<Symbol>] inherited properties to leave out
     # @return [void]
     # @raise [Versponse::DefinitionError] when nested in another version
-    # @raise [Versponse::DefinitionError] when inherit: names no declared version
+    # @raise [Versponse::DefinitionError] when inherit: names a version before every declared one
     def version(name, inherit: true, exclude_properties: [], &block)
       raise DefinitionError, "version blocks can not be nested" if @current_scope
 
@@ -186,11 +187,16 @@ module Versponse
     # Declares a polymorphic value; the block declares variants with reference from:, match:.
     # Without a name, inside a collection block, it types each item of the collection.
     #
-    # @param name [Symbol, nil] output key; nil for the item one_of of a collection
+    # @param positional_name [Symbol, nil] output key; nil for the item one_of of a collection
+    # @param name [Symbol, nil] the output key as a keyword, as verquest writes it
     # @param discriminator [String, Symbol, nil] OpenAPI discriminator property
     # @param options [Hash] see {#field}; an item one_of takes only nullable: and schema keywords
     # @return [void]
-    def one_of(name = nil, discriminator: nil, **options, &block)
+    # @raise [Versponse::DefinitionError] when the name is given both ways
+    def one_of(positional_name = nil, name: nil, discriminator: nil, **options, &block)
+      raise DefinitionError, "one_of #{positional_name}: give the name once, not also as name:" if positional_name && name
+
+      name ||= positional_name
       raise DefinitionError, "#{"one_of #{name}".strip} needs a block declaring its variants" unless block
       return item_one_of(discriminator:, **options, &block) if name.nil?
 
@@ -258,15 +264,18 @@ module Versponse
     end
 
     def version_source(inherit)
-      return inherited_version(inherit) if inherit.is_a?(String)
+      return inherited_version(inherit.to_s) if inherit.is_a?(String) || inherit.is_a?(Symbol)
 
       @last_version if inherit
     end
 
+    # Resolves like a request (and like verquest's inherit:), ignoring supported_versions
     def inherited_version(name)
-      versponse.versions.fetch(name)
-    rescue VersionNotFoundError => e
-      raise DefinitionError, "inherit: #{e.message}"
+      versions = versponse.versions
+      resolved = Versponse.configuration.version_resolver.call(name, versions.sorted_names)
+      return versions.fetch(resolved) if resolved
+
+      raise DefinitionError, "inherit: no version of #{self.name || "AnonymousResponse"} at or before #{name} (declared: #{versions.sorted_names.join(", ")})"
     end
 
     def finish_version(definition)

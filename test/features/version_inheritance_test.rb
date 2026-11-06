@@ -57,13 +57,26 @@ class VersionInheritanceTest < Minitest::Test
     end
   end
 
-  def test_inherit_needs_an_exact_version_name
-    assert_raises(Versponse::DefinitionError) do
+  # Like verquest: inherit: "2025-03" copies the closest earlier version, 2025-01
+  def test_inherit_resolves_to_the_closest_earlier_version
+    klass = Class.new(Versponse::Base) do
+      version("2025-01") { field :id, type: :string }
+      version("2025-02") { field :name, type: :string }
+      version "2025-06", inherit: "2025-01-15"
+    end
+
+    assert_equal({"id" => "1"}, klass.serialize({id: "1", name: "x"}, version: "2025-06"))
+  end
+
+  def test_inherit_before_every_version_raises
+    error = assert_raises(Versponse::DefinitionError) do
       Class.new(Versponse::Base) do
         version("2025-01") { field :id, type: :string }
-        version "2025-06", inherit: "2025-03"
+        version "2025-06", inherit: "2024-01"
       end
     end
+
+    assert_equal "inherit: no version of AnonymousResponse at or before 2024-01 (declared: 2025-01)", error.message
   end
 
   def test_version_blocks_can_not_be_nested

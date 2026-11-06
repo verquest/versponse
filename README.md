@@ -11,7 +11,7 @@ Versponse describes your API's responses with a small Ruby DSL, one definition p
 - optional validation of every rendered response against its own schema, for tests and development;
 - version resolution: ask for `2026-01` and get the closest earlier definition, so unchanged responses need no new version.
 
-The DSL is the same as [verquest](https://github.com/verquest/verquest)'s, which describes requests, and the two gems can reference each other's schemas.
+The DSL is shared with [verquest](https://github.com/verquest/verquest), which describes requests, and the two gems can reference each other's schemas. See [differences from verquest's DSL](#differences-from-verquests-dsl).
 
 Sponsored by [Stora](https://stora.co)
 
@@ -191,7 +191,7 @@ class UserResponse < Versponse::Base
     field :id, type: :string
   end
 
-  version "2026-03", inherit: "2025-01"       # copy an exact earlier version
+  version "2026-03", inherit: "2025-06"       # copy the closest version at or before it (2025-01)
 end
 ```
 
@@ -259,7 +259,7 @@ ProductResponse.serialize(product, version: "2026-01", view: :embedded)
 
 `reference` and `collection` take `view:` to render the nested class in one of its views, which is how cycles are broken (an order embeds its tenancy without the tenancy's order). Redeclaring a view in a later version replaces it.
 
-Mistakes in a definition raise `Versponse::DefinitionError` when the version block closes: excluding an unknown property, `inherit:` naming no declared version, `include_view` of an unknown view, or views including each other in a cycle. `VersionNotFoundError`, `ViewNotFoundError` and `PropertyNotFoundError` are left for what a caller asks for at runtime (a version, a view, or `to_validation_schema(property:)`), so they are safe to map to client errors.
+Mistakes in a definition raise `Versponse::DefinitionError` when the version block closes: excluding an unknown property, `inherit:` naming a version before every declared one, `include_view` of an unknown view, or views including each other in a cycle. `VersionNotFoundError`, `ViewNotFoundError` and `PropertyNotFoundError` are left for what a caller asks for at runtime (a version, a view, or `to_validation_schema(property:)`), so they are safe to map to client errors.
 
 ## Expansion
 
@@ -414,6 +414,15 @@ ContactResponse.to_schema(version: "2025-09")["properties"]["address"]
 The values of such references pass through unchanged, so they must already be JSON-ready.
 
 A verquest request can reference a versponse class with a verquest version that supports schema-only references. verquest builds its schemas when a `version` block closes, so declare the versponse class's versions first, and don't reference a forward-declared, still-empty versponse class from verquest.
+
+### Differences from verquest's DSL
+
+Definitions can be copied between the gems (`one_of name:` and `inherit:` behave the same), except where responses differ from requests:
+
+- `required:` raises. Every key is rendered, so it's required in the schema unless `if:` or `unless:` makes it conditional.
+- `enum` needs `type:`, and checks its values against it. verquest writes only `enum`.
+- Response-only DSL: `view`, `include_view`, `view:` on `reference` and `collection`, `match:` on `one_of` variants, `identifier`, `expandable:` and `source`.
+- Request-only DSL: `location`, `parameter_examples:`, `explode:` and conditions (`condition`, `depends_on`).
 
 ## Formats and validation notes
 
