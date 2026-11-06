@@ -28,6 +28,11 @@ module Versponse
       @generation = Versponse.cache_generation
     end
 
+    # @return [Versponse::Builder] the class's DSL state and helpers
+    def builder
+      @builder ||= Builder.new(@klass)
+    end
+
     # @return [Versponse::SupportedVersions, nil] range declared with supported_versions on this class
     #   or its closest ancestor, nil when every declared version is served
     def supported_version_range

@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 module Versponse
-  # Class-level DSL of {Versponse::Base}. All methods are private class methods.
+  # Class-level DSL of {Versponse::Base}. All methods are private class methods; they delegate to the
+  # class's {Versponse::Builder}, which holds the definition state.
   module Base::DSL
     private
 
@@ -10,7 +11,7 @@ module Versponse
     # @param text [String] description
     # @return [void]
     def description(text)
-      class_or_version(:description).description = text
+      versponse.builder.description(text)
     end
 
     # Adds schema keywords to the class or the current version
@@ -18,8 +19,7 @@ module Versponse
     # @param options [Hash] JSON Schema keywords in snake_case
     # @return [void]
     def schema_options(**options)
-      target = class_or_version(:schema_options)
-      target.schema_options = target.schema_options.merge(Naming.camelize_keys(options))
+      versponse.builder.schema_options(**options)
     end
 
     # Limits the versions the class serves; resolving a version outside the range raises
@@ -30,13 +30,7 @@ module Versponse
     # @return [void]
     # @raise [Versponse::DefinitionError] when min sorts after max, inside a version, or after the first version
     def supported_versions(min: nil, max: nil)
-      raise DefinitionError, "supported_versions must come before the first version" unless versponse.versions.empty?
-      raise DefinitionError, "supported_versions can only be set on the class" if @current_scope
-
-      range = (min.nil? && max.nil?) ? nil : SupportedVersions.new(min:, max:)
-      versponse.supported_version_range = range
-      Registry.add_range(range) if range
-      Versponse.reset_caches!
+      versponse.builder.supported_versions(min:, max:)
     end
 
     # Declares a version
@@ -49,16 +43,7 @@ module Versponse
     # @raise [Versponse::DefinitionError] when nested in another version
     # @raise [Versponse::DefinitionError] when inherit: names a version before every declared one
     def version(name, inherit: true, exclude_properties: [], &block)
-      raise DefinitionError, "version blocks can not be nested" if @current_scope
-
-      definition = Version.new(name: name.to_s, owner: self.name || "AnonymousResponse")
-      source = version_source(inherit)
-      definition.copy_from(source, exclude_properties:) if source
-      @current_scope = definition
-      instance_exec(&block) if block
-      finish_version(definition)
-    ensure
-      @current_scope = nil
+      versponse.builder.version(name, inherit:, exclude_properties:, &block)
     end
 
     # Computes the value of the enclosing inline object, inline collection or one_of
@@ -67,9 +52,7 @@ module Versponse
     # @yieldparam context [Hash] serialize context
     # @return [void]
     def source(&block)
-      raise DefinitionError, "source can only be used inside object, collection or one_of" unless @current_scope.is_a?(Properties::Base)
-
-      @current_scope.source = block
+      versponse.builder.source(&block)
     end
 
     # Declares a scalar field
@@ -81,7 +64,7 @@ module Versponse
     # @yieldparam context [Hash] serialize context
     # @return [void]
     def field(name, type: nil, **options, &block)
-      add_property(Properties::Field, name:, type: type || default_options[:type], block:, **options)
+      versponse.builder.field(name, type:, **options, &block)
     end
 
     # Declares a field of both the full shape and the collapsed shape, rendered for expandable associations that aren't expanded
@@ -95,15 +78,7 @@ module Versponse
     # @return [void]
     # @raise [Versponse::DefinitionError] outside a version, with if:/unless:, or with a collapse_if: that doesn't respond to call
     def identifier(name, type: nil, collapse_if: nil, **options, &block)
-      raise DefinitionError, "identifier must be declared inside a version" unless @current_scope.is_a?(Version)
-      raise DefinitionError, "identifier #{name} takes no if: or unless:" if options.key?(:if) || options.key?(:unless)
-      raise DefinitionError, "identifier #{name}: collapse_if: must respond to call" unless collapse_if.nil? || collapse_if.respond_to?(:call)
-
-      defaults = default_options.except(:type, :if, :unless, :collapse_if)
-      type ||= default_options[:type] || :string
-      identifier = Properties::Field.new(**defaults, name:, type:, block:, **options)
-      property = collapse_if ? Properties::Field.new(**defaults, name:, type:, block:, if: collapse_if, **options) : identifier
-      @current_scope.add_identifier(identifier, property_in_full: property, collapse_if: Callable.normalize(collapse_if))
+      versponse.builder.identifier(name, type:, collapse_if:, **options, &block)
     end
 
     # Declares a value from a fixed list
@@ -115,7 +90,7 @@ module Versponse
     # @return [void]
     # @raise [Versponse::DefinitionError] when the type can't be inferred, or a value isn't of the type
     def enum(name, values:, type: nil, **options, &block)
-      add_property(Properties::Enum, name:, values:, type: type || default_options[:type], block:, **options)
+      versponse.builder.enum(name, values:, type:, **options, &block)
     end
 
     # Declares a constant
@@ -125,7 +100,7 @@ module Versponse
     # @param options [Hash] if:, unless:, JSON Schema keywords
     # @return [void]
     def const(name, value:, **options)
-      add_property(Properties::Const, name:, value:, ignore_defaults: %i[map nullable], **options)
+      versponse.builder.const(name, value:, **options)
     end
 
     # Declares an array of scalars
@@ -136,7 +111,7 @@ module Versponse
     # @param options [Hash] see {#field}
     # @return [void]
     def array(name, type: nil, item_schema_options: {}, **options, &block)
-      add_property(Properties::Array, name:, type: type || default_options[:type], item_schema_options:, block:, **options)
+      versponse.builder.array(name, type:, item_schema_options:, **options, &block)
     end
 
     # Declares an inline object; the block defines its properties
@@ -145,9 +120,7 @@ module Versponse
     # @param options [Hash] map: (use "." for the same object), nullable:, if:, unless:, JSON Schema keywords
     # @return [void]
     def object(name, **options, &block)
-      raise DefinitionError, "object #{name} needs a block defining its properties" unless block
-
-      nested(add_property(Properties::Object, name:, **options), &block)
+      versponse.builder.object(name, **options, &block)
     end
 
     # Declares an array of objects, either of another response class (item:) or inline (block)
@@ -160,10 +133,7 @@ module Versponse
     # @param options [Hash] see {#field}
     # @return [void]
     def collection(name, item: nil, view: :default, **options, &block)
-      return add_property(Properties::Collection, name:, item:, view:, block:, **options) if item
-      raise DefinitionError, "collection #{name} needs item: or a block defining its properties" unless block
-
-      nested(add_property(Properties::Collection, name:, **options), &block)
+      versponse.builder.collection(name, item:, view:, **options, &block)
     end
 
     # Declares a nested response class, or a variant inside one_of
@@ -176,12 +146,7 @@ module Versponse
     # @param options [Hash] see {#field}
     # @return [void]
     def reference(name = nil, from:, view: :default, property: nil, match: nil, **options, &block)
-      return one_of_variant(name, from:, view:, match:, extra: options.any? || block || property) if @current_scope.is_a?(Properties::OneOf)
-      raise DefinitionError, "reference needs a name outside one_of" if name.nil?
-      raise DefinitionError, "#{name}: match: is only used for one_of variants" if match
-
-      ignore_defaults = (property && References.versponse?(from)) ? %i[nullable] : []
-      add_property(Properties::Reference, name:, from:, view:, property:, block:, ignore_defaults:, **options)
+      versponse.builder.reference(name, from:, view:, property:, match:, **options, &block)
     end
 
     # Declares a polymorphic value; the block declares variants with reference from:, match:.
@@ -194,15 +159,7 @@ module Versponse
     # @return [void]
     # @raise [Versponse::DefinitionError] when the name is given both ways
     def one_of(positional_name = nil, name: nil, discriminator: nil, **options, &block)
-      raise DefinitionError, "one_of #{positional_name}: give the name once, not also as name:" if positional_name && name
-
-      name ||= positional_name
-      raise DefinitionError, "#{"one_of #{name}".strip} needs a block declaring its variants" unless block
-      return item_one_of(discriminator:, **options, &block) if name.nil?
-
-      property = add_property(Properties::OneOf, name:, discriminator:, **options)
-      nested(property, &block)
-      raise DefinitionError, "one_of #{name} needs at least one variant" unless property.variants?
+      versponse.builder.one_of(positional_name, name:, discriminator:, **options, &block)
     end
 
     # Declares a view inside a version
@@ -210,11 +167,7 @@ module Versponse
     # @param name [Symbol] view name
     # @return [void]
     def view(name, &block)
-      raise DefinitionError, "view must be declared inside a version" unless @current_scope.is_a?(Version)
-
-      definition = View.new(name:)
-      @current_scope.add_view(definition)
-      nested(definition, &block) if block
+      versponse.builder.view(name, &block)
     end
 
     # Applies another view's operations inside a view
@@ -222,9 +175,7 @@ module Versponse
     # @param name [Symbol] included view
     # @return [void]
     def include_view(name)
-      raise DefinitionError, "include_view can only be used inside a view" unless @current_scope.is_a?(View)
-
-      @current_scope.include_view(name)
+      versponse.builder.include_view(name)
     end
 
     # Removes properties from the current version or view
@@ -232,92 +183,15 @@ module Versponse
     # @param names [Array<Symbol>] property names
     # @return [void]
     def exclude_properties(*names)
-      case @current_scope
-      when Version then names.each { |name| @current_scope.remove(name) }
-      when View then @current_scope.exclude(names)
-      else raise DefinitionError, "exclude_properties can only be used inside a version or a view"
-      end
+      versponse.builder.exclude_properties(*names)
     end
 
     # Applies options to every property declared in the block
     #
     # @param options [Hash] shared options
     # @return [void]
-    def with_options(**options)
-      previous = @default_options
-      @default_options = default_options.merge(options)
-      yield
-    ensure
-      @default_options = previous
-    end
-
-    def default_options
-      @default_options || {}
-    end
-
-    def class_or_version(keyword)
-      target = @current_scope || versponse.versions
-      raise DefinitionError, "#{keyword} on the class must come before the first version" if target.is_a?(Versions) && !versponse.versions.empty?
-      return target if target.is_a?(Versions) || target.is_a?(Version)
-
-      raise DefinitionError, "#{keyword} can only be set on the class or a version"
-    end
-
-    def version_source(inherit)
-      return inherited_version(inherit.to_s) if inherit.is_a?(String) || inherit.is_a?(Symbol)
-
-      @last_version if inherit
-    end
-
-    # Resolves like a request (and like verquest's inherit:), ignoring supported_versions
-    def inherited_version(name)
-      versions = versponse.versions
-      resolved = Versponse.configuration.version_resolver.call(name, versions.sorted_names)
-      return versions.fetch(resolved) if resolved
-
-      raise DefinitionError, "inherit: no version of #{self.name || "AnonymousResponse"} at or before #{name} (declared: #{versions.sorted_names.join(", ")})"
-    end
-
-    def finish_version(definition)
-      definition.description ||= versponse.versions.description
-      definition.schema_options = versponse.versions.schema_options.merge(definition.schema_options)
-      versponse.versions.add(definition.finalize!)
-      @last_version = definition
-      # Any class may embed this one in a plan or validation schema, so a reopened class (forward
-      # declarations, verquest references) clears every cache; this only happens at definition time
-      Versponse.reset_caches!
-    end
-
-    def one_of_variant(name, from:, view:, match:, extra:)
-      raise DefinitionError, "one_of variants take no name, options or block (use source inside one_of)" if name || extra
-
-      @current_scope.add_variant(from:, match:, view:)
-    end
-
-    def item_one_of(discriminator:, **options, &block)
-      collection = @current_scope
-      raise DefinitionError, "one_of without a name is only allowed inside a collection block" unless collection.is_a?(Properties::Collection)
-      raise DefinitionError, "#{collection.key}: the item one_of takes no map:, if: or unless:" if options.key?(:map) || options.key?(:if) || options.key?(:unless)
-
-      property = Properties::ItemOneOf.new(name: collection.key, discriminator:, **options)
-      collection.items_one_of = property
-      nested(property, &block)
-      raise DefinitionError, "#{collection.key}: one_of needs at least one variant" unless property.variants?
-    end
-
-    def add_property(klass, ignore_defaults: [], **options)
-      scope = @current_scope || raise(DefinitionError, "Properties must be declared inside a version block")
-      property = klass.new(**default_options.except(:type, :collapse_if, *ignore_defaults), **options)
-      scope.add(property)
-      property
-    end
-
-    def nested(scope)
-      previous = @current_scope
-      @current_scope = scope
-      yield
-    ensure
-      @current_scope = previous
+    def with_options(**options, &block)
+      versponse.builder.with_options(**options, &block)
     end
   end
 end

@@ -39,7 +39,7 @@ module Versponse
       context = context.frozen? ? context : context.dup.freeze
       data = Collections.collection?(object) ? Collections.map(Collections.items(object)) { |item| plan.call(item, context, expansion) } : plan.call(object, context, expansion)
       OutputValidator.call(self, data, version:, view:) if Versponse.configuration.validate_output
-      wrap(data, root:, meta:)
+      Wrapper.wrap(data, root:, meta:)
     end
 
     # @param object [Object] source
@@ -62,7 +62,7 @@ module Versponse
       raise ArgumentError, "meta: requires root:" if meta && root.nil?
 
       version = versponse.version_name(version)
-      return DeepFreeze.call(wrapper_schema(view:, root:, meta:, collection:)) if root
+      return DeepFreeze.call(Wrapper.schema(self, view:, root:, meta:, collection:)) if root
 
       versponse.openapi_schema(version:, view:)
     end
@@ -110,31 +110,6 @@ module Versponse
     # @return [Array<String>] sorted, frozen paths such as ["deal.stage", "site"]
     def expandable_paths(version: nil, view: :default)
       versponse.expandable_paths(version: versponse.version_name(version), view:)
-    end
-
-    private
-
-    def wrapper_schema(view:, root:, meta:, collection:)
-      item = {"$ref" => to_ref(view:)}
-      properties = {root.to_s => collection ? {"type" => "array", "items" => item} : item}
-      properties["meta"] = {"$ref" => meta.to_ref} if meta
-      {"type" => "object", "required" => properties.keys, "properties" => properties, "additionalProperties" => false}
-    end
-
-    def wrap(data, root:, meta:)
-      return data if root.nil?
-
-      wrapped = {root.to_s => data}
-      wrapped["meta"] = string_keys(meta) if meta
-      wrapped
-    end
-
-    def string_keys(value)
-      case value
-      when Hash then value.to_h { |key, item| [key.to_s, string_keys(item)] }
-      when Array then value.map { |item| string_keys(item) }
-      else value
-      end
     end
   end
 end

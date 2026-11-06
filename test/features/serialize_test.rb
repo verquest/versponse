@@ -193,6 +193,20 @@ class SerializeTest < Minitest::Test
     assert_match(/items: expected a collection, got /, error.message)
   end
 
+  # The DSL's state and helpers live in klass.versponse.builder, so a class's own methods can't break them
+  def test_user_helpers_do_not_clash_with_the_dsl
+    klass = Class.new(Versponse::Base) do
+      def self.nested = "mine"
+      def self.add_property = "mine"
+      def self.wrap = "mine"
+      def self.default_options = "mine"
+
+      version("2025-09") { object(:a) { field :b, type: :string } }
+    end
+
+    assert_equal({"r" => {"a" => {"b" => "x"}}}, klass.serialize({a: {b: "x"}}, version: "2025-09", root: :r))
+  end
+
   def test_meta_keys_are_strings
     meta = {page: {next: "c2", sizes: [{per: 10}]}}
     result = UnitTypeResponse.serialize(unit_type, version: "2025-09", root: :unit_type, meta:)
