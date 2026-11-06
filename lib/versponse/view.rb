@@ -43,6 +43,11 @@ module Versponse
       @operations << [:exclude, names.map(&:to_s)]
     end
 
+    # @return [Boolean] true when declared in its version, false when inherited from an earlier one
+    def declared?
+      !@inherited
+    end
+
     # @return [View] a copy for a later version, whose unknown excludes are ignored
     def for_next_version
       View.new(name:, operations: @operations.dup, properties: @properties.dup, inherited: true)

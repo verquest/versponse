@@ -71,16 +71,18 @@ module Versponse
 
     # @param name [Symbol, String] property to remove
     # @return [Versponse::Properties::Base] the removed property
-    # @raise [Versponse::DefinitionError] when the property does not exist
+    # @raise [Versponse::DefinitionError] when the property does not exist or is an identifier
     def remove(name)
+      check_not_identifier!(name.to_s)
       properties.delete(name.to_s) || raise(DefinitionError, "Property #{name} not found in #{label}")
     end
 
     # @param view [Versponse::View] view to add or replace
     # @return [Versponse::View] the view
-    # @raise [Versponse::DefinitionError] for the implicit default and collapsed views
+    # @raise [Versponse::DefinitionError] for the implicit default and collapsed views, or a view the version already declares
     def add_view(view)
       raise DefinitionError, "The #{view.name} view is implicit and can not be declared (#{label})" if %i[default collapsed].include?(view.name)
+      raise DefinitionError, "#{label} declares view #{view.name} twice" if views[view.name]&.declared?
 
       views[view.name] = view
     end
@@ -88,9 +90,10 @@ module Versponse
     # @param other [Version] version to copy from
     # @param exclude_properties [Array<Symbol, String>] properties left out of the copy
     # @return [void]
-    # @raise [Versponse::DefinitionError] when an excluded property does not exist in other
+    # @raise [Versponse::DefinitionError] when an excluded property does not exist in other, or is an identifier
     def copy_from(other, exclude_properties: [])
       excluded = exclude_properties.map(&:to_s)
+      excluded.each { |key| raise DefinitionError, identifier_message(key) if other.identifiers.key?(key) }
       unknown = excluded - other.properties.keys
       raise DefinitionError, "#{label} excludes properties unknown in #{other.label}: #{unknown.join(", ")}" if unknown.any?
 
@@ -148,6 +151,15 @@ module Versponse
     end
 
     private
+
+    # Excluding it would leave the collapsed shape rendering it
+    def check_not_identifier!(key)
+      raise DefinitionError, identifier_message(key) if identifiers.key?(key)
+    end
+
+    def identifier_message(key)
+      "#{label}: #{key} is an identifier; redeclare the identifiers instead of excluding it"
+    end
 
     def declared_properties_for(view_name)
       return properties.values if view_name == :default

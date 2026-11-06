@@ -73,11 +73,11 @@ class NestedTest < Minitest::Test
     child = Class.new(Versponse::Base) { version("2025-09") { field :name, type: :string } }
     holder = Class.new(Versponse::Base)
     holder.class_exec(child) { |item| version("2025-09") { collection :items, item: } }
-    holder.serialize({items: [{name: "a"}]}, version: "2025-09")
+    holder.serialize({items: [{name: "a"}]}, version: "2025-10")
 
-    child.class_exec { version("2025-09", inherit: false) { field :title, type: :string } }
+    child.class_exec { version("2025-10", inherit: false) { field :title, type: :string } }
 
-    assert_equal({"items" => [{"title" => "b"}]}, holder.serialize({items: [{title: "b"}]}, version: "2025-09"))
+    assert_equal({"items" => [{"title" => "b"}]}, holder.serialize({items: [{title: "b"}]}, version: "2025-10"))
   end
 
   def test_collection_items_must_implement_the_protocol

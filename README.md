@@ -259,7 +259,7 @@ ProductResponse.serialize(product, version: "2026-01", view: :embedded)
 
 `reference` and `collection` take `view:` to render the nested class in one of its views, which is how cycles are broken (an order embeds its tenancy without the tenancy's order). Redeclaring a view in a later version replaces it.
 
-Mistakes in a definition raise `Versponse::DefinitionError` when the version block closes: excluding an unknown property, `inherit:` naming a version before every declared one, `include_view` of an unknown view, or views including each other in a cycle. `VersionNotFoundError`, `ViewNotFoundError` and `PropertyNotFoundError` are left for what a caller asks for at runtime (a version, a view, or `to_validation_schema(property:)`), so they are safe to map to client errors.
+Mistakes in a definition raise `Versponse::DefinitionError` when the version block closes: excluding an unknown property or an identifier (redeclare the identifiers instead), declaring a version or a view twice, `inherit:` naming a version before every declared one, `include_view` of an unknown view, or views including each other in a cycle. `VersionNotFoundError`, `ViewNotFoundError` and `PropertyNotFoundError` are left for what a caller asks for at runtime (a version, a view, or `to_validation_schema(property:)`), so they are safe to map to client errors.
 
 ## Expansion
 

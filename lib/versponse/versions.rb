@@ -26,7 +26,10 @@ module Versponse
 
     # @param version [Versponse::Version] finalized version
     # @return [void]
+    # @raise [Versponse::DefinitionError] when the class already declares the version
     def add(version)
+      raise DefinitionError, "#{@owner} declares version #{version.name} twice" if @versions.key?(version.name)
+
       @versions[version.name] = version
       @sorted_names = @versions.keys.sort.freeze
       Registry.add_version_name(version.name)

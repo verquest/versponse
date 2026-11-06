@@ -61,6 +61,51 @@ class DslErrorsTest < Minitest::Test
     assert_equal({"type" => "string"}, klass.to_schema(version: "2025-09")["properties"]["name"])
   end
 
+  def test_duplicate_version_raises
+    error = assert_raises(Versponse::DefinitionError) do
+      define do
+        version("2025-09") { field :a, type: :string }
+        version("2025-09") { field :b, type: :string }
+      end
+    end
+
+    assert_equal "AnonymousResponse declares version 2025-09 twice", error.message
+  end
+
+  def test_duplicate_view_in_a_version_raises
+    error = assert_raises(Versponse::DefinitionError) do
+      define do
+        version "2025-09" do
+          field :a, type: :string
+          view :a
+          view :a
+        end
+      end
+    end
+
+    assert_equal "AnonymousResponse 2025-09 declares view a twice", error.message
+  end
+
+  # The collapsed shape would keep rendering it, so the identifiers are redeclared instead
+  def test_excluding_an_identifier_raises
+    message = "AnonymousResponse 2025-10: id is an identifier; redeclare the identifiers instead of excluding it"
+    error = assert_raises(Versponse::DefinitionError) do
+      define do
+        version("2025-09") { identifier :id, type: :string }
+        version("2025-10") { exclude_properties :id }
+      end
+    end
+    inherited = assert_raises(Versponse::DefinitionError) do
+      define do
+        version("2025-09") { identifier :id, type: :string }
+        version "2025-10", exclude_properties: [:id]
+      end
+    end
+
+    assert_equal message, error.message
+    assert_equal message, inherited.message
+  end
+
   def test_view_outside_a_version
     assert_raises(Versponse::DefinitionError) { define { view(:embedded) {} } }
   end
