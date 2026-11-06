@@ -46,6 +46,13 @@ class OpenapiComponentsTest < Minitest::Test
         reference :site, from: Api::SiteResponse
       end
     end
+
+    # Its property is named like a data keyword, which must not hide the reference
+    class DefaultResponse < Versponse::Base
+      version "2025-09" do
+        reference :default, from: Api::SiteResponse
+      end
+    end
   end
 
   class ApiDocument < Versponse::OpenAPI::Document
@@ -116,6 +123,23 @@ class OpenapiComponentsTest < Minitest::Test
     assert_equal "/components/schemas/ElsewhereOwnerResponse/properties/site", error[:pointer]
     assert_equal "ref", error[:type]
     assert_equal "$ref #/components/schemas/ApiSiteResponse does not resolve in the document", error[:message]
+  end
+
+  def test_validate_checks_refs_under_any_property_name_mappings_and_examples
+    document = Class.new(Versponse::OpenAPI::Document) do
+      info "title" => "API"
+      responses [Elsewhere::DefaultResponse]
+      schema "Poly", {"type" => "object", "discriminator" => {"propertyName" => "t", "mapping" => {"x" => "#/components/schemas/Missing"}}}
+      finalize do |built, _version|
+        built["paths"]["/x"] = {"get" => {"responses" => {"200" => {"description" => "ok", "content" => {"application/json" => {
+          "examples" => {"a" => {"$ref" => "#/components/examples/Missing"}}
+        }}}}}}
+      end
+    end
+
+    refs = document.validate(version: "2025-09").select { |error| error[:type] == "ref" }.map { |error| error[:details]["ref"] }
+
+    assert_equal %w[#/components/examples/Missing #/components/schemas/ApiSiteResponse #/components/schemas/Missing], refs.sort
   end
 
   def test_schema_collisions_raise

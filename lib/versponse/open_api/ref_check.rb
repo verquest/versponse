@@ -7,8 +7,12 @@ module Versponse
     #
     # @api private
     module RefCheck
-      # Keywords whose values are data, so a "$ref" key in them isn't a reference
-      DATA_KEYWORDS = %w[example examples default const enum].freeze
+      # Keywords whose values are data, so a "$ref" key in them isn't a reference ("examples" too when it's
+      # a schema's Array; a Hash of Example Objects is walked)
+      DATA_KEYWORDS = %w[example default const enum].freeze
+
+      # Keywords whose keys are names (a property may be called "default"), not keywords
+      NAME_MAPS = %w[properties patternProperties $defs definitions dependentSchemas].freeze
 
       # @param document [Hash] built OpenAPI document
       # @return [Array<Hash>] errors with :pointer, :type, :message and :details
@@ -18,15 +22,32 @@ module Versponse
         errors
       end
 
-      def self.walk(value, pointer, document, errors)
+      def self.walk(value, pointer, document, errors, names: false)
         case value
-        when Hash
-          check(value["$ref"], pointer, document, errors) if value["$ref"].is_a?(String)
-          value.each do |key, item|
-            walk(item, "#{pointer}/#{escape(key)}", document, errors) unless DATA_KEYWORDS.include?(key)
-          end
-        when Array
-          value.each_with_index { |item, index| walk(item, "#{pointer}/#{index}", document, errors) }
+        when Hash then names ? walk_names(value, pointer, document, errors) : walk_object(value, pointer, document, errors)
+        when Array then value.each_with_index { |item, index| walk(item, "#{pointer}/#{index}", document, errors) }
+        end
+      end
+
+      def self.walk_names(map, pointer, document, errors)
+        map.each { |name, item| walk(item, "#{pointer}/#{escape(name)}", document, errors) }
+      end
+
+      def self.walk_object(object, pointer, document, errors)
+        check(object["$ref"], pointer, document, errors) if object["$ref"].is_a?(String)
+        check_mapping(object["discriminator"], "#{pointer}/discriminator", document, errors)
+        object.each do |key, item|
+          next if DATA_KEYWORDS.include?(key) || (key == "examples" && !item.is_a?(Hash))
+
+          walk(item, "#{pointer}/#{escape(key)}", document, errors, names: NAME_MAPS.include?(key))
+        end
+      end
+
+      def self.check_mapping(discriminator, pointer, document, errors)
+        return unless discriminator.is_a?(Hash) && discriminator["mapping"].is_a?(Hash)
+
+        discriminator["mapping"].each do |value, ref|
+          check(ref, "#{pointer}/mapping/#{escape(value)}", document, errors) if ref.is_a?(String)
         end
       end
 
@@ -53,7 +74,7 @@ module Versponse
         key.to_s.gsub("~", "~0").gsub("/", "~1")
       end
 
-      private_class_method :walk, :check, :resolves?, :escape
+      private_class_method :walk, :walk_names, :walk_object, :check_mapping, :check, :resolves?, :escape
     end
   end
 end
