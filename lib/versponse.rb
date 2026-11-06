@@ -82,7 +82,7 @@ module Versponse
     # @param paths [Array<String>] unknown paths
     def initialize(paths:)
       @paths = paths
-      super("Unknown expand paths: #{paths.join(", ")}")
+      super("Unknown expand paths: #{paths.map(&:inspect).join(", ")}")
     end
   end
 

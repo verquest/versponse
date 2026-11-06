@@ -60,7 +60,7 @@ class ExpandablePathsTest < Minitest::Test
     error = assert_raises(Versponse::InvalidExpandError) { serialize(%w[deal.stage nope deal]) }
 
     assert_equal %w[nope deal], error.paths
-    assert_match(/Unknown expand paths: nope, deal/, error.message)
+    assert_equal 'Unknown expand paths: "nope", "deal"', error.message
   end
 
   # The validated tree is cached, so repeated requests with the same expand: skip the walk
@@ -77,6 +77,38 @@ class ExpandablePathsTest < Minitest::Test
     assert_equal [{"id" => "c2"}], UnitResponse.serialize(unit, version: "2025-09", expand: ["category"])["category"]["children"]
     assert_equal [{"id" => "c2", "children" => []}], UnitResponse.serialize(unit, version: "2025-09", expand: ["category.*"])["category"]["children"]
     assert_raises(Versponse::InvalidExpandError) { serialize(["nope.*"]) }
+  end
+
+  def expansion(paths) = UnitResponse.versponse.expansion(paths, version: "2025-09", view: :default)
+
+  # "deal.*" works when deal itself isn't expandable but something below it is
+  def test_wildcard_under_a_non_expandable_path
+    tree = expansion(["deal.*"])
+
+    assert tree.child("deal").expand?("stage")
+    refute tree.expand?("category")
+  end
+
+  # "*" with other paths: they're validated and merged, so deeper paths go further than "*" alone
+  def test_wildcard_with_other_paths
+    tree = Category.new("c1", [Category.new("c2", [Category.new("c3", [])])])
+    result = CategoryResponse.serialize(tree, version: "2025-09", expand: ["*", "children.children"])
+
+    assert_equal [{"id" => "c3", "children" => []}], result["children"].first["children"]
+    assert_raises(Versponse::InvalidExpandError) { serialize(["*", "bogus"]) }
+  end
+
+  def test_malformed_paths_raise
+    error = assert_raises(Versponse::InvalidExpandError) { serialize(["category.", ""]) }
+
+    assert_equal ["category.", ""], error.paths
+  end
+
+  # Ignored junk doesn't take cache slots: the key is the valid paths
+  def test_ignored_junk_shares_the_cache_entry_of_its_valid_paths
+    with_configuration(unknown_expand: :ignore) do
+      assert_same expansion(%w[category junk1]), expansion(%w[category junk2])
+    end
   end
 
   def test_unknown_paths_can_be_ignored

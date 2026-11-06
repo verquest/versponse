@@ -33,6 +33,12 @@ module Versponse
       end
     end
 
+    # @param key [Object] cache key
+    # @return [Object, nil] the cached value, nil when missing (computes nothing)
+    def [](key)
+      @store[key]
+    end
+
     # @return [void]
     def clear
       @mutex.synchronize { @store = {}.freeze }

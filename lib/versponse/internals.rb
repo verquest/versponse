@@ -24,7 +24,6 @@ module Versponse
       @schemers = Cache.new
       @checkers = Cache.new
       @expandable_paths = Cache.new
-      @wildcards = Cache.new
       @expansions = Cache.new(limit: EXPANSION_LIMIT)
       @generation = Versponse.cache_generation
     end
@@ -158,7 +157,8 @@ module Versponse
       end
     end
 
-    # Validated trees are cached by their sorted paths, up to {EXPANSION_LIMIT} combinations
+    # Trees are cached by their sorted paths, up to {EXPANSION_LIMIT} combinations. A list with unknown paths
+    # (config.unknown_expand = :ignore) is cached under its valid paths only, so junk can't take the slots.
     #
     # @param expand [Array<String, Symbol>, String, Symbol, nil] requested paths: dotted, "*", or ending in ".*"
     # @param version [String] canonical version name
@@ -171,11 +171,8 @@ module Versponse
       fresh!
       paths = Array(expand).map(&:to_s).uniq
       return Expansion::NONE if paths.empty?
-      return wildcard_expansion(version:, view:) if paths.include?("*")
 
-      @expansions.fetch([version, view.to_sym, Versponse.configuration.unknown_expand, paths.sort]) do
-        build_expansion(paths, version:, view:)
-      end
+      @expansions[[version, view.to_sym, paths.sort]] || validated_expansion(paths, version:, view:)
     end
 
     private
@@ -186,7 +183,7 @@ module Versponse
       generation = Versponse.cache_generation
       return if @generation == generation
 
-      [@plans, @schemas, @schemers, @checkers, @expandable_paths, @wildcards, @expansions].each(&:clear)
+      [@plans, @schemas, @schemers, @checkers, @expandable_paths, @expansions].each(&:clear)
       versions.clear_resolved
       @generation = generation
     end
@@ -198,27 +195,36 @@ module Versponse
       current.call.to_s
     end
 
-    def build_expansion(paths, version:, view:)
-      unknown = paths.reject { |path| expandable_path?(path.delete_suffix(".*"), version:, view:) }
+    def validated_expansion(paths, version:, view:)
+      valid, unknown = paths.partition { |path| known_path?(path, version:, view:) }
       raise InvalidExpandError.new(paths: unknown) if unknown.any? && Versponse.configuration.unknown_expand == :raise
+      return Expansion::NONE if valid.empty?
 
-      Expansion.build((paths - unknown).flat_map { |path| with_wildcards(path, version:, view:) })
+      @expansions.fetch([version, view.to_sym, valid.sort]) do
+        Expansion.build(valid.flat_map { |path| expanded_paths(path, version:, view:) })
+      end
     end
 
-    # "<path>.*" is the path plus every expandable path below it
-    def with_wildcards(path, version:, view:)
+    # "*" is always known; "<path>.*" when the path is expandable or has expandable paths below it
+    def known_path?(path, version:, view:)
+      return true if path == "*"
+
+      base = path.delete_suffix(".*")
+      return false if base.split(".", -1).include?("")
+      return true if expandable_path?(base, version:, view:)
+
+      base != path && expandable_paths(version:, view:).any? { |known| known.start_with?("#{base}.") }
+    end
+
+    # "*" expands every path expandable_paths lists, so each recursive association expands once and cyclic
+    # object graphs can't recurse forever; "<path>.*" is the path (when expandable) and every listed path below it
+    def expanded_paths(path, version:, view:)
+      return expandable_paths(version:, view:) if path == "*"
       return [path] unless path.end_with?(".*")
 
-      prefix = path.delete_suffix(".*")
-      [prefix, *expandable_paths(version:, view:).select { |known| known.start_with?("#{prefix}.") }]
-    end
-
-    # "*" expands every path expandable_paths lists, so each recursive association expands once
-    # and cyclic object graphs can't recurse forever
-    def wildcard_expansion(version:, view:)
-      @wildcards.fetch([version, view.to_sym]) do
-        Expansion.build(expandable_paths(version:, view:))
-      end
+      base = path.delete_suffix(".*")
+      below = expandable_paths(version:, view:).select { |known| known.start_with?("#{base}.") }
+      expandable_path?(base, version:, view:) ? [base, *below] : below
     end
 
     # Walks the requested path one segment at a time; valid when the last segment is expandable.
