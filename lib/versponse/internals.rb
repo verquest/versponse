@@ -25,6 +25,7 @@ module Versponse
       @checkers = Cache.new
       @expandable_paths = Cache.new
       @expansions = Cache.new(limit: EXPANSION_LIMIT)
+      @raw_expansions = Cache.new
       @time_precisions = {}
       @generation = Versponse.cache_generation
     end
@@ -241,10 +242,16 @@ module Versponse
       return Expansion::NONE if expand.nil?
 
       fresh!
+      raw = @raw_expansions[version]&.[](view)&.[](expand)
+      return raw if raw
+
       paths = Array(expand).map(&:to_s).uniq
       return Expansion::NONE if paths.empty?
 
-      @expansions[[version, view.to_sym, paths.sort]] || validated_expansion(paths, version:, view:)
+      tree = @expansions[[version, view.to_sym, paths.sort]]
+      return remember_expansion(expand, tree, version:, view:) if tree
+
+      validated_expansion(paths, version:, view:) { |known| remember_expansion(expand, known, version:, view:) }
     end
 
     # Checks without compiling that every referenced class serves the version and view, in every view,
@@ -289,6 +296,7 @@ module Versponse
       @checkers = Cache.new
       @expandable_paths = Cache.new
       @expansions = Cache.new(limit: EXPANSION_LIMIT)
+      @raw_expansions = Cache.new
       versions.clear_resolved
       @generation = generation
     end
@@ -303,14 +311,24 @@ module Versponse
       value.to_s
     end
 
+    # Yields the tree when every path is known, so the requested value can be remembered as a key
     def validated_expansion(paths, version:, view:)
       valid, unknown = paths.partition { |path| known_path?(path, version:, view:) }
       raise InvalidExpandError.new(paths: unknown) if unknown.any? && Versponse.configuration.unknown_expand == :raise
       return Expansion::NONE if valid.empty?
 
-      @expansions.fetch([version, view.to_sym, valid.sort]) do
+      tree = @expansions.fetch([version, view.to_sym, valid.sort]) do
         Expansion.build(valid.flat_map { |path| expanded_paths(path, version:, view:) })
       end
+      unknown.empty? ? yield(tree) : tree
+    end
+
+    # Stores the tree under the requested value as given (an Array as a frozen copy), so a repeated
+    # expand: is found without normalizing or allocating. Only lists whose paths are all known get here.
+    def remember_expansion(expand, tree, version:, view:)
+      key = (expand.is_a?(::Array) && !expand.frozen?) ? expand.dup.freeze : expand
+      by_view = @raw_expansions.fetch(version) { Cache.new }
+      by_view.fetch(view) { Cache.new(limit: EXPANSION_LIMIT) }.fetch(key) { tree }
     end
 
     # "*" is always known; "<path>.*" when the path is expandable or has expandable paths below it

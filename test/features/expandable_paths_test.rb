@@ -111,6 +111,28 @@ class ExpandablePathsTest < Minitest::Test
     end
   end
 
+  # A repeated expand: is found by the requested value itself, without normalizing or allocating per call
+  # (measured over many calls, since the VM may allocate once while warming up its caches)
+  def test_repeated_expansions_allocate_nothing
+    paths = %w[deal.stage category]
+    first = expansion(paths)
+    before = GC.stat(:total_allocated_objects)
+    20.times { expansion(paths) }
+
+    assert_operator GC.stat(:total_allocated_objects) - before, :<, 20
+    assert_same first, expansion(paths)
+  end
+
+  # The stored key is a frozen copy, so mutating the caller's Array can't change later results
+  def test_mutating_the_requested_array_afterwards
+    paths = %w[category]
+    expansion(paths)
+    paths << "deal.stage"
+
+    assert expansion(paths).expand?("deal")
+    refute expansion(%w[category]).expand?("deal")
+  end
+
   def test_unknown_paths_can_be_ignored
     with_configuration(unknown_expand: :ignore) do
       assert_equal({"id" => "s1"}, serialize(%w[deal.stage nope])["deal"]["stage"])
