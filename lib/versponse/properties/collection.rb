@@ -93,8 +93,8 @@ module Versponse
       private
 
       def items_schema(context)
-        return {"anyOf" => References.expandable_schemas(@item, view: @view, context:)} if expandable?
-        return References.schema(@item, view: @view, property: nil, context:) if @item
+        return {"anyOf" => References.expandable_schemas(@item, view: @view, context:, key:)} if expandable?
+        return References.schema(@item, view: @view, property: nil, context:, key:) if @item
         return @items_one_of.schema(context) if @items_one_of
 
         inline_schema(context)
@@ -110,7 +110,7 @@ module Versponse
         return @items_one_of.dispatcher(version) if @items_one_of
         return inline_plan(version) if @item.nil?
 
-        LazyPlan.new(@item, version:, view: @view) if References.versponse?(@item)
+        References.lazy_plan(@item, version:, view: @view, key:) if References.versponse?(@item)
       end
     end
   end

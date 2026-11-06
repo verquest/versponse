@@ -70,7 +70,7 @@ module Versponse
       # @param version [String] canonical version name
       # @return [Versponse::VariantDispatcher] matching to the variants' full plans
       def dispatcher(version)
-        variants = @variants.map { |variant| [Array(variant.match).freeze, LazyPlan.new(variant.from, version:, view: variant.view)] }
+        variants = @variants.map { |variant| [Array(variant.match).freeze, References.lazy_plan(variant.from, version:, view: variant.view, key:)] }
         VariantDispatcher.new(variants, nullable: nullable?)
       end
 
@@ -113,7 +113,7 @@ module Versponse
       private
 
       def variant_schemas(variant, context)
-        full = References.schema(variant.from, view: variant.view, property: nil, context:)
+        full = References.schema(variant.from, view: variant.view, property: nil, context:, key:)
         expandable? ? [full, collapsed_variant_schema(variant, context)] : [full]
       end
 

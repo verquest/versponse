@@ -39,9 +39,9 @@ module Versponse
         return referenced_property_schema(context).merge(schema_options) if versponse_property?
 
         check_foreign_property!(context.version) if @property
-        return nullable_choice("anyOf", References.expandable_schemas(@from, view: @view, context:), context).merge(schema_options) if expandable?
+        return nullable_choice("anyOf", References.expandable_schemas(@from, view: @view, context:, key:), context).merge(schema_options) if expandable?
 
-        schema = nullable_ref(References.schema(@from, view: @view, property: @property, context:), context)
+        schema = nullable_ref(References.schema(@from, view: @view, property: @property, context:, key:), context)
         schema = {"allOf" => [schema]} if schema.key?("$ref") && schema_options.any? && nullable_keyword?(context)
         schema.merge(schema_options)
       end
@@ -55,7 +55,7 @@ module Versponse
 
         collapsed_plan = (References.collapsed_plan(@from, version) if expandable?)
         collapse_if = (References.collapse_if(@from, version) if expandable?)
-        Steps::Nested.new(key:, extractor:, condition:, plan: LazyPlan.new(@from, version:, view: @view), collapsed_plan:, collapse_if:, collection: false)
+        Steps::Nested.new(key:, extractor:, condition:, plan: References.lazy_plan(@from, version:, view: @view, key:), collapsed_plan:, collapse_if:, collection: false)
       end
 
       # @param version [String] canonical version name

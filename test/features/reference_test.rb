@@ -120,6 +120,26 @@ class ReferenceTest < Minitest::Test
     end
   end
 
+  # A typo in view: is a definition mistake, not a client error, and surfaces wherever the reference compiles
+  def test_unknown_nested_view_raises_definition_error
+    klass = Class.new(Versponse::Base) { version("2025-09") { reference :money, from: MoneyResponse, view: :embeded } }
+
+    error = assert_raises(Versponse::DefinitionError) { klass.serialize({money: {}}, version: "2025-09") }
+
+    assert_equal "money: view embeded not found in ReferenceTest::MoneyResponse 2025-09", error.message
+    assert_raises(Versponse::DefinitionError) { klass.to_schema(version: "2025-09") }
+    assert_raises(Versponse::DefinitionError) { Versponse.eager_load!(classes: [klass]) }
+  end
+
+  def test_nested_class_without_the_version_raises_definition_error
+    later = Class.new(Versponse::Base) { version("2030-01") { field :id, type: :string } }
+    klass = Class.new(Versponse::Base) { version("2025-09") { collection :items, item: later } }
+
+    error = assert_raises(Versponse::DefinitionError) { klass.serialize({items: []}, version: "2025-09") }
+
+    assert_equal "items: AnonymousResponse has no version at or before 2025-09", error.message
+  end
+
   def test_validation_schema_inlines_references
     schema = UnitTypeResponse.to_validation_schema(version: "2025-09")
 

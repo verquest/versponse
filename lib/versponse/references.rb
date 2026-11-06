@@ -14,13 +14,55 @@ module Versponse
       klass.is_a?(Class) && klass < Base
     end
 
+    # Checks a referenced Versponse class serves the version and view, so a definition mistake raises
+    # DefinitionError wherever the reference compiles (serialize, schemas, eager_load!, documents)
+    #
+    # @param klass [Class] referenced class (anything but a Versponse class passes)
+    # @param version [String] canonical version name
+    # @param view [Symbol] referenced view
+    # @param key [String] referencing property, for the message
+    # @return [void]
+    # @raise [Versponse::DefinitionError] when the class declares nothing at or before the version, or lacks the view
+    # @raise [Versponse::VersionNotFoundError] when its supported_versions leave the version out (a runtime answer)
+    def self.check_target!(klass, version:, view:, key:)
+      return unless versponse?(klass)
+
+      definition = target_version(klass, version, key)
+      return if definition.view_names.include?(view.to_sym)
+
+      raise DefinitionError, "#{key}: view #{view} not found in #{klass.name || "AnonymousResponse"} #{version}"
+    end
+
+    def self.target_version(klass, version, key)
+      klass.versponse.resolve(version)
+    rescue VersionNotFoundError
+      raise if Versponse.configuration.version_resolver.call(Registry.canonical(version), klass.versponse.versions.sorted_names)
+
+      raise DefinitionError, "#{key}: #{klass.name || "AnonymousResponse"} has no version at or before #{version}"
+    end
+    private_class_method :target_version
+
+    # @param klass [Class] Versponse response class
+    # @param version [String] canonical version name
+    # @param view [Symbol] view to render
+    # @param key [String] referencing property, for errors
+    # @return [Versponse::LazyPlan] the class's plan, compiled on first use
+    # @raise [Versponse::DefinitionError] see {.check_target!}
+    def self.lazy_plan(klass, version:, view:, key:)
+      check_target!(klass, version:, view:, key:)
+      LazyPlan.new(klass, version:, view:)
+    end
+
     # @param klass [Class] referenced class
     # @param view [Symbol] view of a Versponse class
     # @param property [Symbol, nil] property of a non-Versponse class
     # @param context [Versponse::SchemaContext] schema generation context
+    # @param key [String, nil] referencing property; given, the target is checked with {.check_target!}
     # @return [Hash] a $ref, or the inlined schema in validation mode
-    def self.schema(klass, view:, property:, context:)
+    def self.schema(klass, view:, property:, context:, key: nil)
       return foreign_schema(klass, property:, context:) unless versponse?(klass)
+
+      check_target!(klass, version: context.version, view:, key:) if key
       return {"$ref" => klass.to_ref(view:)} unless context.validation?
 
       context.inline([klass, view], klass.component_name(view:)) { klass.versponse.object_schema(version: context.version, view:, context:) }
@@ -74,7 +116,8 @@ module Versponse
     # @param context [Versponse::SchemaContext] schema generation context
     # @return [Array(Hash, Hash)] the full and the collapsed schema
     # @raise [Versponse::DefinitionError] when the class has no identifier
-    def self.expandable_schemas(klass, view:, context:)
+    def self.expandable_schemas(klass, view:, context:, key: nil)
+      check_target!(klass, version: context.version, view:, key:) if key
       ensure_identifier!(klass, context.version)
       [schema(klass, view:, property: nil, context:), schema(klass, view: :collapsed, property: nil, context:)]
     end
