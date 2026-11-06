@@ -78,4 +78,21 @@ class Versponse::PlanTest < Minitest::Test
   def test_plan_is_frozen
     assert_predicate plan(value_step("name")), :frozen?
   end
+
+  # Plain fields compile to a specialized read step; errors keep their key paths and messages
+  def test_read_steps_keep_error_key_paths
+    klass = Class.new(Versponse::Base) do
+      version "2025-09" do
+        field :name, type: :string
+        field :at, type: :string, format: "date-time", map: "created", nullable: true
+      end
+    end
+
+    assert_kind_of Versponse::Steps::Read, klass.versponse.plan(version: "2025-09").instance_variable_get(:@steps).first
+    missing_key = assert_raises(Versponse::ExtractionError) { klass.serialize({}, version: "2025-09") }
+    assert_equal ["name"], missing_key.keys
+    missing_method = assert_raises(Versponse::ExtractionError) { klass.serialize(Object.new, version: "2025-09") }
+    assert_match(/\.name: undefined method 'name'/, missing_method.message)
+    assert_equal({"name" => "n", "at" => nil}, klass.serialize({"name" => "n", "created" => nil}, version: "2025-09"))
+  end
 end

@@ -194,8 +194,15 @@ module Versponse
         Extractors.for(name:, map:, block:)
       end
 
+      # A plain field (no block, condition or path map:) compiles to the specialized Steps::Read
       def value_step(formatter: nil)
+        return Steps::Read.new(key:, name: map || name, formatter:) if plain_read?
+
         Steps::Value.new(key:, extractor:, condition:, formatter:)
+      end
+
+      def plain_read?
+        block.nil? && condition.nil? && (map.nil? || !(map == "." || map.include?("/") || map.empty?))
       end
 
       def nullable_type(schema, context = nil)
