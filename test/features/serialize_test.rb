@@ -115,6 +115,44 @@ class SerializeTest < Minitest::Test
     assert_equal({"a" => nil, "b" => nil}, klass.serialize({a: nil, b: nil}, version: "2025-09"))
   end
 
+  # As in verquest: a nested with_options replaces the outer options, and map: never applies
+  def test_nested_with_options_replace_and_ignore_map
+    klass = Class.new(Versponse::Base) do
+      version "2025-09" do
+        with_options nullable: true, map: "x" do
+          field :a, type: :string
+          with_options description: "B" do
+            field :b, type: :string
+          end
+        end
+      end
+    end
+    properties = klass.to_schema(version: "2025-09")["properties"]
+
+    assert_equal %w[string null], properties["a"]["type"]
+    assert_equal({"type" => "string", "description" => "B"}, properties["b"])
+    assert_equal({"a" => "1", "b" => "2"}, klass.serialize({a: "1", b: "2"}, version: "2025-09"))
+  end
+
+  def test_with_options_view_and_discriminator_apply
+    target = Class.new(Versponse::Base) do
+      def self.name = "TargetResponse"
+      version("2025-09") { const(:kind, value: "t") && field(:id, type: :string) && view(:compact) { exclude_properties :id } }
+    end
+    klass = Class.new(Versponse::Base) do
+      version "2025-09" do
+        with_options view: :compact, discriminator: "kind" do
+          reference :one, from: target
+          one_of(:many) { reference from: target, match: Object }
+        end
+      end
+    end
+    properties = klass.to_schema(version: "2025-09")["properties"]
+
+    assert_equal "#/components/schemas/TargetResponseCompact", properties["one"]["$ref"]
+    assert_equal "kind", properties["many"]["discriminator"]["propertyName"]
+  end
+
   def test_explicit_options_override_with_options_and_unless
     klass = Class.new(Versponse::Base) do
       version "2025-09" do

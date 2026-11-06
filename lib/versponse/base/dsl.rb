@@ -129,10 +129,10 @@ module Versponse
     #
     # @param name [Symbol] output key
     # @param item [Class, nil] class implementing the reference protocol
-    # @param view [Symbol] view of item
+    # @param view [Symbol, nil] view of item (with_options view:, else :default)
     # @param options [Hash] see {#field}
     # @return [void]
-    def collection(name, item: nil, view: :default, **options, &block)
+    def collection(name, item: nil, view: nil, **options, &block)
       versponse.builder.collection(name, item:, view:, **options, &block)
     end
 
@@ -140,12 +140,12 @@ module Versponse
     #
     # @param name [Symbol, nil] output key, omitted inside one_of
     # @param from [Class] class implementing the reference protocol
-    # @param view [Symbol] view of from
+    # @param view [Symbol, nil] view of from (with_options view:, else :default)
     # @param property [Symbol, nil] one property of a non-Versponse class's schema
     # @param match [Class, Proc, nil] one_of matcher, compared with ===
     # @param options [Hash] see {#field}
     # @return [void]
-    def reference(name = nil, from:, view: :default, property: nil, match: nil, **options, &block)
+    def reference(name = nil, from:, view: nil, property: nil, match: nil, **options, &block)
       versponse.builder.reference(name, from:, view:, property:, match:, **options, &block)
     end
 
@@ -186,7 +186,8 @@ module Versponse
       versponse.builder.exclude_properties(*names)
     end
 
-    # Applies options to every property declared in the block
+    # Applies options to every property declared in the block. A nested with_options replaces the outer
+    # options, and map: is ignored, as in verquest.
     #
     # @param options [Hash] shared options
     # @return [void]

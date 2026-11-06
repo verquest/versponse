@@ -109,7 +109,7 @@ module Versponse
       raise DefinitionError, "identifier #{name} takes no if: or unless:" if options.key?(:if) || options.key?(:unless)
       raise DefinitionError, "identifier #{name}: collapse_if: must respond to call" unless collapse_if.nil? || collapse_if.respond_to?(:call)
 
-      defaults = default_options.except(:type, :if, :unless, :collapse_if)
+      defaults = default_options.except(:type, :if, :unless, :collapse_if, :view, :discriminator)
       type ||= default_options[:type] || :string
       identifier = Properties::Field.new(**defaults, name:, type:, block:, **options)
       property = collapse_if ? Properties::Field.new(**defaults, name:, type:, block:, if: collapse_if, **options) : identifier
@@ -166,10 +166,11 @@ module Versponse
     #
     # @param name [Symbol] output key
     # @param item [Class, nil] class implementing the reference protocol
-    # @param view [Symbol] view of item
+    # @param view [Symbol, nil] view of item (with_options view:, else :default)
     # @param options [Hash] see {#field}
     # @return [void]
-    def collection(name, item: nil, view: :default, **options, &block)
+    def collection(name, item: nil, view: nil, **options, &block)
+      view ||= default_options[:view] || :default
       return add_property(Properties::Collection, name:, item:, view:, block:, **options) if item
       raise DefinitionError, "collection #{name} needs item: or a block defining its properties" unless block
 
@@ -180,12 +181,13 @@ module Versponse
     #
     # @param name [Symbol, nil] output key, omitted inside one_of
     # @param from [Class] class implementing the reference protocol
-    # @param view [Symbol] view of from
+    # @param view [Symbol, nil] view of from (with_options view:, else :default)
     # @param property [Symbol, nil] one property of a non-Versponse class's schema
     # @param match [Class, Proc, nil] one_of matcher, compared with ===
     # @param options [Hash] see {#field}
     # @return [void]
-    def reference(name = nil, from:, view: :default, property: nil, match: nil, **options, &block)
+    def reference(name = nil, from:, view: nil, property: nil, match: nil, **options, &block)
+      view ||= default_options[:view] || :default
       return one_of_variant(name, from:, view:, match:, extra: options.any? || block || property) if @current_scope.is_a?(Properties::OneOf)
       raise DefinitionError, "reference needs a name outside one_of" if name.nil?
       raise DefinitionError, "#{name}: match: is only used for one_of variants" if match
@@ -207,6 +209,7 @@ module Versponse
       raise DefinitionError, "one_of #{positional_name}: give the name once, not also as name:" if positional_name && name
 
       name ||= positional_name
+      discriminator ||= default_options[:discriminator]
       raise DefinitionError, "#{"one_of #{name}".strip} needs a block declaring its variants" unless block
       return item_one_of(discriminator:, **options, &block) if name.nil?
 
@@ -249,13 +252,15 @@ module Versponse
       end
     end
 
-    # Applies options to every property declared in the block
+    # Applies options to every property declared in the block. A nested with_options replaces the outer
+    # options, and map: is ignored, as in verquest.
     #
     # @param options [Hash] shared options
     # @return [void]
     def with_options(**options)
       previous = @default_options
-      @default_options = default_options.merge(options)
+      # As in verquest: a nested block replaces the outer options, and map: never applies to a group
+      @default_options = options.except(:map)
       yield
     ensure
       @default_options = previous
@@ -311,7 +316,7 @@ module Versponse
       raise DefinitionError, "one_of without a name is only allowed inside a collection block" unless collection.is_a?(Properties::Collection)
       raise DefinitionError, "#{collection.key}: the item one_of takes no map:, if: or unless:" if options.key?(:map) || options.key?(:if) || options.key?(:unless)
 
-      property = Properties::ItemOneOf.new(name: collection.key, discriminator:, **options)
+      property = Properties::ItemOneOf.new(name: collection.key, discriminator:, **default_options.slice(:nullable), **options)
       collection.items_one_of = property
       nested(property, &block)
       raise DefinitionError, "#{collection.key}: one_of needs at least one variant" unless property.variants?
@@ -319,7 +324,7 @@ module Versponse
 
     def add_property(klass, ignore_defaults: [], **options)
       scope = @current_scope || raise(DefinitionError, "Properties must be declared inside a version block")
-      property = klass.new(**default_options.except(:type, :collapse_if, *ignore_defaults), **options)
+      property = klass.new(**default_options.except(:type, :collapse_if, :view, :discriminator, *ignore_defaults), **options)
       scope.add(property)
       property
     end
