@@ -176,6 +176,10 @@ class DslErrorsTest < Minitest::Test
     assert_raises(Versponse::DefinitionError) { Class.new(parent) }
   end
 
+  def test_const_block_raises_instead_of_being_ignored
+    assert_raises(Versponse::DefinitionError) { define { version("2025-09") { const(:a, value: 1) { 2 } } } }
+  end
+
   def test_item_schema_options_are_checked
     error = assert_raises(Versponse::DefinitionError) { define { version("2025-09") { array :a, type: :string, item_schema_options: {mapp: 1} } } }
 

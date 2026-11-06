@@ -163,10 +163,14 @@ class Versponse::Properties::ScalarsTest < Minitest::Test
     assert_equal({"metadata" => {"a" => "b"}}, render(field, Struct.new(:metadata).new({"a" => "b"})))
   end
 
+  # A response constant never reads the object, so each option gets its own explanation
   def test_const_rejects_block_map_and_nullable
-    assert_raises(Versponse::DefinitionError) { Versponse::Properties::Const.new(name: :a, value: 1, block: proc { 2 }) }
-    assert_raises(Versponse::DefinitionError) { Versponse::Properties::Const.new(name: :a, value: 1, map: "b") }
-    assert_raises(Versponse::DefinitionError) { Versponse::Properties::Const.new(name: :a, value: 1, nullable: true) }
+    reads = "a: const never reads the object, so it takes no map: or block (use enum or field for computed values)"
+    nullable = "a: const always renders its value, so it can't be nullable (use enum with nil)"
+
+    assert_equal reads, assert_raises(Versponse::DefinitionError) { Versponse::Properties::Const.new(name: :a, value: 1, block: proc { 2 }) }.message
+    assert_equal reads, assert_raises(Versponse::DefinitionError) { Versponse::Properties::Const.new(name: :a, value: 1, map: "b") }.message
+    assert_equal nullable, assert_raises(Versponse::DefinitionError) { Versponse::Properties::Const.new(name: :a, value: 1, nullable: true) }.message
   end
 
   def test_const_value_is_frozen

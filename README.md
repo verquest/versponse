@@ -441,6 +441,7 @@ A verquest request can reference a versponse class with a verquest version that 
 Definitions can be copied between the gems (`one_of name:` and `inherit:` behave the same), except where responses differ from requests:
 
 - `required:` raises. Every key is rendered, so it's required in the schema unless `if:` or `unless:` makes it conditional.
+- `const` takes no `map:`, block or `nullable:`, because a response constant never reads the object. Use `enum` (with `nil` for nullable) for computed values.
 - Response-only DSL: `view`, `include_view`, `view:` on `reference` and `collection`, `match:` on `one_of` variants, `identifier`, `expandable:` and `source`.
 - Request-only DSL: `location`, `parameter_examples:`, `explode:` and conditions (`condition`, `depends_on`).
 

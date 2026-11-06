@@ -111,8 +111,9 @@ module Versponse
     # @param value [Object] constant value
     # @param options [Hash] if:, unless:, JSON Schema keywords
     # @return [void]
-    def const(name, value:, **options)
-      versponse.builder.const(name, value:, **options)
+    # @raise [Versponse::DefinitionError] with a block, map: or nullable: (a constant never reads the object)
+    def const(name, value:, **options, &block)
+      versponse.builder.const(name, value:, **options, &block)
     end
 
     # Declares an array of scalars

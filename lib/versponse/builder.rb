@@ -158,8 +158,8 @@ module Versponse
     # @param value [Object] constant value
     # @param options [Hash] if:, unless:, JSON Schema keywords
     # @return [void]
-    def const(name, value:, **options)
-      add_property(Properties::Const, name:, value:, ignore_defaults: %i[map nullable], **options)
+    def const(name, value:, **options, &block)
+      add_property(Properties::Const, name:, value:, block:, ignore_defaults: %i[map nullable], **options)
     end
 
     # Declares an array of scalars

@@ -11,10 +11,11 @@ module Versponse
 
       # @param value [Object] constant value
       # @param options [Hash] see {Base#initialize}
-      # @raise [Versponse::DefinitionError] with a block, map: or nullable:
+      # @raise [Versponse::DefinitionError] with a block, map: or nullable: (a response constant never reads the object)
       def initialize(value:, **options)
         super(**options)
-        raise DefinitionError, "#{key}: const takes no block, map: or nullable:" if block || map || nullable?
+        raise DefinitionError, "#{key}: const never reads the object, so it takes no map: or block (use enum or field for computed values)" if block || map
+        raise DefinitionError, "#{key}: const always renders its value, so it can't be nullable (use enum with nil)" if nullable?
 
         @constant = DeepFreeze.call(value)
       end
