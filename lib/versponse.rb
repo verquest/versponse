@@ -105,6 +105,13 @@ module Versponse
     def reset_caches!
       Registry.clear_canonical
       Registry.all.each { |klass| klass.versponse.reset_caches! }
+      @cache_generation = cache_generation + 1
+    end
+
+    # @return [Integer] how many times the caches were reset, for holders of built documents
+    # @api private
+    def cache_generation
+      @cache_generation ||= 0
     end
 
     # @param version [String] requested version

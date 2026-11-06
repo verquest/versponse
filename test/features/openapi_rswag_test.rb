@@ -33,6 +33,15 @@ class OpenapiRswagTest < Minitest::Test
     assert_same document, adapter["api/2025-09.json"]
   end
 
+  def test_documents_are_rebuilt_after_a_cache_reset
+    rswag = specs
+    first = rswag["api/2025-09.json"]
+    Versponse.reset_caches!
+
+    refute_same first, rswag["api/2025-09.json"]
+    assert_same rswag["api/2025-09.json"], rswag["api/2025-09.json"]
+  end
+
   def test_security_scheme_type_and_in_are_symbols_for_rswag
     schemes = specs["api/2025-09.json"][:components][:securitySchemes]
 
