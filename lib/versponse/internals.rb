@@ -39,9 +39,11 @@ module Versponse
       versions.description || ancestor&.description
     end
 
-    # @return [Hash{String => Object}] class-level schema options of this class, or of its closest ancestor that sets some
+    # Looked up when schemas are built, so declaration order of parent and subclass doesn't matter
+    #
+    # @return [Hash{String => Object}] class-level schema options of the ancestors merged with this class's own
     def schema_options
-      versions.schema_options.empty? ? (ancestor&.schema_options || {}) : versions.schema_options
+      (ancestor&.schema_options || {}).merge(versions.schema_options)
     end
 
     # @return [Versponse::SupportedVersions, nil] range declared with supported_versions on this class
@@ -148,7 +150,9 @@ module Versponse
       # Collapsed shapes are strict, or any object with an identifier would pass as the full one
       return ObjectSchema.build(definition.properties_for(:collapsed), context, additional_properties: false) if view.to_sym == :collapsed
 
-      ObjectSchema.build(definition.properties_for(view), context, description: definition.description, schema_options: definition.schema_options)
+      # Class-level settings are looked up now (live); the version's own win
+      ObjectSchema.build(definition.properties_for(view), context, description: definition.description || description,
+        schema_options: schema_options.merge(definition.schema_options))
     end
 
     # @param version [String] canonical version name

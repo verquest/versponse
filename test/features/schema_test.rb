@@ -165,6 +165,29 @@ class SchemaTest < Minitest::Test
     end
   end
 
+  # Class-level settings are looked up when schemas are built, so a parent changed later still reaches
+  # its subclasses, and schema_options merge with the subclass winning per key
+  def test_class_settings_are_inherited_live_and_merged
+    parent = Class.new(Versponse::Base) { schema_options deprecated: true, title: "Parent" }
+    child = Class.new(parent) do
+      schema_options title: "Child"
+      version("2025-09") { field :id, type: :string }
+    end
+    parent.class_exec { description "Added later" }
+    schema = child.to_schema(version: "2025-09")
+
+    assert_equal "Added later", schema["description"]
+    assert schema["deprecated"]
+    assert_equal "Child", schema["title"]
+  end
+
+  def test_version_settings_win_over_inherited_ones
+    parent = Class.new(Versponse::Base) { schema_options title: "Parent" }
+    child = Class.new(parent) { version("2025-09") { schema_options(title: "Version") && description("Version") } }
+
+    assert_equal %w[Version Version], child.to_schema(version: "2025-09").values_at("title", "description")
+  end
+
   def test_component_names
     assert_equal "ProductResponse", ProductResponse.component_name
     assert_equal "ProductResponseCompact", ProductResponse.component_name(view: :compact)
