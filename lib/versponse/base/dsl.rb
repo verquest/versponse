@@ -298,7 +298,7 @@ module Versponse
 
     def add_property(klass, ignore_defaults: [], **options)
       scope = @current_scope || raise(DefinitionError, "Properties must be declared inside a version block")
-      property = klass.new(**default_options.except(:type, *ignore_defaults), **options)
+      property = klass.new(**default_options.except(:type, :collapse_if, *ignore_defaults), **options)
       scope.add(property)
       property
     end

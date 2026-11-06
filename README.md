@@ -127,7 +127,7 @@ Options shared by every property:
   enum :notice_period, type: [:integer, :string], values: [7, 30, "send_immediately"]
   # => {"type" => ["integer", "string"], "enum" => [7, 30, "send_immediately"]}
   ```
-- Other options are JSON Schema keywords in snake case, such as `description:`, `format:` or `max_length:`. They're written in camel case (`maxLength`).
+- Other options are JSON Schema keywords in snake case, such as `description:`, `format:` or `max_length:`. They're written in camel case (`maxLength`). OpenAPI extensions go in as written (`"x-internal": true`). Anything else raises `Versponse::DefinitionError`, with a suggestion for typos such as `nulable:`.
 - `with_options type: :string, nullable: true do ... end` applies options to every property in the block. Explicit options win.
 
 `required` is computed for you: every property without `if:`/`unless:` is always emitted, so it's required.

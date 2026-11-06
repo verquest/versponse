@@ -10,6 +10,21 @@ module Versponse
       # Schema allowing null next to a referenced schema
       NULL_SCHEMA = {"type" => "null"}.freeze
 
+      # JSON Schema and OpenAPI keywords a property takes as options (camelized), besides x- extensions.
+      # type, required, nullable, discriminator and $ref come from the DSL itself.
+      SCHEMA_KEYWORDS = %w[
+        title description default examples example deprecated readOnly writeOnly externalDocs xml $comment
+        enum const format pattern minLength maxLength contentMediaType contentEncoding contentSchema
+        minimum maximum exclusiveMinimum exclusiveMaximum multipleOf
+        items prefixItems contains minContains maxContains minItems maxItems uniqueItems unevaluatedItems
+        properties patternProperties additionalProperties unevaluatedProperties propertyNames
+        minProperties maxProperties dependentRequired dependentSchemas
+        allOf anyOf oneOf not if then else
+      ].freeze
+
+      # Options the DSL reads itself, suggested for typos
+      DSL_OPTIONS = %w[map nullable if unless].freeze
+
       # @return [Symbol] property name, used to read the value
       attr_reader :name
       # @return [String] key in the output and the schema
@@ -36,6 +51,7 @@ module Versponse
         @condition = Condition.build(options.delete(:if), options.delete(:unless))
         check_options!(options)
         @schema_options = Naming.camelize_keys(options)
+        check_keywords!(options)
       end
 
       # @return [Boolean] true when the key is emitted only under a condition (so it is not required)
@@ -138,6 +154,23 @@ module Versponse
         raise DefinitionError, "#{key}: expandable: only works on reference, collection item: and one_of" if options.key?(:expandable)
         raise DefinitionError, "#{key}: required is computed automatically, use if: or unless: for optional keys" if options.key?(:required)
         raise DefinitionError, "#{key}: use either a block or map:, not both" if block && map
+      end
+
+      def check_keywords!(options)
+        unknown = options.keys.reject do |option|
+          keyword = Naming.camelize(option)
+          SCHEMA_KEYWORDS.include?(keyword) || keyword.start_with?("x-")
+        end
+        return if unknown.empty?
+
+        raise DefinitionError, "#{key}: unknown options #{unknown.map { |option| "#{option}:" }.join(", ")}#{suggestions(unknown)}"
+      end
+
+      def suggestions(unknown)
+        dictionary = DSL_OPTIONS + SCHEMA_KEYWORDS.map { |keyword| keyword.gsub(/[A-Z]/) { |letter| "_#{letter.downcase}" } }
+        checker = DidYouMean::SpellChecker.new(dictionary:)
+        found = unknown.filter_map { |option| checker.correct(option.to_s).first }
+        found.empty? ? " (use JSON Schema keywords in snake_case, or x- extensions)" : " (did you mean #{found.map { |option| "#{option}:" }.join(", ")}?)"
       end
 
       def extractor

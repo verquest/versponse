@@ -32,6 +32,35 @@ class DslErrorsTest < Minitest::Test
     assert_equal({"name" => "Leeds"}, klass.serialize(Struct.new(:name).new("Leeds"), version: "2025-09"))
   end
 
+  def test_unknown_options_raise
+    error = assert_raises(Versponse::DefinitionError) do
+      define { version("2025-09") { field :id, type: :string, mapp: "name", nulable: true } }
+    end
+
+    assert_equal "id: unknown options mapp:, nulable: (did you mean map:, nullable:?)", error.message
+  end
+
+  def test_schema_keywords_and_extensions_are_accepted
+    klass = define do
+      version("2025-09") { field :id, type: :string, max_length: 10, read_only: true, "x-internal": true }
+    end
+
+    assert_equal({"type" => "string", "maxLength" => 10, "readOnly" => true, "x-internal" => true}, klass.to_schema(version: "2025-09")["properties"]["id"])
+  end
+
+  def test_with_options_collapse_if_stays_on_identifiers
+    klass = define do
+      version "2025-09" do
+        with_options collapse_if: ->(_object) { true } do
+          identifier :id, type: :string
+          field :name, type: :string
+        end
+      end
+    end
+
+    assert_equal({"type" => "string"}, klass.to_schema(version: "2025-09")["properties"]["name"])
+  end
+
   def test_view_outside_a_version
     assert_raises(Versponse::DefinitionError) { define { view(:embedded) {} } }
   end
