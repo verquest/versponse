@@ -87,6 +87,7 @@ module Versponse
 
       def add_requests(set)
         request_classes.each do |klass|
+          References.check_dialect!(klass)
           schema = request_schema(klass)
           set.add(klass.component_name, schema, klass.name) if schema
         end

@@ -73,9 +73,30 @@ module Versponse
     # @param context [Versponse::SchemaContext] schema generation context
     # @return [Hash] a $ref, or its validation schema
     def self.foreign_schema(klass, property:, context:)
+      check_dialect!(klass)
       return {"$ref" => klass.to_ref(property:)} unless context.validation?
 
       klass.to_validation_schema(version: context.version, property:)
+    end
+
+    # JSON Schema versions that write const, nullability and anchors alike (OpenAPI 3.1 uses the 2020-12 dialect),
+    # so verquest and versponse schemas from the same group can be mixed
+    COMPATIBLE_VERSIONS = [%i[draft4], %i[openapi30], %i[draft6 draft7], %i[draft2019_09 draft2020_12 openapi31]].freeze
+
+    # A verquest request's schemas follow verquest's json_schema_version; embedded in versponse documents and
+    # validation they must be compatible with versponse's. Checked when schemas are built, so it sees the current config.
+    #
+    # @param klass [Object] referenced class
+    # @return [void]
+    # @raise [Versponse::DefinitionError] for a verquest request when the two gems' json_schema_version aren't compatible
+    def self.check_dialect!(klass)
+      return unless defined?(::Verquest::Base) && klass.is_a?(Class) && klass < ::Verquest::Base
+
+      theirs = ::Verquest.configuration.json_schema_version
+      ours = Versponse.configuration.json_schema_version
+      return if COMPATIBLE_VERSIONS.any? { |group| group.include?(theirs) && group.include?(ours) }
+
+      raise DefinitionError, "#{klass.name} is a verquest request with json_schema_version :#{theirs}, versponse uses :#{ours}; set both to the same"
     end
 
     # @param klass [Class] Versponse response class

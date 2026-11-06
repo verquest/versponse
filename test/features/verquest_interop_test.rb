@@ -4,6 +4,8 @@ require "test_helper"
 require "verquest"
 
 class VerquestInteropTest < Minitest::Test
+  include ConfigurationTestHelper
+
   class ContactCreateRequest < Verquest::Base
     version "2025-06" do
       field :name, type: :string, required: true
@@ -66,6 +68,16 @@ class VerquestInteropTest < Minitest::Test
   def test_invalid_pass_through_value_fails_validation
     assert_raises(Versponse::InvalidOutputError) do
       ContactResponse.serialize(contact(address: {"street" => "Main"}), version: "2025-09")
+    end
+  end
+
+  # Embedded verquest schemas use verquest's json_schema_version, so both gems must use the same one
+  def test_mismatched_json_schema_versions_raise
+    with_configuration(json_schema_version: :openapi30) do
+      error = assert_raises(Versponse::DefinitionError) { ContactResponse.to_validation_schema(version: "2025-09") }
+
+      assert_match(/json_schema_version :#{Verquest.configuration.json_schema_version}, versponse uses :openapi30; set both to the same/, error.message)
+      assert_raises(Versponse::DefinitionError) { ContactResponse.to_schema(version: "2025-09") }
     end
   end
 end
