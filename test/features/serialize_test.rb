@@ -176,6 +176,15 @@ class SerializeTest < Minitest::Test
     assert_equal [{"n" => 1, "tags" => [{"name" => "a"}]}], klass.serialize(Set[{n: 1, tags: Set[{name: "a"}]}], version: "2025-09")
   end
 
+  # A version before every declared one raises without leaving a cache entry behind
+  def test_unknown_early_versions_are_not_cached
+    klass = Class.new(Versponse::Base) { version("2025-09") { field :id, type: :string } }
+
+    50.times { |index| assert_raises(Versponse::VersionNotFoundError) { klass.serialize({id: "1"}, version: "1999-#{index}") } }
+
+    assert_empty klass.versponse.instance_variable_get(:@plans).instance_variable_get(:@store)
+  end
+
   def test_meta_keys_are_strings
     meta = {page: {next: "c2", sizes: [{per: 10}]}}
     result = UnitTypeResponse.serialize(unit_type, version: "2025-09", root: :unit_type, meta:)
