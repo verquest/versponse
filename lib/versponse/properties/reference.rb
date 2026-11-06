@@ -39,7 +39,7 @@ module Versponse
         return with_options(referenced_property_schema(context), context) if versponse_property?
 
         check_foreign_property!(context.version) if @property
-        return nullable_choice("anyOf", References.expandable_schemas(@from, view: @view, context:, key:), context).merge(schema_options) if expandable?
+        return SchemaMerge.call(nullable_choice("anyOf", References.expandable_schemas(@from, view: @view, context:, key:), context), schema_options) if expandable?
 
         with_options(nullable_ref(References.schema(@from, view: @view, property: @property, context:, key:), context), context)
       end
@@ -101,7 +101,7 @@ module Versponse
       # OpenAPI 3.0 ignores keywords next to a $ref, so a bare $ref with keywords is wrapped in allOf
       def with_options(schema, context)
         schema = {"allOf" => [schema]} if schema.key?("$ref") && schema_options.any? && nullable_keyword?(context)
-        schema.merge(schema_options)
+        SchemaMerge.call(schema, schema_options)
       end
 
       # A foreign class (a verquest request) answers nil for a property it doesn't have

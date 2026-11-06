@@ -52,7 +52,7 @@ module Versponse
       names.freeze
     end
 
-    # The union's anyOf and a declared anyOf can't share the anyOf key, so both go under allOf
+    # The union's anyOf and a declared anyOf (or allOf) are combined by {SchemaMerge}
     #
     # OpenAPI 3.0's nullable only applies next to a type, so a nullable union sets it on each branch
     #
@@ -62,10 +62,7 @@ module Versponse
     # @return [Hash] OpenAPI 3.0 schema: an anyOf of single types with the keywords alongside
     def self.openapi30_union(types, options, nullable: false)
       branch = nullable ? {"nullable" => true} : {}
-      union = {"anyOf" => types.map { |type| {"type" => type}.merge(branch) }}
-      return union.merge(options) unless options.key?("anyOf")
-
-      {"allOf" => [union, {"anyOf" => options["anyOf"]}]}.merge(options.except("anyOf"))
+      SchemaMerge.call({"anyOf" => types.map { |type| {"type" => type}.merge(branch) }}, options)
     end
 
     # @return [Array<String>] built-in and custom type names

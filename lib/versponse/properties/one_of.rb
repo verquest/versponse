@@ -67,7 +67,7 @@ module Versponse
         else
           nullable_choice(keyword, schemas, context)
         end
-        schema.merge(schema_options)
+        SchemaMerge.call(schema, schema_options)
       end
 
       # @param version [String] canonical version name
