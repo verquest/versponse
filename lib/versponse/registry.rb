@@ -6,6 +6,7 @@ module Versponse
   # @api private
   module Registry
     @classes = []
+    @anonymous = ObjectSpace::WeakMap.new
     @version_names = [].freeze
     @range_maxes = [].freeze
     @after_max = {}.freeze
@@ -17,13 +18,17 @@ module Versponse
       attr_reader :version_names
 
       # Replaces a registered class with the same name, so code reloading doesn't keep stale classes.
+      # Anonymous classes (Class.new, mostly in tests) are held weakly, so they can be garbage collected;
+      # one later assigned to a constant stays alive through it.
       #
       # @param klass [Class] response class
       # @return [void]
       def add(klass)
         name = klass.name
         @mutex.synchronize do
-          @classes.reject! { |registered| registered.name == name } if name
+          next @anonymous[klass] = true unless name
+
+          @classes.reject! { |registered| registered.name == name }
           @classes << klass
         end
       end
@@ -73,7 +78,7 @@ module Versponse
 
       # @return [Array<Class>] every registered class, including anonymous ones
       def all
-        @mutex.synchronize { @classes.dup }
+        @mutex.synchronize { @classes + @anonymous.keys }
       end
 
       # @return [Array<Class>] named classes still bound to their constant (skips stale reloaded classes)
