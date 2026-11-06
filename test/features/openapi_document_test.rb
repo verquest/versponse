@@ -32,8 +32,19 @@ class OpenapiDocumentTest < Minitest::Test
   def build(document = ApiDocument, version: "2025-09") = document.build(version:)
 
   def test_openapi_version_follows_the_configured_schema_version
+    document = Class.new(Versponse::OpenAPI::Document) { info "title" => "No webhooks" }
+
     with_configuration(json_schema_version: :openapi30) do
-      assert_equal "3.0.3", build["openapi"]
+      assert_equal "3.0.3", document.build(version: "2025-09")["openapi"]
+    end
+  end
+
+  # OpenAPI 3.0 has no webhooks section
+  def test_webhooks_raise_in_openapi30
+    with_configuration(json_schema_version: :openapi30) do
+      error = assert_raises(Versponse::DefinitionError) { build }
+
+      assert_equal "webhooks need OpenAPI 3.1 (config.json_schema_version is :openapi30)", error.message
     end
   end
 

@@ -15,7 +15,8 @@ module Versponse
 
       # @return [Hash] the document
       # @raise [ArgumentError] for a version the document doesn't declare
-      # @raise [Versponse::DefinitionError] for colliding component names, or an openapi version config.json_schema_version doesn't write
+      # @raise [Versponse::DefinitionError] for colliding component names, an openapi version config.json_schema_version
+      #   doesn't write, or webhooks in an OpenAPI 3.0 document
       def call
         check_version!
         document = base.merge("components" => components)
@@ -37,15 +38,21 @@ module Versponse
       end
 
       def base
+        openapi = openapi_version
+        webhooks = resolve(@declarations.webhooks)
+        if webhooks && openapi.start_with?("3.0.")
+          raise DefinitionError, "webhooks need OpenAPI 3.1 (config.json_schema_version is :#{Versponse.configuration.json_schema_version})"
+        end
+
         {
-          "openapi" => openapi_version,
+          "openapi" => openapi,
           "info" => {"version" => @version}.merge(resolve(@declarations.info) || {}),
           "externalDocs" => resolve(@declarations.external_docs),
           "servers" => presence(resolve(@declarations.servers)),
           "tags" => presence(resolve(@declarations.tags)),
           "security" => resolve(@declarations.security),
           "paths" => {},
-          "webhooks" => resolve(@declarations.webhooks)
+          "webhooks" => webhooks
         }.compact
       end
 
