@@ -43,6 +43,13 @@ module Versponse
       @operations << [:exclude, names.map(&:to_s)]
     end
 
+    # @param keys [Array<String>] keys the version declares itself
+    # @return [void]
+    def drop_inherited(keys)
+      @operations = @operations.reject { |type, argument| type == :add && keys.include?(argument) }
+      @properties = @properties.except(*keys)
+    end
+
     # @return [Boolean] true when declared in its version, false when inherited from an earlier one
     def declared?
       !@inherited

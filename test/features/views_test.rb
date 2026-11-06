@@ -93,4 +93,32 @@ class ViewsTest < Minitest::Test
 
     assert_equal "View a in AnonymousResponse 2025-09 includes unknown view nope", error.message
   end
+
+  # Promoting a view-only field to the whole version: the version-level declaration applies in every view
+  def test_version_level_redeclaration_replaces_an_inherited_view_only_property
+    klass = Class.new(Versponse::Base) do
+      version "2025-01" do
+        field :id, type: :string
+        view(:admin) { field :secret, type: :string }
+      end
+      version("2025-02") { field :secret, type: :integer }
+    end
+
+    assert_equal({"type" => "integer"}, klass.to_schema(version: "2025-02", view: :admin)["properties"]["secret"])
+  end
+
+  def test_view_redeclared_in_the_same_version_still_wins
+    klass = Class.new(Versponse::Base) do
+      version "2025-01" do
+        field :id, type: :string
+        view(:admin) { field :secret, type: :string }
+      end
+      version "2025-02" do
+        field :secret, type: :integer
+        view(:admin) { field :secret, type: :boolean }
+      end
+    end
+
+    assert_equal({"type" => "boolean"}, klass.to_schema(version: "2025-02", view: :admin)["properties"]["secret"])
+  end
 end

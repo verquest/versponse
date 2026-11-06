@@ -31,6 +31,7 @@ module Versponse
       @identifiers = {}
       @collapse_if = nil
       @schema_options = {}
+      @declared_keys = []
     end
 
     # @param property [Versponse::Properties::Base] property to add or replace
@@ -39,6 +40,7 @@ module Versponse
     def add(property)
       raise DefinitionError, "#{label}: #{property.key} is declared by identifier" if identifiers.key?(property.key)
 
+      @declared_keys << property.key
       properties[property.key] = property
     end
 
@@ -62,6 +64,7 @@ module Versponse
 
         @collapse_if = collapse_if
       end
+      @declared_keys << property.key
       properties[property.key] = property_in_full
       identifiers[property.key] = property
     end
@@ -112,6 +115,8 @@ module Versponse
     # @raise [Versponse::DefinitionError] when a view excludes an unknown property, includes an unknown view
     #   or is part of an include cycle
     def finalize!
+      # A key declared in this version replaces inherited views' view-only definitions of it
+      views.each_value { |view| view.drop_inherited(@declared_keys) unless view.declared? }
       known = properties.keys | views.each_value.flat_map { |view| view.properties.keys }
       views.each_value do |view|
         view.check_excludes!(known, label)
