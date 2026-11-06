@@ -16,7 +16,7 @@ module Versponse
 
     # Renders an object, or each item of an Array-like collection, to a Hash with String keys
     #
-    # @param object [Object, Hash, #to_ary] source
+    # @param object [Object, Hash, #to_ary, Set] source
     # @param version [String, nil] requested version, config.current_version when nil
     # @param view [Symbol] view name
     # @param context [Hash] passed to blocks and conditions
@@ -37,7 +37,7 @@ module Versponse
       plan = internals.plan(version:, view:)
       expansion = internals.expansion(expand, version:, view:)
       context = context.frozen? ? context : context.dup.freeze
-      data = object.respond_to?(:to_ary) ? object.to_ary.map { |item| plan.call(item, context, expansion) } : plan.call(object, context, expansion)
+      data = Collections.collection?(object) ? Collections.map(Collections.items(object)) { |item| plan.call(item, context, expansion) } : plan.call(object, context, expansion)
       OutputValidator.call(self, data, version:, view:) if Versponse.configuration.validate_output
       wrap(data, root:, meta:)
     end

@@ -45,7 +45,7 @@ module Versponse
           collapse = @collapsed_plan && !expansion.expand?(@key) && (@collapse_if.nil? || collapse?(value, context))
           plan = collapse ? @collapsed_plan : @plan
           node = expansion.child(@key)
-          @collection ? render_items(value.to_ary, context, plan, node) : plan.call(value, context, node)
+          @collection ? Collections.map(Collections.items(value)) { |item| plan.call(item, context, node) } : plan.call(value, context, node)
         end
       end
 
@@ -55,20 +55,7 @@ module Versponse
       def collapse?(value, context)
         return @collapse_if.call(value, context) unless @collection
 
-        value.to_ary.all? { |item| @collapse_if.call(item, context) }
-      end
-
-      def render_items(items, context, plan, node)
-        index = 0
-        items.map do |item|
-          rendered = plan.call(item, context, node)
-          index += 1
-          rendered
-        end
-      rescue ExtractionError => e
-        raise ExtractionError.new(label: e.label, keys: [index.to_s, *e.keys], detail: e.detail)
-      rescue NoMethodError, KeyError => e
-        raise ExtractionError.new(label: "", keys: [index.to_s], detail: e.message)
+        Collections.items(value).all? { |item| @collapse_if.call(item, context) }
       end
     end
   end

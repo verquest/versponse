@@ -160,6 +160,22 @@ class SerializeTest < Minitest::Test
     assert_equal({"request_id" => "r1"}, result["meta"])
   end
 
+  def test_top_level_collection_errors_name_the_item
+    klass = Class.new(Versponse::Base) { version("2025-09") { field :n, type: :integer } }
+
+    error = assert_raises(Versponse::ExtractionError) { klass.serialize([{n: 1}, {}], version: "2025-09") }
+
+    assert_equal ["1", "n"], error.keys
+  end
+
+  def test_sets_render_as_collections
+    klass = Class.new(Versponse::Base) do
+      version("2025-09") { field(:n, type: :integer) && collection(:tags) { field :name, type: :string } }
+    end
+
+    assert_equal [{"n" => 1, "tags" => [{"name" => "a"}]}], klass.serialize(Set[{n: 1, tags: Set[{name: "a"}]}], version: "2025-09")
+  end
+
   def test_meta_keys_are_strings
     meta = {page: {next: "c2", sizes: [{per: 10}]}}
     result = UnitTypeResponse.serialize(unit_type, version: "2025-09", root: :unit_type, meta:)

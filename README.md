@@ -86,7 +86,7 @@ UnitTypeResponse.serialize(unit_type, version: "2025-09")
 # }
 ```
 
-`serialize` takes an object, a Hash (symbol or string keys), or anything that responds to `to_ary`, such as an Array or an ActiveRecord relation. It returns String keys. `serialize_json` takes the same arguments and returns a String.
+`serialize` takes an object, a Hash (symbol or string keys), or anything that responds to `to_ary`, such as an Array or an ActiveRecord relation, or a Set. It returns String keys. `serialize_json` takes the same arguments and returns a String.
 
 ```ruby
 UnitTypeResponse.serialize(unit_types, version: "2025-09", view: :embedded, root: "unit_types", meta: {"request_id" => "r1"})
