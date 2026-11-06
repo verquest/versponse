@@ -238,7 +238,7 @@ end
 - A request uses the setting with the closest `from:` at or before it, compared with `config.version_resolver`, or the one without `from:`. Without any, `config.formatters` applies (milliseconds by default).
 - Each `from:` is registered like a `supported_versions` bound, so it takes effect even when no class declares that version.
 - It replaces the `date-time` formatter of `config.formatters`, and applies to the class's fields, arrays, inline objects and `reference property:`. A nested class (`reference from:`, `collection item:`, `one_of` variants) renders with its own setting, so declare it on a shared base class.
-- Declare it on the class before the first `version` block. Subclasses inherit the settings and can add their own or replace one with the same `from:`. Schemas don't change.
+- Declare it on the class before the first `version` block. A subclass without `time_precision` inherits its closest ancestor's settings; one that sets any uses only its own, so two timelines never mix. Schemas don't change.
 
 ## Views
 

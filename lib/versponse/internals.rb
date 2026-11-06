@@ -64,9 +64,14 @@ module Versponse
       @time_precisions = @time_precisions.merge(from => digits).freeze
     end
 
-    # @return [Hash{String, nil => Integer}] time_precision settings of the ancestors and this class, keyed by from:
+    # A class that sets any time_precision uses only its own settings; one that sets none inherits the
+    # closest ancestor's, so two classes' timelines never mix
+    #
+    # @return [Hash{String, nil => Integer}] time_precision settings, keyed by from:
     def time_precisions
-      ancestor ? ancestor.time_precisions.merge(@time_precisions) : @time_precisions
+      return @time_precisions unless @time_precisions.empty?
+
+      ancestor&.time_precisions || @time_precisions
     end
 
     # @param version [String] canonical version name

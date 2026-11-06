@@ -63,8 +63,9 @@ class TimePrecisionTest < Minitest::Test
     assert_equal "2025-09-01T10:00:00.123Z", EventResponse.serialize(event, version: "2025-09")["detail"]["at"]
   end
 
-  def test_subclasses_inherit_and_add_settings
-    assert_equal "2025-09-01T10:00:00Z", MicrosecondResponse.serialize(event, version: "2025-09")["at"]
+  # Its own settings replace the parent's: before its from: it has none, so config.formatters applies
+  def test_subclass_settings_replace_inherited_ones
+    assert_equal "2025-09-01T10:00:00.123Z", MicrosecondResponse.serialize(event, version: "2025-09")["at"]
     assert_equal "2025-09-01T10:00:00.123Z", MicrosecondResponse.serialize(event, version: "2026-03")["at"]
     assert_equal "2025-09-01T10:00:00.123456Z", MicrosecondResponse.serialize(event, version: "2027-01")["at"]
   end
@@ -101,5 +102,22 @@ class TimePrecisionTest < Minitest::Test
         time_precision 3, from: "2026-03"
       end
     end
+  end
+
+  # A subclass that sets time_precision uses only its own settings, not a mix with its parent's timeline
+  def test_subclass_settings_replace_the_parents
+    parent = Class.new(Versponse::Base) do
+      time_precision 0
+      time_precision 6, from: "2026-03"
+    end
+    child = Class.new(parent) do
+      time_precision 2
+      version("2025-01") { field :at, type: :string, format: "date-time" }
+    end
+    plain = Class.new(parent) { version("2025-01") { field :at, type: :string, format: "date-time" } }
+    time = Time.utc(2026, 4, 1, 10, 0, 0, 123_456)
+
+    assert_equal "2026-04-01T10:00:00.12Z", child.serialize({at: time}, version: "2026-04")["at"]
+    assert_equal "2026-04-01T10:00:00.123456Z", plain.serialize({at: time}, version: "2026-04")["at"]
   end
 end
