@@ -185,6 +185,14 @@ class SerializeTest < Minitest::Test
     assert_empty klass.versponse.instance_variable_get(:@plans).instance_variable_get(:@store)
   end
 
+  def test_non_collections_in_a_collection_raise
+    klass = Class.new(Versponse::Base) { version("2025-09") { collection(:items) { field :id, type: :string } } }
+
+    error = assert_raises(Versponse::ExtractionError) { klass.serialize({items: Struct.new(:id).new("x")}, version: "2025-09") }
+
+    assert_match(/items: expected a collection, got /, error.message)
+  end
+
   def test_meta_keys_are_strings
     meta = {page: {next: "c2", sizes: [{per: 10}]}}
     result = UnitTypeResponse.serialize(unit_type, version: "2025-09", root: :unit_type, meta:)

@@ -59,6 +59,15 @@ class Versponse::CallableTest < Minitest::Test
     assert_equal "expected a callable (a Proc, lambda or Method), got :active?", error.message
   end
 
+  def test_callable_objects_are_normalized
+    one = Class.new { def call(object) = object * 2 }.new
+    two = Class.new { def call(object, context) = [object, context] }.new
+
+    assert_equal 4, Versponse::Callable.normalize(one).call(2, {})
+    assert_same two, Versponse::Callable.normalize(two)
+    assert_raises(Versponse::DefinitionError) { Versponse::Callable.normalize(Class.new { def call(_a, _b, _c) = nil }.new) }
+  end
+
   def test_rejects_other_arities
     assert_raises(Versponse::DefinitionError) { Versponse::Callable.normalize(->(_name, _object, _options) { true }) }
   end

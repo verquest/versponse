@@ -15,10 +15,9 @@ module Versponse
     def self.normalize(callable)
       return if callable.nil?
       raise DefinitionError, "expected a callable (a Proc, lambda or Method), got #{callable.inspect}" unless callable.respond_to?(:call)
-      return callable unless callable.respond_to?(:parameters)
       return callable if callable.is_a?(Proc) && !callable.lambda?
 
-      params = callable.parameters
+      params = (callable.respond_to?(:parameters) ? callable : callable.method(:call)).parameters
       raise DefinitionError, "callables cannot take required keyword arguments" if params.any? { |type, _| type == :keyreq }
 
       required = params.count { |type, _| type == :req }

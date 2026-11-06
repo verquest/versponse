@@ -14,9 +14,12 @@ module Versponse
 
     # @param value [#to_ary, Set] collection
     # @return [Array] its items
-    # @raise [NoMethodError] for a value that isn't a collection
+    # @raise [KeyError] for a value that isn't a collection (the plan reports it with the key path)
     def self.items(value)
-      value.respond_to?(:to_ary) ? value.to_ary : value.to_a
+      return value.to_ary if value.respond_to?(:to_ary)
+      return value.to_a if value.is_a?(::Set)
+
+      raise KeyError, "expected a collection, got #{value.class}"
     end
 
     # @param items [Array] items to render
