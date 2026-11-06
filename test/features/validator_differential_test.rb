@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "bigdecimal"
 require_relative "../support/stora_field_types"
 
 # The compiled checker must agree with json_schemer on rendered examples and on broken copies of them
@@ -8,7 +9,10 @@ class ValidatorDifferentialTest < Minitest::Test
   include ConfigurationTestHelper
   include ExampleObjects
 
-  REPLACEMENTS = [nil, 0, 1, 1.5, -1, "", "x", "a" * 300, true, [], ["x"], {}, {"x" => 1}].freeze
+  REPLACEMENTS = [nil, 0, 1, 1.0, BigDecimal(1), 1.5, -1, "", "x", "a" * 300, true, [], ["x"], {}, {"x" => 1}].freeze
+
+  # Every json_schema_version, so version-specific rules (integer, $ref siblings) are compared too
+  VERSIONS = Versponse::Configuration::SCHEMAS.keys.freeze
 
   STORA_VALUES = [
     "a@b.co", "nope", "123e4567-e89b-12d3-a456-426614174000", "2025-09-01", "2025-09-01T12:30:00Z", "https://x.io",
@@ -67,11 +71,15 @@ class ValidatorDifferentialTest < Minitest::Test
   end
 
   def test_checker_agrees_on_examples_and_mutations
-    found = cases.flat_map do |klass, object, options|
-      version = options.fetch(:version, "2025-09")
-      view = options.fetch(:view, :default)
-      rendered = klass.serialize(object, version:, view:, expand: options[:expand])
-      disagreements(klass, version, view, [rendered] + mutations(rendered))
+    found = VERSIONS.flat_map do |json_schema_version|
+      with_configuration(json_schema_version:) do
+        cases.flat_map do |klass, object, options|
+          version = options.fetch(:version, "2025-09")
+          view = options.fetch(:view, :default)
+          rendered = klass.serialize(object, version:, view:, expand: options[:expand])
+          disagreements(klass, version, view, [rendered] + mutations(rendered)).map { |found| [json_schema_version, *found] }
+        end
+      end
     end
 
     assert_empty found
@@ -102,8 +110,14 @@ class ValidatorDifferentialTest < Minitest::Test
     keys = %w[notice_period starts_at stora_notice_period]
     payloads = UNION_VALUES.flat_map { |value| keys.map { |key| base.merge(key => value) } + [base.merge("sizes" => [value])] }
 
-    refute_nil klass.versponse.checker(version: "2025-09", view: :default)
-    assert_empty disagreements(klass, "2025-09", :default, payloads)
+    found = VERSIONS.flat_map do |json_schema_version|
+      with_configuration(json_schema_version:) do
+        refute_nil klass.versponse.checker(version: "2025-09", view: :default)
+        disagreements(klass, "2025-09", :default, payloads)
+      end
+    end
+
+    assert_empty found
   end
 
   def test_checker_agrees_on_typed_enums
