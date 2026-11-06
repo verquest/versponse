@@ -135,4 +135,25 @@ class Versponse::Validator::CompilerTest < Minitest::Test
   def test_errors_in_checks_defer
     refute compile({"type" => "number", "multipleOf" => 0.1}).valid?(Float::INFINITY)
   end
+
+  # Drafts 4-7 and OpenAPI 3.0 ignore keywords next to $ref, so both oneOf branches match here
+  def test_ref_siblings_are_ignored_before_2019_09
+    with_configuration(json_schema_version: :draft7) do
+      schema = {"type" => "object", "properties" => {
+        "t" => {"$id" => "#T", "type" => "object"},
+        "v" => {"oneOf" => [{"$ref" => "#T", "maxProperties" => 0}, {"type" => "object"}]}
+      }}
+      data = {"t" => {}, "v" => {"a" => 1}}
+
+      refute JSONSchemer.schema(schema, meta_schema: Versponse.configuration.json_schema_uri).valid?(data)
+      refute compile(schema).valid?(data)
+    end
+  end
+
+  def test_annotations_keep_the_fast_path
+    schema = {"type" => "string", "x-internal" => true, "nullable" => true, "xml" => {}, "externalDocs" => {}}
+
+    refute_nil compile(schema)
+    assert_nil compile(schema.merge("discriminator" => {"propertyName" => "a"}))
+  end
 end

@@ -9,8 +9,15 @@ module Versponse
       # Raised inside the compiler for a keyword or value it doesn't support
       Unsupported = Class.new(StandardError)
 
-      # Keywords that don't affect validity
-      ANNOTATIONS = %w[description title example examples default deprecated readOnly writeOnly $comment].freeze
+      # Keywords that don't affect validity (x- extensions too). discriminator is not one: json_schemer uses it
+      # to pick the oneOf variant it checks.
+      ANNOTATIONS = %w[
+        description title example examples default deprecated readOnly writeOnly $comment
+        nullable xml externalDocs
+      ].freeze
+
+      # JSON Schema versions that ignore keywords next to $ref
+      REF_ONLY = %i[draft4 draft6 draft7 openapi30].freeze
 
       # Checker classes, each building itself from the keywords it owns
       CHECKS = [TypeCheck, ValueCheck, ObjectCheck, ArrayCheck, StringCheck, FormatCheck, NumberCheck, Combinator, Ref].freeze
@@ -53,7 +60,10 @@ module Versponse
       # @raise [Unsupported] for an unsupported keyword
       def compile(schema)
         return Constant.for(schema) if schema == true || schema == false
-        raise Unsupported, schema.inspect unless schema.is_a?(Hash) && (schema.keys - KEYWORDS).empty?
+        raise Unsupported, schema.inspect unless schema.is_a?(Hash)
+
+        schema = schema.slice("$ref", *ANCHORS) if schema.key?("$ref") && REF_ONLY.include?(Versponse.configuration.json_schema_version)
+        raise Unsupported, schema.inspect unless schema.keys.all? { |key| KEYWORDS.include?(key) || key.start_with?("x-") }
 
         name = anchor_name(schema)
         checker = All.for(CHECKS.filter_map { |check| check.build(schema, self) })
