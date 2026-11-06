@@ -156,7 +156,7 @@ module Versponse
     def openapi_schema(version:, view:)
       fresh!
       @schemas.fetch([:openapi, version, view.to_sym]) do
-        DeepFreeze.call(object_schema(version:, view:, context: SchemaContext.new(version:, validation: false)))
+        finished(object_schema(version:, view:, context: SchemaContext.new(version:, validation: false)))
       end
     end
 
@@ -167,7 +167,7 @@ module Versponse
       fresh!
       @schemas.fetch([:validation, version, view.to_sym]) do
         context = SchemaContext.new(version:, validation: true)
-        DeepFreeze.call(context.inline([@klass, view.to_sym], @klass.component_name(view:)) { object_schema(version:, view:, context:) })
+        finished(context.inline([@klass, view.to_sym], @klass.component_name(view:)) { object_schema(version:, view:, context:) })
       end
     end
 
@@ -181,7 +181,7 @@ module Versponse
       @schemas.fetch([:validation, version, view.to_sym, key]) do
         target = resolve(version).properties_for(view).find { |property| property.key == key } ||
           raise(PropertyNotFoundError, "Property #{key} not found in #{@klass.name} #{version}/#{view}")
-        DeepFreeze.call(target.schema(SchemaContext.new(version:, validation: true)))
+        finished(target.schema(SchemaContext.new(version:, validation: true)))
       end
     end
 
@@ -251,6 +251,11 @@ module Versponse
     end
 
     private
+
+    # Version-specific rewrites of a generated schema, then a frozen copy
+    def finished(schema)
+      DeepFreeze.call(Versponse.configuration.const_keyword? ? schema : ConstAsEnum.call(schema))
+    end
 
     def ancestor
       superclass = @klass.superclass

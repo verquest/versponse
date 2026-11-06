@@ -136,6 +136,25 @@ class SchemaTest < Minitest::Test
     assert_equal ["a", "b", nil], klass.to_validation_schema(version: "2025-09")["properties"]["s"]["enum"]
   end
 
+  # Draft 4 and OpenAPI 3.0 have no const: every generated const becomes a one-value enum, options included
+  def test_const_options_become_enums_without_const_keyword
+    klass = Class.new(Versponse::Base) do
+      version "2025-09" do
+        field :fixed, type: :string, const: "a"
+        field :choice, type: :integer, any_of: [{const: 0}, {minimum: 5}]
+      end
+    end
+
+    %i[draft4 openapi30].each do |json_schema_version|
+      with_configuration(json_schema_version:) do
+        [klass.to_schema(version: "2025-09"), klass.to_validation_schema(version: "2025-09")].each do |schema|
+          assert_equal({"type" => "string", "enum" => ["a"]}, schema["properties"]["fixed"], json_schema_version)
+          assert_equal [{"enum" => [0]}, {"minimum" => 5}], schema["properties"]["choice"]["anyOf"]
+        end
+      end
+    end
+  end
+
   def test_component_names
     assert_equal "ProductResponse", ProductResponse.component_name
     assert_equal "ProductResponseCompact", ProductResponse.component_name(view: :compact)
