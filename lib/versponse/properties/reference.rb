@@ -72,7 +72,7 @@ module Versponse
       # @param version [String] canonical version name
       # @return [Array<Versponse::Properties::Base>] properties of the referenced class's view
       def path_children(version)
-        References.versponse?(@from) ? @from.resolve(version).properties_for(@view) : []
+        References.versponse?(@from) ? @from.versponse.resolve(version).properties_for(@view) : []
       end
 
       # @param version [String] canonical version name
@@ -88,7 +88,7 @@ module Versponse
       end
 
       def referenced_property(version)
-        original = @from.resolve(version).properties_for(@view).find { |property| property.key == @property } ||
+        original = @from.versponse.resolve(version).properties_for(@view).find { |property| property.key == @property } ||
           raise(PropertyNotFoundError, "#{key}: property #{@property} not found in #{@from.name} #{version}/#{@view}")
         original.renamed(name:, map:, block:, condition:)
       end

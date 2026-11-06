@@ -26,7 +26,7 @@ class ExamplesTest < Minitest::Test
 
   def test_validation_schemas_are_valid
     CLASSES.each do |klass|
-      klass.resolve("2025-09").view_names.each do |view|
+      klass.versponse.resolve("2025-09").view_names.each do |view|
         assert valid_schema?(klass.to_validation_schema(version: "2025-09", view:)), "#{klass.name}/#{view}"
       end
     end

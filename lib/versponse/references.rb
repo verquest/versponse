@@ -23,7 +23,7 @@ module Versponse
       return foreign_schema(klass, property:, context:) unless versponse?(klass)
       return {"$ref" => klass.to_ref(view:)} unless context.validation?
 
-      context.inline([klass, view], klass.component_name(view:)) { klass.object_schema(version: context.version, view:, context:) }
+      context.inline([klass, view], klass.component_name(view:)) { klass.versponse.object_schema(version: context.version, view:, context:) }
     end
 
     # @param klass [Class] non-Versponse class implementing the protocol
@@ -42,7 +42,7 @@ module Versponse
     # @raise [Versponse::DefinitionError] when the class has no identifier in that version (a class that
     #   lacks the version entirely is left alone, like a plain $ref)
     def self.ensure_identifier!(klass, version)
-      definition = klass.resolve(version)
+      definition = klass.versponse.resolve(version)
     rescue VersionNotFoundError
       nil
     else
@@ -64,7 +64,7 @@ module Versponse
     # @param version [String] canonical version name
     # @return [#call, nil] the class's identifier collapse_if in that version; nil without one or without the version
     def self.collapse_if(klass, version)
-      klass.resolve(version).collapse_if
+      klass.versponse.resolve(version).collapse_if
     rescue VersionNotFoundError
       nil
     end
@@ -89,7 +89,7 @@ module Versponse
       return [] unless versponse?(klass)
       return [] if stack.include?([klass, view])
 
-      klass.resolve(version).properties_for(view).flat_map do |property|
+      klass.versponse.resolve(version).properties_for(view).flat_map do |property|
         property.expandable_paths(version:, prefix:, stack: [*stack, [klass, view]])
       end
     end

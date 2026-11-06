@@ -87,7 +87,7 @@ module Versponse
         return @items_one_of.path_children(version) if @items_one_of
         return super unless @item
 
-        References.versponse?(@item) ? @item.resolve(version).properties_for(@view) : []
+        References.versponse?(@item) ? @item.versponse.resolve(version).properties_for(@view) : []
       end
 
       private

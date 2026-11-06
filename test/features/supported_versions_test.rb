@@ -73,9 +73,9 @@ class SupportedVersionsTest < Minitest::Test
   def define(&) = Class.new(Versponse::Base, &)
 
   def test_subclasses_inherit_and_override_the_range
-    assert_equal "2025-09", LegacyResponse.supported_version_range.max
-    assert_nil OpenResponse.supported_version_range
-    assert_equal "preview", PreviewResponse.supported_version_range.min
+    assert_equal "2025-09", LegacyResponse.versponse.supported_version_range.max
+    assert_nil OpenResponse.versponse.supported_version_range
+    assert_equal "preview", PreviewResponse.versponse.supported_version_range.min
   end
 
   def test_declaration_errors
@@ -95,8 +95,8 @@ class SupportedVersionsTest < Minitest::Test
   end
 
   def test_min_later_than_every_declared_block
-    assert_equal "2025-09", PreviewResponse.resolve("preview").name
-    assert_raises(Versponse::VersionNotFoundError) { PreviewResponse.resolve("2025-09") }
+    assert_equal "2025-09", PreviewResponse.versponse.resolve("preview").name
+    assert_raises(Versponse::VersionNotFoundError) { PreviewResponse.versponse.resolve("2025-09") }
   end
 
   def test_versions_outside_the_range_raise
@@ -124,7 +124,7 @@ class SupportedVersionsTest < Minitest::Test
 
     assert_equal({"a" => "x"}, klass.serialize({a: "x"}, version: "2025-04-15"))
     assert_equal({"a" => "x"}, klass.serialize({a: "x"}, version: "2025-05"))
-    assert_equal "2025-01", klass.resolve("2025-05").name
+    assert_equal "2025-01", klass.versponse.resolve("2025-05").name
     assert_raises(Versponse::VersionNotFoundError) { klass.serialize({a: "x"}, version: "2025-04") }
   end
 
@@ -137,7 +137,7 @@ class SupportedVersionsTest < Minitest::Test
 
     assert_equal({"a" => "x"}, klass.serialize({a: "x"}, version: "2025-06-15"))
     assert_raises(Versponse::VersionNotFoundError) { klass.serialize({a: "x"}, version: "2025-06-20") }
-    assert_raises(Versponse::VersionNotFoundError) { klass.resolve("2025-07") }
+    assert_raises(Versponse::VersionNotFoundError) { klass.versponse.resolve("2025-07") }
   end
 
   def test_min_defaults_to_the_first_declared_version
@@ -189,9 +189,9 @@ class SupportedVersionsTest < Minitest::Test
   end
 
   def test_supported_version_names
-    assert_equal ["preview"], PreviewResponse.supported_version_names
-    assert_equal ["2025-09"], LegacyResponse.supported_version_names
-    assert_equal %w[2025-09 preview], LatestResponse.supported_version_names
+    assert_equal ["preview"], PreviewResponse.versponse.supported_version_names
+    assert_equal ["2025-09"], LegacyResponse.versponse.supported_version_names
+    assert_equal %w[2025-09 preview], LatestResponse.versponse.supported_version_names
   end
 
   def test_eager_load_raises_when_max_is_before_the_first_declared_version

@@ -86,7 +86,7 @@ class OutputValidationTest < Minitest::Test
     klass = Class.new(Versponse::Base) { version("2025-09") { field :code, type: :string, content_encoding: "base64" } }
 
     with_configuration(validate_output: true) do
-      assert_nil klass.checker(version: "2025-09")
+      assert_nil klass.versponse.checker(version: "2025-09")
       assert_raises(Versponse::InvalidOutputError) { klass.serialize({code: 1}, version: "2025-09") }
     end
   end

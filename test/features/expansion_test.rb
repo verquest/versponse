@@ -95,7 +95,7 @@ class ExpansionTest < Minitest::Test
   end
 
   def test_to_json_passes_expand
-    assert_equal "Leeds", JSON.parse(UnitResponse.to_json(unit, version: "2025-09", expand: [:site]))["site"]["name"]
+    assert_equal "Leeds", JSON.parse(UnitResponse.serialize_json(unit, version: "2025-09", expand: [:site]))["site"]["name"]
   end
 
   def test_openapi_schema

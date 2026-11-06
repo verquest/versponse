@@ -83,12 +83,12 @@ class SerializeTest < Minitest::Test
   end
 
   def test_to_json
-    assert_equal "ut_1", JSON.parse(UnitTypeResponse.to_json(unit_type, version: "2025-09"))["id"]
+    assert_equal "ut_1", JSON.parse(UnitTypeResponse.serialize_json(unit_type, version: "2025-09"))["id"]
   end
 
   def test_custom_json_generator
     with_configuration(json_generator: ->(hash) { "custom:#{hash["id"]}" }) do
-      assert_equal "custom:ut_1", UnitTypeResponse.to_json(unit_type, version: "2025-09")
+      assert_equal "custom:ut_1", UnitTypeResponse.serialize_json(unit_type, version: "2025-09")
     end
   end
 
@@ -99,7 +99,7 @@ class SerializeTest < Minitest::Test
   end
 
   def test_plans_are_cached
-    assert_same UnitTypeResponse.plan(version: "2025-09"), UnitTypeResponse.plan(version: "2025-09")
+    assert_same UnitTypeResponse.versponse.plan(version: "2025-09"), UnitTypeResponse.versponse.plan(version: "2025-09")
   end
 
   def test_with_options
@@ -124,14 +124,33 @@ class SerializeTest < Minitest::Test
         end
       end
     end
-    property = klass.resolve("2025-09").properties["a"]
+    property = klass.versponse.resolve("2025-09").properties["a"]
 
     refute_predicate property, :nullable?
     assert_equal({"a" => 1}, klass.serialize({a: 1, b: "x", hide_b: true}, version: "2025-09"))
   end
 
   def test_requested_versions_are_canonicalized_before_caching
-    assert_equal UnitTypeResponse.send(:version_name, "2099-01-01-a"), UnitTypeResponse.send(:version_name, "2099-01-01-b")
+    assert_equal UnitTypeResponse.versponse.version_name("2099-01-01-a"), UnitTypeResponse.versponse.version_name("2099-01-01-b")
+  end
+
+  # Internals live on klass.versponse, so a response class's own class methods can't break rendering
+  def test_user_class_methods_do_not_clash_with_internals
+    klass = Class.new(Versponse::Base) do
+      def self.plan = "mine"
+      def self.versions = "mine"
+      def self.resolve(_version) = "mine"
+      def self.checker = "mine"
+
+      version("2025-09") { field :id, type: :string }
+    end
+
+    assert_equal({"id" => "1"}, klass.serialize({id: "1"}, version: "2025-09"))
+  end
+
+  def test_response_classes_keep_object_to_json
+    assert_equal %({"k":"#{UnitTypeResponse.name}"}), JSON.generate({"k" => UnitTypeResponse})
+    assert_equal UnitTypeResponse.name.to_json, UnitTypeResponse.to_json
   end
 
   def test_root_and_meta

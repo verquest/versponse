@@ -12,9 +12,9 @@ module Versponse
     # @return [void]
     # @raise [Versponse::InvalidOutputError] when the output does not match
     def self.call(klass, data, version:, view:)
-      return if valid?(klass.checker(version:, view:), data)
+      return if valid?(klass.versponse.checker(version:, view:), data)
 
-      schemer = klass.schemer(version:, view:)
+      schemer = klass.versponse.schemer(version:, view:)
       errors = if data.is_a?(Array)
         data.each_with_index.flat_map { |item, index| errors_for(schemer, item, "/#{index}") }
       else

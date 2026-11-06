@@ -6,36 +6,12 @@ module Versponse
     # Context used when serialize gets none (avoids two allocations per call)
     EMPTY_CONTEXT = {}.freeze
 
-    # @return [Versponse::Versions] declared versions
-    # @api private
-    def versions
-      @versions ||= Versions.new(owner: name || "AnonymousResponse")
-    end
-
-    # @param version [String] requested version
-    # @return [Versponse::Version] closest declared version at or before it
-    # @raise [Versponse::VersionNotFoundError] when there is none, or supported_versions leaves it out
-    # @raise [Versponse::DefinitionError] when supported_versions max sorts before every declared version
-    def resolve(version)
-      versions.resolve(Registry.canonical(version.to_s), supported: supported_version_range)
-    end
-
-    # @return [Versponse::SupportedVersions, nil] range declared with supported_versions on this class
-    #   or its closest ancestor, nil when every declared version is served
-    def supported_version_range
-      return @supported_versions if defined?(@supported_versions)
-
-      superclass.supported_version_range if superclass.respond_to?(:supported_version_range)
-    end
-
-    # Names that resolve within supported_versions: the declared versions in range plus min,
-    # so a min: "preview" class whose only block is 2025-09 compiles that block as "preview"
+    # Versions, resolution and caches of the class
     #
-    # @return [Array<String>] canonical version names; every declared version without a range
-    # @raise [Versponse::DefinitionError] when supported_versions max sorts before every declared version
+    # @return [Versponse::Internals] per-class internals
     # @api private
-    def supported_version_names
-      versions.supported_names(supported_version_range)
+    def versponse
+      @versponse ||= Internals.new(self)
     end
 
     # Renders an object, or each item of an Array-like collection, to a Hash with String keys
@@ -56,9 +32,10 @@ module Versponse
     def serialize(object, version: nil, view: :default, context: EMPTY_CONTEXT, root: nil, meta: nil, expand: nil)
       raise ArgumentError, "meta: requires root:" if meta && root.nil?
 
-      version = version_name(version)
-      plan = plan(version:, view:)
-      expansion = expansion_for(expand, version:, view:)
+      internals = versponse
+      version = internals.version_name(version)
+      plan = internals.plan(version:, view:)
+      expansion = internals.expansion(expand, version:, view:)
       context = context.frozen? ? context : context.dup.freeze
       data = object.respond_to?(:to_ary) ? object.to_ary.map { |item| plan.call(item, context, expansion) } : plan.call(object, context, expansion)
       OutputValidator.call(self, data, version:, view:) if Versponse.configuration.validate_output
@@ -68,7 +45,7 @@ module Versponse
     # @param object [Object] source
     # @param options [Hash] see {#serialize}
     # @return [String] JSON produced by config.json_generator
-    def to_json(object, **options)
+    def serialize_json(object, **options)
       Versponse.configuration.json_generator.call(serialize(object, **options))
     end
 
@@ -84,12 +61,10 @@ module Versponse
     def to_schema(version: nil, view: :default, root: nil, meta: nil, collection: false)
       raise ArgumentError, "meta: requires root:" if meta && root.nil?
 
-      version = version_name(version)
+      version = versponse.version_name(version)
       return DeepFreeze.call(wrapper_schema(view:, root:, meta:, collection:)) if root
 
-      schemas.fetch([:openapi, version, view.to_sym]) do
-        DeepFreeze.call(object_schema(version:, view:, context: SchemaContext.new(version:, validation: false)))
-      end
+      versponse.openapi_schema(version:, view:)
     end
 
     # Schema with every reference inlined, for validation
@@ -100,25 +75,10 @@ module Versponse
     # @return [Hash] frozen schema
     # @raise [Versponse::PropertyNotFoundError] for an unknown property
     def to_validation_schema(version: nil, view: :default, property: nil)
-      version = version_name(version)
-      return property_validation_schema(version, view, property.to_s) if property
+      version = versponse.version_name(version)
+      return versponse.property_validation_schema(version:, view:, key: property.to_s) if property
 
-      schemas.fetch([:validation, version, view.to_sym]) do
-        context = SchemaContext.new(version:, validation: true)
-        DeepFreeze.call(context.inline([self, view.to_sym], component_name(view:)) { object_schema(version:, view:, context:) })
-      end
-    end
-
-    # @param version [String] requested version name
-    # @param view [Symbol] view name
-    # @param context [Versponse::SchemaContext] schema generation context
-    # @return [Hash] object schema of the version and view
-    # @api private
-    def object_schema(version:, view:, context:)
-      definition = resolve(version)
-      return ObjectSchema.build(definition.properties_for(:collapsed), context) if view.to_sym == :collapsed
-
-      ObjectSchema.build(definition.properties_for(view), context, description: definition.description, schema_options: definition.schema_options)
+      versponse.validation_schema(version:, view:)
     end
 
     # Component name without the view suffix: the class name without its first namespace, squashed.
@@ -149,146 +109,16 @@ module Versponse
     # @param view [Symbol] view name
     # @return [Array<String>] sorted, frozen paths such as ["deal.stage", "site"]
     def expandable_paths(version: nil, view: :default)
-      version = version_name(version)
-      expandable_path_cache.fetch([version, view.to_sym]) do
-        References.nested_paths(self, view: view.to_sym, version:, prefix: [], stack: []).map { |path| path.join(".") }.uniq.sort.freeze
-      end
-    end
-
-    # @param version [String] canonical (declared) version name, as serialize and nested references pass it;
-    #   raw client strings would grow the cache
-    # @param view [Symbol] view name
-    # @return [Versponse::Plan] compiled, cached plan
-    # @api private
-    def plan(version:, view: :default)
-      plans.fetch([version, view.to_sym]) do
-        definition = resolve(version)
-        steps = definition.properties_for(view).map { |property| property.step(version:) }
-        Plan.new(label: "#{name}[#{definition.name}/#{view}]", steps:)
-      end
-    end
-
-    # @param version [String] canonical (declared) version name
-    # @param view [Symbol] view name
-    # @return [JSONSchemer::Schema] compiled, cached validation schema
-    # @api private
-    def schemer(version:, view: :default)
-      schemers.fetch([version, view.to_sym]) do
-        require "json_schemer"
-        JSONSchemer.schema(to_validation_schema(version:, view:), meta_schema: JSONSchemer::OpenAPI31::BASE_URI.to_s)
-      end
-    end
-
-    # @param version [String] canonical (declared) version name
-    # @param view [Symbol] view name
-    # @return [#valid?, nil] fast checker compiled from the validation schema, nil when it uses keywords the compiler does not support
-    # @api private
-    def checker(version:, view: :default)
-      checkers.fetch([version, view.to_sym]) do
-        Validator::Compiler.call(to_validation_schema(version:, view:), schemer(version:, view:))
-      end
-    end
-
-    # Clears compiled plans, schemas, schemers, checkers and resolved versions
-    #
-    # @return [void]
-    # @api private
-    def reset_caches!
-      plans.clear
-      schemas.clear
-      schemers.clear
-      checkers.clear
-      expandable_path_cache.clear
-      wildcard_cache.clear
-      versions.clear_resolved
+      versponse.expandable_paths(version: versponse.version_name(version), view:)
     end
 
     private
-
-    def plans
-      @plans ||= Cache.new
-    end
-
-    def schemas
-      @schemas ||= Cache.new
-    end
-
-    def schemers
-      @schemers ||= Cache.new
-    end
-
-    def checkers
-      @checkers ||= Cache.new
-    end
-
-    def expandable_path_cache
-      @expandable_path_cache ||= Cache.new
-    end
-
-    def wildcard_cache
-      @wildcard_cache ||= Cache.new
-    end
-
-    def property_validation_schema(version, view, key)
-      schemas.fetch([:validation, version, view.to_sym, key]) do
-        target = resolve(version).properties_for(view).find { |property| property.key == key } ||
-          raise(PropertyNotFoundError, "Property #{key} not found in #{name} #{version}/#{view}")
-        DeepFreeze.call(target.schema(SchemaContext.new(version:, validation: true)))
-      end
-    end
-
-    # Maps the requested version to a registered name before it reaches a cache (see Registry.canonical).
-    # Assumes the resolver picks the closest earlier version, like the default one.
-    def version_name(version)
-      Registry.canonical(version&.to_s || current_version_name)
-    end
-
-    def current_version_name
-      current = Versponse.configuration.current_version
-      raise ArgumentError, "version: is required when config.current_version is not set" unless current
-
-      current.call.to_s
-    end
 
     def wrapper_schema(view:, root:, meta:, collection:)
       item = {"$ref" => to_ref(view:)}
       properties = {root.to_s => collection ? {"type" => "array", "items" => item} : item}
       properties["meta"] = {"$ref" => meta.to_ref} if meta
       {"type" => "object", "required" => properties.keys, "properties" => properties, "additionalProperties" => false}
-    end
-
-    def expansion_for(expand, version:, view:)
-      paths = Array(expand).map(&:to_s)
-      return Expansion::NONE if paths.empty?
-      return wildcard_expansion(version:, view:) if paths.include?("*")
-
-      unknown = paths.reject { |path| expandable_path?(path, version:, view:) }
-      return Expansion.build(paths) if unknown.empty?
-      raise InvalidExpandError.new(paths: unknown) if Versponse.configuration.unknown_expand == :raise
-
-      Expansion.build(paths - unknown)
-    end
-
-    # "*" expands every path expandable_paths lists, so each recursive association expands once
-    # and cyclic object graphs can't recurse forever
-    def wildcard_expansion(version:, view:)
-      wildcard_cache.fetch([version, view.to_sym]) do
-        Expansion.build(expandable_paths(version:, view:))
-      end
-    end
-
-    # Walks the requested path one segment at a time; valid when the last segment is expandable.
-    # Every property with a matching key is tried, because one_of variants can share keys.
-    def expandable_path?(path, version:, view:)
-      path_known?(resolve(version).properties_for(view), path.split("."), version)
-    end
-
-    def path_known?(properties, segments, version)
-      head, *rest = segments
-      properties.select { |property| property.key == head }.any? do |property|
-        target = property.path_target(version)
-        rest.empty? ? target.expandable_path? : path_known?(target.path_children(version), rest, version)
-      end
     end
 
     def wrap(data, root:, meta:)

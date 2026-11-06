@@ -72,8 +72,8 @@ class IdentifierTest < Minitest::Test
   end
 
   def test_view_names_include_collapsed_only_with_an_identifier
-    assert_equal %i[default collapsed], SiteResponse.resolve("2025-09").view_names
-    assert_equal %i[default], PlainResponse.resolve("2025-09").view_names
+    assert_equal %i[default collapsed], SiteResponse.versponse.resolve("2025-09").view_names
+    assert_equal %i[default], PlainResponse.versponse.resolve("2025-09").view_names
   end
 
   def test_collapsed_without_an_identifier_raises

@@ -25,7 +25,7 @@ module Versponse
     # @raise [Versponse::DefinitionError] when the parent already declares versions
     def self.inherited(subclass)
       super
-      if self != Versponse::Base && !versions.empty?
+      if self != Versponse::Base && !versponse.versions.empty?
         raise DefinitionError, "#{name} has versions and can not be subclassed; subclass a class without versions (e.g. an abstract BaseResponse)"
       end
 

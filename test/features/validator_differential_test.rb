@@ -53,15 +53,15 @@ class ValidatorDifferentialTest < Minitest::Test
   end
 
   def disagreements(klass, version, view, payloads)
-    checker = klass.checker(version:, view:)
-    schemer = klass.schemer(version:, view:)
+    checker = klass.versponse.checker(version:, view:)
+    schemer = klass.versponse.schemer(version:, view:)
     payloads.reject { |payload| checker.valid?(payload) == schemer.valid?(payload) }.map { |payload| [klass.name, view, payload] }
   end
 
   def test_every_example_compiles
     uncompiled = Versponse::Registry.classes.select { |klass| klass.name&.start_with?("Examples::") }.flat_map do |klass|
-      klass.versions.flat_map { |definition| definition.view_names.map { |view| [klass, definition.name, view] } }
-    end.reject { |klass, version, view| klass.checker(version:, view:) }
+      klass.versponse.versions.flat_map { |definition| definition.view_names.map { |view| [klass, definition.name, view] } }
+    end.reject { |klass, version, view| klass.versponse.checker(version:, view:) }
 
     assert_empty uncompiled
   end
@@ -102,7 +102,7 @@ class ValidatorDifferentialTest < Minitest::Test
     keys = %w[notice_period starts_at stora_notice_period]
     payloads = UNION_VALUES.flat_map { |value| keys.map { |key| base.merge(key => value) } + [base.merge("sizes" => [value])] }
 
-    refute_nil klass.checker(version: "2025-09", view: :default)
+    refute_nil klass.versponse.checker(version: "2025-09", view: :default)
     assert_empty disagreements(klass, "2025-09", :default, payloads)
   end
 
@@ -124,7 +124,7 @@ class ValidatorDifferentialTest < Minitest::Test
               "object" => {"a" => 1}, "union" => 1, "custom" => "site_1"}
       payloads = ENUM_VALUES.flat_map { |value| base.keys.map { |key| base.merge(key => value) } }
 
-      refute_nil klass.checker(version: "2025-09", view: :default)
+      refute_nil klass.versponse.checker(version: "2025-09", view: :default)
       disagreements(klass, "2025-09", :default, [base] + payloads)
     end
 

@@ -122,8 +122,8 @@ class CollapseIfTest < Minitest::Test
   end
 
   def test_inherited_with_the_identifier_and_reset_when_it_is_redeclared
-    refute_nil StageResponse.resolve("2026-01").collapse_if
-    assert_nil StageResponse.resolve("2026-03").collapse_if
+    refute_nil StageResponse.versponse.resolve("2026-01").collapse_if
+    assert_nil StageResponse.versponse.resolve("2026-03").collapse_if
   end
 
   def test_collapse_if_must_respond_to_call
@@ -192,7 +192,7 @@ class CollapseIfTest < Minitest::Test
   end
 
   def test_with_options_collapse_if_is_ignored
-    assert_nil WithOptionsResponse.resolve("2025-09").collapse_if
+    assert_nil WithOptionsResponse.versponse.resolve("2025-09").collapse_if
     assert_equal({"type" => "string"}, WithOptionsResponse.to_schema(version: "2025-09", view: :collapsed)["properties"]["id"])
   end
 

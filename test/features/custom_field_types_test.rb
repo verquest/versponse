@@ -76,7 +76,7 @@ class CustomFieldTypesTest < Minitest::Test
       klass = define { STORA_FIELD_TYPES.each_key { |type| field type, type: } }
 
       assert_equal STORA_FIELD_TYPES.keys.map(&:to_s), properties(klass).keys
-      assert_kind_of JSONSchemer::Schema, klass.schemer(version: "2025-09")
+      assert_kind_of JSONSchemer::Schema, klass.versponse.schemer(version: "2025-09")
     end
   end
 

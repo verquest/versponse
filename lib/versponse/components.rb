@@ -27,9 +27,9 @@ module Versponse
     # @param version [String] requested version
     # @return [Versponse::Version, nil] the resolved version, nil when the class does not cover it
     def self.resolved(klass, version)
-      return if klass.versions.empty?
+      return if klass.versponse.versions.empty?
 
-      klass.resolve(version)
+      klass.versponse.resolve(version)
     rescue VersionNotFoundError
       nil
     end

@@ -105,7 +105,7 @@ module Versponse
     #
     # @return [void]
     def reset_caches!
-      Registry.all.each(&:reset_caches!)
+      Registry.all.each { |klass| klass.versponse.reset_caches! }
     end
 
     # @param version [String] requested version
@@ -125,9 +125,9 @@ module Versponse
     # @raise [Versponse::DefinitionError] when a supported_versions max sorts before every declared version
     def eager_load!(classes: Registry.classes)
       classes.each do |klass|
-        klass.supported_version_names.each do |version|
-          klass.resolve(version).view_names.each do |view|
-            klass.plan(version:, view:)
+        klass.versponse.supported_version_names.each do |version|
+          klass.versponse.resolve(version).view_names.each do |view|
+            klass.versponse.plan(version:, view:)
             klass.to_schema(version:, view:)
             klass.to_validation_schema(version:, view:)
           end

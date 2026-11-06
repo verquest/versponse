@@ -107,7 +107,7 @@ module Versponse
       # @param version [String] canonical version name
       # @return [Array<Versponse::Properties::Base>] properties of every variant's view
       def path_children(version)
-        @variants.flat_map { |variant| variant.from.resolve(version).properties_for(variant.view) }
+        @variants.flat_map { |variant| variant.from.versponse.resolve(version).properties_for(variant.view) }
       end
 
       private
@@ -121,7 +121,7 @@ module Versponse
         References.ensure_identifier!(variant.from, context.version)
         return References.schema(variant.from, view: :collapsed, property: nil, context:) unless @discriminator
 
-        schema = variant.from.object_schema(version: context.version, view: :collapsed, context:)
+        schema = variant.from.versponse.object_schema(version: context.version, view: :collapsed, context:)
         discriminator = {@discriminator => discriminator_property(variant, context.version).schema(context)}
         schema.merge("required" => [@discriminator, *schema["required"]], "properties" => discriminator.merge(schema["properties"]))
       end
@@ -146,7 +146,7 @@ module Versponse
       end
 
       def discriminator_property(variant, version)
-        property = variant.from.resolve(version).properties_for(variant.view).find { |candidate| candidate.key == @discriminator }
+        property = variant.from.versponse.resolve(version).properties_for(variant.view).find { |candidate| candidate.key == @discriminator }
         raise DefinitionError, "#{key}: #{variant.from.name} has no const #{@discriminator} for the discriminator" if property.nil?
         raise DefinitionError, "#{key}: #{variant.from.name}'s #{@discriminator} must be a const for the discriminator" unless property.is_a?(Const)
 

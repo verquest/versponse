@@ -30,11 +30,12 @@ module Versponse
     # @return [void]
     # @raise [Versponse::DefinitionError] when min sorts after max, inside a version, or after the first version
     def supported_versions(min: nil, max: nil)
-      raise DefinitionError, "supported_versions must come before the first version" unless versions.empty?
+      raise DefinitionError, "supported_versions must come before the first version" unless versponse.versions.empty?
       raise DefinitionError, "supported_versions can only be set on the class" if @current_scope
 
-      @supported_versions = (min.nil? && max.nil?) ? nil : SupportedVersions.new(min:, max:)
-      Registry.add_range(@supported_versions) if @supported_versions
+      range = (min.nil? && max.nil?) ? nil : SupportedVersions.new(min:, max:)
+      versponse.supported_version_range = range
+      Registry.add_range(range) if range
       Versponse.reset_caches!
     end
 
@@ -249,23 +250,23 @@ module Versponse
     end
 
     def class_or_version(keyword)
-      target = @current_scope || versions
-      raise DefinitionError, "#{keyword} on the class must come before the first version" if target.is_a?(Versions) && !versions.empty?
+      target = @current_scope || versponse.versions
+      raise DefinitionError, "#{keyword} on the class must come before the first version" if target.is_a?(Versions) && !versponse.versions.empty?
       return target if target.is_a?(Versions) || target.is_a?(Version)
 
       raise DefinitionError, "#{keyword} can only be set on the class or a version"
     end
 
     def version_source(inherit)
-      return versions.fetch(inherit) if inherit.is_a?(String)
+      return versponse.versions.fetch(inherit) if inherit.is_a?(String)
 
       @last_version if inherit
     end
 
     def finish_version(definition)
-      definition.description ||= versions.description
-      definition.schema_options = versions.schema_options.merge(definition.schema_options)
-      versions.add(definition.finalize!)
+      definition.description ||= versponse.versions.description
+      definition.schema_options = versponse.versions.schema_options.merge(definition.schema_options)
+      versponse.versions.add(definition.finalize!)
       @last_version = definition
       # Any class may embed this one in a plan or validation schema, so a reopened class (forward
       # declarations, verquest references) clears every cache; this only happens at definition time
