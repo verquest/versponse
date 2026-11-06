@@ -32,11 +32,8 @@ module Versponse
   # Raised when the DSL is used incorrectly
   DefinitionError = Class.new(Error)
 
-  # Raised when exclude_properties names an unknown property
+  # Raised when to_validation_schema(property:) names an unknown property
   PropertyNotFoundError = Class.new(Error)
-
-  # Raised when views include each other in a cycle
-  InvalidViewError = Class.new(Error)
 
   # Raised when no version matches the requested one
   VersionNotFoundError = Class.new(Error)

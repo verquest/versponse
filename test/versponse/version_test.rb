@@ -17,7 +17,7 @@ class Versponse::VersionTest < Minitest::Test
   end
 
   def test_remove_unknown_raises
-    error = assert_raises(Versponse::PropertyNotFoundError) { build.remove(:a) }
+    error = assert_raises(Versponse::DefinitionError) { build.remove(:a) }
 
     assert_match(/UserResponse 2025-09/, error.message)
   end
@@ -39,7 +39,7 @@ class Versponse::VersionTest < Minitest::Test
   def test_copy_from_rejects_unknown_excludes
     old = build("2025-01").tap { |v| v.add(field(:a)) }.finalize!
 
-    assert_raises(Versponse::PropertyNotFoundError) { build.copy_from(old, exclude_properties: [:typo]) }
+    assert_raises(Versponse::DefinitionError) { build.copy_from(old, exclude_properties: [:typo]) }
   end
 
   def test_finalize_freezes

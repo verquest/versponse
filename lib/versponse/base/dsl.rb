@@ -46,7 +46,7 @@ module Versponse
     # @param exclude_properties [Array<Symbol>] inherited properties to leave out
     # @return [void]
     # @raise [Versponse::DefinitionError] when nested in another version
-    # @raise [Versponse::VersionNotFoundError] when inherit: names no declared version
+    # @raise [Versponse::DefinitionError] when inherit: names no declared version
     def version(name, inherit: true, exclude_properties: [], &block)
       raise DefinitionError, "version blocks can not be nested" if @current_scope
 
@@ -258,9 +258,15 @@ module Versponse
     end
 
     def version_source(inherit)
-      return versponse.versions.fetch(inherit) if inherit.is_a?(String)
+      return inherited_version(inherit) if inherit.is_a?(String)
 
       @last_version if inherit
+    end
+
+    def inherited_version(name)
+      versponse.versions.fetch(name)
+    rescue VersionNotFoundError => e
+      raise DefinitionError, "inherit: #{e.message}"
     end
 
     def finish_version(definition)

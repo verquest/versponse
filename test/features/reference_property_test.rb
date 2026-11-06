@@ -89,8 +89,8 @@ class ReferencePropertyTest < Minitest::Test
   def test_unknown_property_raises
     klass = Class.new(Versponse::Base) { version("2025-09") { reference :x, from: ContactResponse, property: :missing } }
 
-    assert_raises(Versponse::PropertyNotFoundError) { klass.serialize(contact, version: "2025-09") }
-    assert_raises(Versponse::PropertyNotFoundError) { klass.to_schema(version: "2025-09") }
+    assert_raises(Versponse::DefinitionError) { klass.serialize(contact, version: "2025-09") }
+    assert_raises(Versponse::DefinitionError) { klass.to_schema(version: "2025-09") }
   end
 
   def test_with_options_nullable_does_not_break_property_references

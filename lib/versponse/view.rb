@@ -51,7 +51,7 @@ module Versponse
     # @param known [Array<String>] property keys known in the declaring version
     # @param label [String] version label for the error message
     # @return [nil]
-    # @raise [Versponse::PropertyNotFoundError] when a declared (not inherited) view excludes an unknown property
+    # @raise [Versponse::DefinitionError] when a declared (not inherited) view excludes an unknown property
     def check_excludes!(known, label)
       return if @inherited
 
@@ -59,16 +59,33 @@ module Versponse
         next unless type == :exclude
 
         unknown = argument - known
-        raise PropertyNotFoundError, "View #{name} in #{label} excludes unknown properties: #{unknown.join(", ")}" if unknown.any?
+        raise DefinitionError, "View #{name} in #{label} excludes unknown properties: #{unknown.join(", ")}" if unknown.any?
       end
       nil
     end
 
     # @param version [Versponse::Version] version the view belongs to
+    # @param chain [Array<Symbol>] views being checked, for cycle detection
+    # @return [nil]
+    # @raise [Versponse::DefinitionError] when the view includes an unknown view or is part of an include cycle
+    def check_includes!(version, chain = [])
+      raise DefinitionError, "include_view cycle in #{version.label}: #{[*chain, name].join(" -> ")}" if chain.include?(name)
+
+      @operations.each do |type, argument|
+        next unless type == :include
+
+        included = version.views.fetch(argument) { raise DefinitionError, "View #{name} in #{version.label} includes unknown view #{argument}" }
+        included.check_includes!(version, [*chain, name])
+      end
+      nil
+    end
+
+    # Includes are checked by {#check_includes!} when the version is finalized
+    #
+    # @param version [Versponse::Version] version the view belongs to
     # @return [Array<Versponse::Properties::Base>] resolved properties in output order
-    # @raise [Versponse::InvalidViewError] when views include each other in a cycle
     def resolve(version)
-      apply(version, version.properties.dup, []).values
+      apply(version, version.properties.dup).values
     end
 
     # @return [View] self, with operations and properties frozen
@@ -82,15 +99,12 @@ module Versponse
 
     # @param version [Versponse::Version] version the view belongs to
     # @param result [Hash] properties being built
-    # @param chain [Array<Symbol>] views being applied, for cycle detection
     # @return [Hash] result
-    def apply(version, result, chain)
-      raise InvalidViewError, "include_view cycle in #{version.label}: #{[*chain, name].join(" -> ")}" if chain.include?(name)
-
+    def apply(version, result)
       @operations.each do |type, argument|
         case type
         when :add then result[argument] = properties.fetch(argument)
-        when :include then version.fetch_view(argument).apply(version, result, [*chain, name])
+        when :include then version.fetch_view(argument).apply(version, result)
         when :exclude then argument.each { |key| result.delete(key) }
         end
       end

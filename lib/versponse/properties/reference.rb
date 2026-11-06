@@ -33,7 +33,7 @@ module Versponse
 
       # @param context [Versponse::SchemaContext] schema generation context
       # @return [Hash] $ref or inlined schema (anyOf full/collapsed when expandable); keywords sit on the outer node
-      # @raise [Versponse::PropertyNotFoundError] when a versponse property: does not exist
+      # @raise [Versponse::DefinitionError] when a versponse property: does not exist
       def schema(context)
         return referenced_property_schema(context).merge(schema_options) if versponse_property?
         return nullable_choice("anyOf", References.expandable_schemas(@from, view: @view, context:), context).merge(schema_options) if expandable?
@@ -43,7 +43,7 @@ module Versponse
 
       # @param version [String] canonical version name
       # @return [Versponse::Steps::Nested, Versponse::Steps::Value, #call] compiled step
-      # @raise [Versponse::PropertyNotFoundError] when a versponse property: does not exist
+      # @raise [Versponse::DefinitionError] when a versponse property: does not exist
       def step(version:)
         return referenced_property(version).step(version:) if versponse_property?
         return value_step unless References.versponse?(@from)
@@ -89,7 +89,7 @@ module Versponse
 
       def referenced_property(version)
         original = @from.versponse.resolve(version).properties_for(@view).find { |property| property.key == @property } ||
-          raise(PropertyNotFoundError, "#{key}: property #{@property} not found in #{@from.name} #{version}/#{@view}")
+          raise(DefinitionError, "#{key}: property #{@property} not found in #{@from.name} #{version}/#{@view}")
         original.renamed(name:, map:, block:, condition:)
       end
 

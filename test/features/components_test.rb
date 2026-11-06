@@ -46,14 +46,11 @@ class ComponentsTest < Minitest::Test
     refute_includes Versponse::Registry.classes, Class.new(Versponse::Base)
   end
 
-  def test_eager_load_surfaces_view_errors
+  def test_eager_load_surfaces_reference_errors
     broken = Class.new(Versponse::Base) do
-      version "2025-09" do
-        field :id, type: :string
-        view(:a) { include_view :a }
-      end
+      version("2025-09") { reference :x, from: Class.new(Versponse::Base) { version("2025-09") { field :id, type: :string } }, property: :missing }
     end
 
-    assert_raises(Versponse::InvalidViewError) { Versponse.eager_load!(classes: [broken]) }
+    assert_raises(Versponse::DefinitionError) { Versponse.eager_load!(classes: [broken]) }
   end
 end

@@ -43,7 +43,7 @@ class Versponse::ViewTest < Minitest::Test
     @version.add_view(first)
     @version.add_view(Versponse::View.new(name: :b).tap { |view| view.include_view(:a) })
 
-    error = assert_raises(Versponse::InvalidViewError) { keys(first) }
+    error = assert_raises(Versponse::DefinitionError) { first.check_includes!(@version) }
 
     assert_match(/a -> b -> a/, error.message)
   end
@@ -51,7 +51,7 @@ class Versponse::ViewTest < Minitest::Test
   def test_check_excludes
     view = Versponse::View.new(name: :embedded).tap { |v| v.exclude([:missing]) }
 
-    assert_raises(Versponse::PropertyNotFoundError) { view.check_excludes!(%w[id], "UserResponse 2025-09") }
+    assert_raises(Versponse::DefinitionError) { view.check_excludes!(%w[id], "UserResponse 2025-09") }
     assert_nil view.for_next_version.check_excludes!(%w[id], "UserResponse 2025-10")
   end
 

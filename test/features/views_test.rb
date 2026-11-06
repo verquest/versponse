@@ -67,20 +67,30 @@ class ViewsTest < Minitest::Test
   end
 
   def test_unknown_exclude_raises_at_definition
-    assert_raises(Versponse::PropertyNotFoundError) do
+    assert_raises(Versponse::DefinitionError) do
       Class.new(Versponse::Base) { version("2025-09") { view(:a) { exclude_properties :missing } } }
     end
   end
 
-  def test_include_view_cycle_raises_on_use
-    klass = Class.new(Versponse::Base) do
-      version "2025-09" do
-        field :id, type: :string
-        view(:a) { include_view :b }
-        view(:b) { include_view :a }
+  def test_include_view_cycle_raises_at_definition
+    error = assert_raises(Versponse::DefinitionError) do
+      Class.new(Versponse::Base) do
+        version "2025-09" do
+          field :id, type: :string
+          view(:a) { include_view :b }
+          view(:b) { include_view :a }
+        end
       end
     end
 
-    assert_raises(Versponse::InvalidViewError) { klass.serialize({id: "1"}, version: "2025-09", view: :a) }
+    assert_match(/a -> b -> a/, error.message)
+  end
+
+  def test_include_of_an_unknown_view_raises_at_definition
+    error = assert_raises(Versponse::DefinitionError) do
+      Class.new(Versponse::Base) { version("2025-09") { view(:a) { include_view :nope } } }
+    end
+
+    assert_equal "View a in AnonymousResponse 2025-09 includes unknown view nope", error.message
   end
 end

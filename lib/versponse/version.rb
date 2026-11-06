@@ -71,9 +71,9 @@ module Versponse
 
     # @param name [Symbol, String] property to remove
     # @return [Versponse::Properties::Base] the removed property
-    # @raise [Versponse::PropertyNotFoundError] when the property does not exist
+    # @raise [Versponse::DefinitionError] when the property does not exist
     def remove(name)
-      properties.delete(name.to_s) || raise(PropertyNotFoundError, "Property #{name} not found in #{label}")
+      properties.delete(name.to_s) || raise(DefinitionError, "Property #{name} not found in #{label}")
     end
 
     # @param view [Versponse::View] view to add or replace
@@ -88,11 +88,11 @@ module Versponse
     # @param other [Version] version to copy from
     # @param exclude_properties [Array<Symbol, String>] properties left out of the copy
     # @return [void]
-    # @raise [Versponse::PropertyNotFoundError] when an excluded property does not exist in other
+    # @raise [Versponse::DefinitionError] when an excluded property does not exist in other
     def copy_from(other, exclude_properties: [])
       excluded = exclude_properties.map(&:to_s)
       unknown = excluded - other.properties.keys
-      raise PropertyNotFoundError, "#{label} excludes properties unknown in #{other.label}: #{unknown.join(", ")}" if unknown.any?
+      raise DefinitionError, "#{label} excludes properties unknown in #{other.label}: #{unknown.join(", ")}" if unknown.any?
 
       @properties = other.properties.except(*excluded)
       @views = other.views.transform_values(&:for_next_version)
@@ -104,11 +104,13 @@ module Versponse
     # Checks the views and freezes the version
     #
     # @return [Version] self
-    # @raise [Versponse::PropertyNotFoundError] when a view excludes an unknown property
+    # @raise [Versponse::DefinitionError] when a view excludes an unknown property, includes an unknown view
+    #   or is part of an include cycle
     def finalize!
       known = properties.keys | views.each_value.flat_map { |view| view.properties.keys }
       views.each_value do |view|
         view.check_excludes!(known, label)
+        view.check_includes!(self)
         view.freeze
       end
       properties.freeze

@@ -259,6 +259,8 @@ ProductResponse.serialize(product, version: "2026-01", view: :embedded)
 
 `reference` and `collection` take `view:` to render the nested class in one of its views, which is how cycles are broken (an order embeds its tenancy without the tenancy's order). Redeclaring a view in a later version replaces it.
 
+Mistakes in a definition raise `Versponse::DefinitionError` when the version block closes: excluding an unknown property, `inherit:` naming no declared version, `include_view` of an unknown view, or views including each other in a cycle. `VersionNotFoundError`, `ViewNotFoundError` and `PropertyNotFoundError` are left for what a caller asks for at runtime (a version, a view, or `to_validation_schema(property:)`), so they are safe to map to client errors.
+
 ## Expansion
 
 Mark associations `expandable: true` and give the referenced class an `identifier`. Unless a request expands them, they render collapsed:

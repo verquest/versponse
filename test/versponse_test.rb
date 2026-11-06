@@ -9,7 +9,7 @@ class VersponseTest < Minitest::Test
 
   def test_errors_inherit_from_the_base_error
     [
-      Versponse::DefinitionError, Versponse::PropertyNotFoundError, Versponse::InvalidViewError,
+      Versponse::DefinitionError, Versponse::PropertyNotFoundError,
       Versponse::VersionNotFoundError, Versponse::ViewNotFoundError, Versponse::ExtractionError,
       Versponse::InvalidOutputError
     ].each { |error| assert_operator error, :<, Versponse::Error }

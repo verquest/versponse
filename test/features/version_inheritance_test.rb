@@ -52,13 +52,13 @@ class VersionInheritanceTest < Minitest::Test
   end
 
   def test_excluding_an_unknown_property_raises
-    assert_raises(Versponse::PropertyNotFoundError) do
+    assert_raises(Versponse::DefinitionError) do
       Class.new(Versponse::Base) { version("2025-01") { exclude_properties :missing } }
     end
   end
 
   def test_inherit_needs_an_exact_version_name
-    assert_raises(Versponse::VersionNotFoundError) do
+    assert_raises(Versponse::DefinitionError) do
       Class.new(Versponse::Base) do
         version("2025-01") { field :id, type: :string }
         version "2025-06", inherit: "2025-03"
