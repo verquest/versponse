@@ -16,11 +16,11 @@ module Versponse
     VALUE_KEYWORDS = %w[example examples default const enum].freeze
 
     # Keywords whose keys are user-chosen names, kept as given; only their Hash values are schemas
-    NAME_MAPS = %w[properties patternProperties $defs dependentRequired].freeze
+    NAME_MAPS = %w[properties patternProperties $defs dependentRequired dependentSchemas].freeze
 
     # @param hash [Hash] snake_case keys, nested schema Hashes and Arrays of them included
     # @return [Hash{String => Object}] camelCase String keys at every schema level; keys of
-    #   name maps (properties, patternProperties, $defs, dependentRequired) are only stringified,
+    #   name maps (properties, patternProperties, $defs, dependentRequired, dependentSchemas) are only stringified,
     #   and a Regexp pattern becomes its source
     def self.camelize_keys(hash)
       hash.to_h do |key, value|
@@ -51,10 +51,12 @@ module Versponse
 
     private_class_method :camelize_value, :camelize_nested, :camelize_name_map
 
-    # @param name [String, Symbol] snake_case name
+    # Capitals inside a part are kept, so :fullDetails and :full_details both give "FullDetails"
+    #
+    # @param name [String, Symbol] snake_case or camelCase name
     # @return [String] PascalCase name
     def self.pascalize(name)
-      name.to_s.split("_").map(&:capitalize).join
+      name.to_s.split("_").map { |part| part.sub(/\A[a-z]/, &:upcase) }.join
     end
   end
 end

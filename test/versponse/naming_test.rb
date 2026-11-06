@@ -44,4 +44,16 @@ class Versponse::NamingTest < Minitest::Test
   def test_pascalize
     assert_equal "EmbeddedWithoutPrices", Versponse::Naming.pascalize(:embedded_without_prices)
   end
+
+  # View names become component names, so their capitals are kept
+  def test_pascalize_keeps_capitals
+    assert_equal "FullDetails", Versponse::Naming.pascalize(:fullDetails)
+    assert_equal "FullDetails", Versponse::Naming.pascalize(:full_details)
+  end
+
+  def test_dependent_schemas_keep_property_names
+    expected = {"dependentSchemas" => {"credit_card" => {"required" => ["x"]}}}
+
+    assert_equal expected, Versponse::Naming.camelize_keys(dependent_schemas: {credit_card: {required: ["x"]}})
+  end
 end
