@@ -59,12 +59,18 @@ module Versponse
     # @param collection [Boolean] the root key holds an array
     # @return [Hash] frozen schema
     # @raise [ArgumentError] with meta: but no root:
+    # @raise [Versponse::VersionNotFoundError] when the class doesn't serve the version (wrappers too)
+    # @raise [Versponse::ViewNotFoundError] for an unknown view (wrappers too)
     def to_schema(version: nil, view: :default, root: nil, meta: nil, collection: false)
       raise ArgumentError, "meta: requires root:" if meta && root.nil?
 
-      return DeepFreeze.call(Wrapper.schema(self, view:, root:, meta:, collection:)) if root
+      versponse.requesting(version) do |canonical|
+        next versponse.openapi_schema(version: canonical, view:) unless root
 
-      versponse.requesting(version) { |canonical| versponse.openapi_schema(version: canonical, view:) }
+        # The wrapper only refers to the component, but the version and view must exist like for any schema
+        versponse.resolve(canonical).properties_for(view)
+        DeepFreeze.call(Wrapper.schema(self, view:, root:, meta:, collection:))
+      end
     end
 
     # Schema with every reference inlined, for validation

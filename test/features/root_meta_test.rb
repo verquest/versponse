@@ -49,4 +49,10 @@ class RootMetaTest < Minitest::Test
 
     assert_equal expected, ItemResponse.to_schema(version: "2025-09", root: "items", collection: true)
   end
+
+  # The wrapper refers to a version and view, so both are checked like any other schema
+  def test_wrapper_schema_checks_the_version_and_view
+    assert_raises(Versponse::VersionNotFoundError) { ItemResponse.to_schema(version: "1900-01", root: "item") }
+    assert_raises(Versponse::ViewNotFoundError) { ItemResponse.to_schema(version: "2025-09", root: "item", view: :nope) }
+  end
 end
