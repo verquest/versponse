@@ -30,14 +30,13 @@ module Versponse
       end
 
       # @param context [Versponse::SchemaContext, nil] schema generation context
-      # @return [Hash] JSON Schema of the enum; nullable adds "null" to type and nil to the values, or nullable: true
-      #   in OpenAPI 3.0 documents, where a type union is an anyOf of single types
+      # @return [Hash] JSON Schema of the enum; nullable adds nil to the values, and "null" to type (or nullable: true
+      #   in OpenAPI 3.0 documents, where a type union is an anyOf of single types)
       def schema(context)
-        options = {"enum" => @values}.merge(schema_options)
-        return nullable_type(FieldType.openapi30_union(@type, options), context) if openapi30_union?(@type, context)
+        options = {"enum" => nullable? ? @values | [nil] : @values}.merge(schema_options)
+        return FieldType.openapi30_union(@type, options, nullable: nullable?) if openapi30_union?(@type, context)
 
-        schema = nullable_type({"type" => @type}.merge(options), context)
-        (nullable? && !nullable_keyword?(context)) ? schema.merge("enum" => @values | [nil]) : schema
+        nullable_type({"type" => @type}.merge(options), context)
       end
 
       # @param version [String] unused by scalars

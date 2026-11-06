@@ -76,6 +76,17 @@ class SchemaTest < Minitest::Test
     end
   end
 
+  # An enum lists null itself, or validators reject it despite nullable
+  def test_openapi30_nullable_enum_lists_null
+    with_configuration(json_schema_version: :openapi30) do
+      klass = Class.new(Versponse::Base) { version("2025-09") { enum :status, values: %w[a b], nullable: true } }
+      schema = klass.to_schema(version: "2025-09")["properties"]["status"]
+
+      assert_equal({"type" => "string", "nullable" => true, "enum" => ["a", "b", nil]}, schema)
+      assert JSONSchemer.schema(schema, meta_schema: JSONSchemer::OpenAPI30::BASE_URI.to_s).valid?(nil)
+    end
+  end
+
   def test_component_names
     assert_equal "ProductResponse", ProductResponse.component_name
     assert_equal "ProductResponseCompact", ProductResponse.component_name(view: :compact)

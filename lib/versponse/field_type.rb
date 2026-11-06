@@ -54,11 +54,15 @@ module Versponse
 
     # The union's anyOf and a declared anyOf can't share the anyOf key, so both go under allOf
     #
+    # OpenAPI 3.0's nullable only applies next to a type, so a nullable union sets it on each branch
+    #
     # @param types [Array<String>] union types
     # @param options [Hash{String => Object}] the property's (or its items') schema keywords
+    # @param nullable [Boolean] whether null is allowed
     # @return [Hash] OpenAPI 3.0 schema: an anyOf of single types with the keywords alongside
-    def self.openapi30_union(types, options)
-      union = {"anyOf" => types.map { |type| {"type" => type} }}
+    def self.openapi30_union(types, options, nullable: false)
+      branch = nullable ? {"nullable" => true} : {}
+      union = {"anyOf" => types.map { |type| {"type" => type}.merge(branch) }}
       return union.merge(options) unless options.key?("anyOf")
 
       {"allOf" => [union, {"anyOf" => options["anyOf"]}]}.merge(options.except("anyOf"))

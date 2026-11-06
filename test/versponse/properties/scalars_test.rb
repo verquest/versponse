@@ -43,7 +43,7 @@ class Versponse::Properties::ScalarsTest < Minitest::Test
     assert_equal({"type" => "string", "enum" => %w[active archived]}, enum.schema(nil))
     assert_equal({"type" => %w[string null], "enum" => ["active", nil]}, nullable.schema(nil))
     with_configuration(json_schema_version: :openapi30) do
-      assert_equal({"type" => "string", "enum" => %w[active], "nullable" => true}, nullable.schema(nil))
+      assert_equal({"type" => "string", "enum" => ["active", nil], "nullable" => true}, nullable.schema(nil))
     end
   end
 
@@ -105,7 +105,7 @@ class Versponse::Properties::ScalarsTest < Minitest::Test
 
     assert_equal({"type" => %w[integer string null], "enum" => [0, "now", nil]}, enum.schema(nil))
     with_configuration(json_schema_version: :openapi30) do
-      expected = {"anyOf" => [{"type" => "integer"}, {"type" => "string"}], "enum" => [0, "now"], "nullable" => true}
+      expected = {"anyOf" => [{"type" => "integer", "nullable" => true}, {"type" => "string", "nullable" => true}], "enum" => [0, "now", nil]}
 
       assert_equal(expected, enum.schema(nil))
     end

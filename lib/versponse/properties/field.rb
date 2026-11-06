@@ -18,12 +18,12 @@ module Versponse
 
       # @param context [Versponse::SchemaContext, nil] schema generation context
       # @return [Hash] JSON Schema of the field; a type union is a type array, or an anyOf of single types in
-      #   OpenAPI 3.0 documents, with keywords and nullable on the outer node. nullable: never changes a
-      #   declared any_of, so a nullable field's any_of must list {"type" => "null"} itself.
+      #   OpenAPI 3.0 documents, with keywords on the outer node and nullable on each branch. nullable: never
+      #   changes a declared any_of, so a nullable field's any_of must list {"type" => "null"} itself.
       def schema(context)
         return nullable_type({"type" => @type}.merge(schema_options), context) unless openapi30_union?(@type, context)
 
-        nullable_type(FieldType.openapi30_union(@type, schema_options), context)
+        FieldType.openapi30_union(@type, schema_options, nullable: nullable?)
       end
 
       # @param version [String] unused by scalars

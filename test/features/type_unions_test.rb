@@ -85,7 +85,9 @@ class TypeUnionsTest < Minitest::Test
     with_configuration(json_schema_version: :openapi30) do
       properties = NoticeResponse.to_schema(version: "2025-09")["properties"]
 
-      assert_equal union.merge("nullable" => true), properties["notice_period"]
+      # nullable only applies next to a type, so each branch carries it
+      assert_equal({"anyOf" => [{"type" => "integer", "nullable" => true}, {"type" => "string", "nullable" => true}]}, properties["notice_period"])
+      assert JSONSchemer.schema(properties["notice_period"], meta_schema: JSONSchemer::OpenAPI30::BASE_URI.to_s).valid?(nil)
       assert_equal union, properties["priority"]
       assert_equal({"type" => "array", "items" => union}, properties["sizes"])
       assert_equal({"type" => %w[integer string null]}, NoticeResponse.to_validation_schema(version: "2025-09")["properties"]["notice_period"])
@@ -100,7 +102,7 @@ class TypeUnionsTest < Minitest::Test
   end
 
   def test_openapi30_union_with_any_of_uses_all_of
-    expected = {"allOf" => [{"anyOf" => [{"type" => "integer"}, {"type" => "string"}]}, {"anyOf" => NOTICE_ANY_OF}], "nullable" => true}
+    expected = {"allOf" => [{"anyOf" => [{"type" => "integer", "nullable" => true}, {"type" => "string", "nullable" => true}]}, {"anyOf" => NOTICE_ANY_OF}]}
 
     with_configuration(json_schema_version: :openapi30) do
       assert_equal expected, NotifyResponse.to_schema(version: "2025-09")["properties"]["notice_period"]
@@ -155,7 +157,7 @@ class TypeUnionsTest < Minitest::Test
     assert_equal({"notice_period" => nil}, notice.call(nil))
     assert_raises(Versponse::InvalidOutputError) { notice.call(8) }
     with_configuration(json_schema_version: :openapi30) do
-      assert_equal({"anyOf" => [{"type" => "integer"}, {"type" => "string"}], "enum" => [7, "send_immediately", nil], "nullable" => true}, klass.to_schema(version: "2025-09")["properties"]["notice_period"])
+      assert_equal({"anyOf" => [{"type" => "integer", "nullable" => true}, {"type" => "string", "nullable" => true}], "enum" => [7, "send_immediately", nil]}, klass.to_schema(version: "2025-09")["properties"]["notice_period"])
     end
   end
 end
