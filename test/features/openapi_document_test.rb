@@ -3,6 +3,8 @@
 require "test_helper"
 
 class OpenapiDocumentTest < Minitest::Test
+  include ConfigurationTestHelper
+
   class ApiDocument < Versponse::OpenAPI::Document
     document_name "api"
     versions "2025-09", "preview"
@@ -28,6 +30,20 @@ class OpenapiDocumentTest < Minitest::Test
   end
 
   def build(document = ApiDocument, version: "2025-09") = document.build(version:)
+
+  def test_openapi_version_follows_the_configured_schema_version
+    with_configuration(json_schema_version: :openapi30) do
+      assert_equal "3.0.3", build["openapi"]
+    end
+  end
+
+  def test_declared_openapi_version_must_match_the_configured_schema_version
+    document = Class.new(Versponse::OpenAPI::Document) { openapi "3.0.3" }
+
+    error = assert_raises(Versponse::DefinitionError) { document.build(version: "2025-09") }
+
+    assert_equal "openapi 3.0.3 doesn't match config.json_schema_version :openapi31 (use 3.1.x)", error.message
+  end
 
   def test_base_sections
     document = build

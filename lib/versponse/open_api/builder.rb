@@ -15,7 +15,7 @@ module Versponse
 
       # @return [Hash] the document
       # @raise [ArgumentError] for a version the document doesn't declare
-      # @raise [Versponse::DefinitionError] for colliding component names
+      # @raise [Versponse::DefinitionError] for colliding component names, or an openapi version config.json_schema_version doesn't write
       def call
         check_version!
         document = base.merge("components" => components)
@@ -34,7 +34,7 @@ module Versponse
 
       def base
         {
-          "openapi" => @declarations.openapi,
+          "openapi" => openapi_version,
           "info" => {"version" => @version}.merge(resolve(@declarations.info) || {}),
           "externalDocs" => resolve(@declarations.external_docs),
           "servers" => presence(resolve(@declarations.servers)),
@@ -124,6 +124,16 @@ module Versponse
 
       def presence(collection)
         collection unless collection.empty?
+      end
+
+      # Schemas are written for config.json_schema_version, so the document declares the matching version
+      def openapi_version
+        openapi30 = Versponse.configuration.json_schema_version == :openapi30
+        declared = @declarations.openapi
+        return openapi30 ? "3.0.3" : "3.1.1" if declared.nil?
+        return declared if declared.start_with?("3.0.") == openapi30
+
+        raise DefinitionError, "openapi #{declared} doesn't match config.json_schema_version :#{Versponse.configuration.json_schema_version} (use #{openapi30 ? "3.0.x" : "3.1.x"})"
       end
 
       def resolve(value)

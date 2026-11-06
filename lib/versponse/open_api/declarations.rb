@@ -15,7 +15,7 @@ module Versponse
 
       # @return [String, nil] rswag key prefix
       attr_accessor :document_name
-      # @return [String] openapi field
+      # @return [String, nil] openapi field, nil for the version config.json_schema_version writes
       attr_accessor :openapi
       # @return [Hash, Proc, nil] info
       attr_accessor :info
@@ -44,9 +44,9 @@ module Versponse
       # @return [Array<Proc>] finalize hooks
       attr_reader :finalizers
 
-      # @return [Declarations] empty declarations with openapi "3.1.1"
+      # @return [Declarations] empty declarations
       def initialize
-        @openapi = "3.1.1"
+        @openapi = nil
         @versions = []
         @servers = []
         @tags = []
