@@ -121,7 +121,7 @@ module Versponse
     def schemer(version:, view: :default)
       @schemers.fetch([version, view.to_sym]) do
         require "json_schemer"
-        JSONSchemer.schema(validation_schema(version:, view:), meta_schema: JSONSchemer::OpenAPI31::BASE_URI.to_s)
+        JSONSchemer.schema(validation_schema(version:, view:), meta_schema: Versponse.configuration.json_schema_uri)
       end
     end
 

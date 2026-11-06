@@ -57,6 +57,17 @@ class Versponse::ConfigurationTest < Minitest::Test
     refute_predicate @config, :const_keyword?
   end
 
+  # The same versions as verquest, with draft 4 also writing a const as a one-value enum
+  def test_json_schema_versions_match_verquest
+    assert_equal %i[draft4 draft6 draft7 draft2019_09 draft2020_12 openapi30 openapi31], Versponse::Configuration::SCHEMAS.keys
+
+    @config.json_schema_version = :draft4
+
+    refute_predicate @config, :const_keyword?
+    refute_predicate @config, :nullable_keyword?
+    assert_equal({"id" => "#Tree"}, @config.anchor("Tree"))
+  end
+
   def test_json_schema_uri
     assert_equal "https://spec.openapis.org/oas/3.1/dialect/base", @config.json_schema_uri
   end

@@ -137,6 +137,23 @@ class ReferenceTest < Minitest::Test
     assert_equal({"$ref" => "#CategoryResponse"}, schema["properties"]["children"]["items"])
   end
 
+  # Like verquest, validation follows config.json_schema_version; older dialects have no $anchor
+  def test_recursive_validation_in_every_json_schema_version
+    anchors = {draft4: "id", openapi30: "id", draft6: "$id", draft7: "$id", draft2019_09: "$anchor", draft2020_12: "$anchor", openapi31: "$anchor"}
+    tree = Category.new("Root", [Category.new("Leaf", [Category.new("Deep", [])])])
+
+    anchors.each do |json_schema_version, keyword|
+      with_configuration(json_schema_version:, validate_output: true) do
+        schema = CategoryResponse.to_validation_schema(version: "2025-09")
+
+        assert_equal (keyword == "$anchor") ? "CategoryResponse" : "#CategoryResponse", schema[keyword], json_schema_version
+        assert_equal "Deep", CategoryResponse.serialize(tree, version: "2025-09")["children"][0]["children"][0]["name"]
+        refute_nil CategoryResponse.versponse.checker(version: "2025-09"), json_schema_version
+        refute CategoryResponse.versponse.schemer(version: "2025-09").valid?({"name" => "Root", "children" => [{"name" => 1, "children" => []}]})
+      end
+    end
+  end
+
   def test_recursive_property_schema_carries_its_own_anchor
     schema = CategoryResponse.to_validation_schema(version: "2025-09", property: :children)
 

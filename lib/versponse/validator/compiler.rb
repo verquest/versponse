@@ -15,8 +15,11 @@ module Versponse
       # Checker classes, each building itself from the keywords it owns
       CHECKS = [TypeCheck, ValueCheck, ObjectCheck, ArrayCheck, StringCheck, FormatCheck, NumberCheck, Combinator, Ref].freeze
 
+      # Keywords naming a schema for "#Name" references, by JSON Schema version (see Configuration#anchor)
+      ANCHORS = %w[$anchor $id id].freeze
+
       # Every keyword the compiler accepts
-      KEYWORDS = (ANNOTATIONS + CHECKS.flat_map(&:keywords) + ["$anchor"]).freeze
+      KEYWORDS = (ANNOTATIONS + CHECKS.flat_map(&:keywords) + ANCHORS).freeze
 
       # @param schema [Hash] validation schema
       # @param schemer [JSONSchemer::Schema] json_schemer schema of the same Hash, used for patterns and formats
@@ -52,9 +55,25 @@ module Versponse
         return Constant.for(schema) if schema == true || schema == false
         raise Unsupported, schema.inspect unless schema.is_a?(Hash) && (schema.keys - KEYWORDS).empty?
 
+        name = anchor_name(schema)
         checker = All.for(CHECKS.filter_map { |check| check.build(schema, self) })
-        @anchors[schema["$anchor"]] = checker if schema.key?("$anchor")
+        @anchors[name] = checker if name
         checker
+      end
+
+      # $id and id name an anchor only as a plain "#Name" fragment; other ids change the base URI
+      #
+      # @param schema [Hash] schema
+      # @return [String, nil] the anchor name the schema declares
+      # @raise [Unsupported] for an $id or id that isn't a plain-name fragment
+      def anchor_name(schema)
+        return schema["$anchor"] if schema.key?("$anchor")
+
+        id = schema["$id"] || schema["id"]
+        return if id.nil?
+        raise Unsupported, "id #{id}" unless id.is_a?(String) && id.start_with?("#")
+
+        id.delete_prefix("#")
       end
 
       # @param name [String] anchor name, without "#"

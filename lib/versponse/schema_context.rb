@@ -2,7 +2,8 @@
 
 module Versponse
   # State of one schema generation. In validation mode referenced classes are inlined.
-  # A class that recurses into itself gets "$anchor": "<Name>" and is referenced as "#<Name>".
+  # A class that recurses into itself gets "$anchor": "<Name>" (or the configured JSON Schema version's
+  # equivalent, see Configuration#anchor) and is referenced as "#<Name>".
   # Anchors (unlike "#/$defs/..." pointers) still resolve when the schema is embedded in
   # another document, for example by verquest. Anchor names are unique within one generated
   # schema only; keep component names unique across classes when several are embedded together.
@@ -46,7 +47,7 @@ module Versponse
       return schema unless @recursive[identity]
 
       @anchored[identity] = true
-      schema.merge("$anchor" => anchor_name(identity, name))
+      schema.merge(Versponse.configuration.anchor(anchor_name(identity, name)))
     end
 
     private

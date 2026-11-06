@@ -12,14 +12,23 @@ module Versponse
   #     config.validate_output = Rails.env.local?
   #   end
   class Configuration
-    # Supported JSON Schema versions and their json_schemer modules
+    # Supported JSON Schema versions and their json_schemer modules, the same as verquest's
     SCHEMAS = {
-      draft2020_12: :Draft202012,
-      draft2019_09: :Draft201909,
+      draft4: :Draft4,
+      draft6: :Draft6,
       draft7: :Draft7,
+      draft2019_09: :Draft201909,
+      draft2020_12: :Draft202012,
       openapi30: :OpenAPI30,
       openapi31: :OpenAPI31
     }.freeze
+
+    # JSON Schema versions without the `const` keyword, as in verquest
+    VERSIONS_WITHOUT_CONST = %i[draft4 openapi30].freeze
+
+    # How each JSON Schema version names a schema for "#Name" references: $anchor from 2019-09,
+    # a plain-name $id in drafts 6 and 7, and id in draft 4 (which OpenAPI 3.0 is based on)
+    ANCHOR_KEYWORDS = {draft4: "id", openapi30: "id", draft6: "$id", draft7: "$id"}.freeze
 
     # @return [Boolean] validate every rendered response against its schema (default false)
     attr_accessor :validate_output
@@ -124,9 +133,16 @@ module Versponse
       json_schema_version == :openapi30
     end
 
-    # @return [Boolean] false when constants are written as a one-value enum (OpenAPI 3.0)
+    # @return [Boolean] false when constants are written as a one-value enum (draft 4 and OpenAPI 3.0)
     def const_keyword?
-      json_schema_version != :openapi30
+      !VERSIONS_WITHOUT_CONST.include?(json_schema_version)
+    end
+
+    # @param name [String] anchor name
+    # @return [Hash{String => String}] the keyword naming a schema so "#<name>" references it
+    def anchor(name)
+      keyword = ANCHOR_KEYWORDS[json_schema_version]
+      keyword ? {keyword => "##{name}"} : {"$anchor" => name}
     end
 
     # @return [String] meta-schema URI of the configured JSON Schema version

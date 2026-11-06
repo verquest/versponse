@@ -446,13 +446,15 @@ end
 | `current_version` | none |
 | `version_resolver` | closest earlier version (a custom resolver must keep that behaviour) |
 | `json_generator` | `JSON.generate` (e.g. `->(hash) { Oj.dump(hash, mode: :compat) }`) |
-| `json_schema_version` | `:openapi31` (also `:openapi30`, `:draft2020_12`, `:draft2019_09`, `:draft7`) |
+| `json_schema_version` | `:openapi31` (also `:openapi30`, `:draft2020_12`, `:draft2019_09`, `:draft7`, `:draft6`, `:draft4`, as in verquest) |
 | `validate_output` | `false` |
 | `formatters` | `date-time` and `date`, keyed by JSON Schema format |
 | `custom_field_types` | `{}`; verquest-shaped custom types (see below) |
 | `default_additional_properties` | `false` |
 | `unknown_expand` | `:raise` (or `:ignore`) |
 | `field_order` | `:declaration` (or `:alphabetical`: identifier fields first, then by key, like blueprinter's `sort_fields_by :name_asc`) |
+
+`json_schema_version` works as in verquest: output validation uses that version's meta-schema, `const` is written as a one-value `enum` under `:draft4` and `:openapi30`, and recursive classes are named with `$anchor` from 2019-09, a plain-name `$id` in drafts 6 and 7, and `id` in draft 4 and OpenAPI 3.0. `:openapi30` also writes `nullable: true` and documents declare `openapi: "3.0.3"`.
 
 Plans and schemas are cached. Change settings at boot, or call `Versponse.reset_caches!` after changing them.
 
