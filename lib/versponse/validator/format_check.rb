@@ -11,11 +11,12 @@ module Versponse
 
       # @param schema [Hash] schema
       # @param compiler [Versponse::Validator::Compiler] looks formats up like json_schemer
-      # @return [FormatCheck, nil] the check, nil without format
+      # @return [FormatCheck, nil] the check, nil without format or for an unknown one (which accepts anything)
       def self.build(schema, compiler)
         return unless schema.key?("format")
 
-        new(schema["format"], compiler.format(schema["format"]))
+        check = compiler.format(schema["format"])
+        new(schema["format"], check) if check
       end
 
       # @param name [String] format name

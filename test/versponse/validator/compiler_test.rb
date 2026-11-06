@@ -56,6 +56,8 @@ class Versponse::Validator::CompilerTest < Minitest::Test
     assert_checks({"format" => "email"}, valid: ["a@b.co", 1], invalid: ["nope"])
     assert_checks({"format" => "date-time"}, valid: ["2025-09-01T12:30:00Z"], invalid: ["2025-09-01"])
     assert_checks({"format" => "int32"}, valid: [1], invalid: [2**40])
+    # Unknown formats (a custom formatter's, say) are annotations, as in json_schemer
+    assert_checks({"type" => "string", "format" => "money"}, valid: ["10.00 GBP"], invalid: [10])
   end
 
   def test_numbers

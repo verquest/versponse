@@ -90,10 +90,10 @@ module Versponse
       end
 
       # @param name [String] format keyword
-      # @return [Proc] json_schemer's format check, called with (data, name)
-      # @raise [Unsupported] for a format json_schemer doesn't know
+      # @return [Proc, nil] json_schemer's format check, called with (data, name); nil for a format
+      #   json_schemer doesn't know, which it treats as an annotation
       def format(name)
-        @schemer.fetch_format(name) { raise Unsupported, "format #{name}" }
+        @schemer.fetch_format(name, nil)
       end
     end
   end
