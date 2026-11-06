@@ -43,6 +43,11 @@ class Versponse::ConfigurationTest < Minitest::Test
     assert_nil @config.current_version
   end
 
+  def test_boolean_settings_are_validated
+    assert_raises(ArgumentError) { @config.validate_output = "yes" }
+    assert_raises(ArgumentError) { @config.default_additional_properties = nil }
+  end
+
   def test_json_schema_version_rejects_unknown_versions
     assert_raises(ArgumentError) { @config.json_schema_version = :draft3 }
   end

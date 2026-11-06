@@ -3,8 +3,9 @@
 module Versponse
   # Settings for Versponse, changed with {Versponse.configure}
   #
-  # Plans and schemas are cached, so change settings at boot. Call {Versponse.reset_caches!}
-  # after changing them later (tests do this through ConfigurationTestHelper).
+  # Plans and schemas are cached. Setting json_schema_version, formatters, version_resolver, field_order
+  # or default_additional_properties on {Versponse.configuration} resets them; custom_field_types resolve
+  # when properties are defined, so set them before response classes load.
   #
   # @example
   #   Versponse.configure do |config|
@@ -31,9 +32,9 @@ module Versponse
     ANCHOR_KEYWORDS = {draft4: "id", openapi30: "id", draft6: "$id", draft7: "$id"}.freeze
 
     # @return [Boolean] validate every rendered response against its schema (default false)
-    attr_accessor :validate_output
+    attr_reader :validate_output
     # @return [Boolean] additionalProperties of generated object schemas (default false)
-    attr_accessor :default_additional_properties
+    attr_reader :default_additional_properties
     # @return [#call, nil] returns the version used when serialize gets no version:
     attr_reader :current_version
     # @return [#call] resolves a requested version from the declared ones; it must return the closest
@@ -67,6 +68,19 @@ module Versponse
       @custom_field_types = {}.freeze
     end
 
+    # @param value [Boolean] validate every rendered response against its schema
+    # @raise [ArgumentError] for a value that isn't true or false
+    def validate_output=(value)
+      @validate_output = boolean!(value, :validate_output)
+    end
+
+    # @param value [Boolean] additionalProperties of generated object schemas
+    # @raise [ArgumentError] for a value that isn't true or false
+    def default_additional_properties=(value)
+      @default_additional_properties = boolean!(value, :default_additional_properties)
+      changed!
+    end
+
     # @param value [#call, nil] returns the current version, or nil to clear it
     # @raise [ArgumentError] when value does not respond to call
     def current_version=(value)
@@ -78,6 +92,7 @@ module Versponse
     # @raise [ArgumentError] when value does not respond to call
     def version_resolver=(value)
       @version_resolver = callable!(value, :version_resolver)
+      changed!
     end
 
     # @param value [#call] called with the rendered Hash, returns a String
@@ -92,6 +107,7 @@ module Versponse
       raise ArgumentError, "Unsupported JSON Schema version: #{value}. Use one of #{SCHEMAS.keys.join(", ")}" unless SCHEMAS.key?(value)
 
       @json_schema_version = value
+      changed!
     end
 
     # @param value [Symbol] :raise or :ignore
@@ -108,6 +124,7 @@ module Versponse
       raise ArgumentError, "field_order must be one of #{FieldOrder::VALUES.join(", ")}" unless FieldOrder::VALUES.include?(value)
 
       @field_order = value
+      changed!
     end
 
     # @param value [Hash{String, Symbol => #call}] formatters keyed by JSON Schema format
@@ -116,6 +133,7 @@ module Versponse
       raise ArgumentError, "formatters must be a Hash of callables" unless value.is_a?(Hash) && value.each_value.all? { |formatter| formatter.respond_to?(:call) }
 
       @formatters = value.transform_keys(&:to_s).freeze
+      changed!
     end
 
     # Types resolve when a field is defined, so set them before response classes load
@@ -153,6 +171,17 @@ module Versponse
     end
 
     private
+
+    # Only the global configuration feeds the caches
+    def changed!
+      Versponse.reset_caches! if Versponse.configuration.equal?(self)
+    end
+
+    def boolean!(value, name)
+      raise ArgumentError, "#{name} must be true or false" unless [true, false].include?(value)
+
+      value
+    end
 
     def callable!(value, name)
       raise ArgumentError, "#{name} must respond to call" unless value.respond_to?(:call)

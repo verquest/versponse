@@ -457,7 +457,7 @@ end
 
 `json_schema_version` works as in verquest: output validation uses that version's meta-schema, `const` is written as a one-value `enum` under `:draft4` and `:openapi30`, and recursive classes are named with `$anchor` from 2019-09, a plain-name `$id` in drafts 6 and 7, and `id` in draft 4 and OpenAPI 3.0. `:openapi30` also writes `nullable: true` and documents declare `openapi: "3.0.3"`. A nullable enum lists `null` among its values there too. A nullable `reference`, `one_of` or other `$ref` is written as `{"allOf": [{"$ref": ...}], "nullable": true}`, the form code generators expect. Strict 3.0 validators ignore `nullable` without a `type`, so they reject `null` there; output validation always uses the 3.1 forms internally and accepts it.
 
-Plans and schemas are cached. Change settings at boot, or call `Versponse.reset_caches!` after changing them.
+Plans and schemas are cached. Settings that change output (`json_schema_version`, `formatters`, `version_resolver`, `field_order`, `default_additional_properties`) reset the caches when set. Set `custom_field_types` before response classes load, because properties resolve their types when they're defined.
 
 ### Custom field types
 

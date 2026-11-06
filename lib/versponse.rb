@@ -98,10 +98,12 @@ module Versponse
       yield(configuration)
     end
 
-    # Clears compiled plans and schemas of every response class. Call it after changing settings.
+    # Clears compiled plans and schemas of every response class. Setting a configuration value that
+    # changes output calls it already.
     #
     # @return [void]
     def reset_caches!
+      Registry.clear_canonical
       Registry.all.each { |klass| klass.versponse.reset_caches! }
     end
 

@@ -64,6 +64,13 @@ module Versponse
         end
       end
 
+      # Forgets the representatives of requests after a max, which depend on the version resolver
+      #
+      # @return [void]
+      def clear_canonical
+        @mutex.synchronize { @after_max = {}.freeze }
+      end
+
       # @return [Array<Class>] every registered class, including anonymous ones
       def all
         @mutex.synchronize { @classes.dup }

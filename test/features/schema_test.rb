@@ -87,6 +87,19 @@ class SchemaTest < Minitest::Test
     end
   end
 
+  # Settings that change output reset the caches themselves, so a later change isn't ignored
+  def test_changing_settings_resets_cached_schemas
+    config = Versponse.configuration
+    klass = Class.new(Versponse::Base) { version("2025-09") { field :id, type: :string } }
+
+    refute klass.to_schema(version: "2025-09")["additionalProperties"]
+    config.default_additional_properties = true
+
+    assert klass.to_schema(version: "2025-09")["additionalProperties"]
+  ensure
+    config.default_additional_properties = false
+  end
+
   def test_component_names
     assert_equal "ProductResponse", ProductResponse.component_name
     assert_equal "ProductResponseCompact", ProductResponse.component_name(view: :compact)
