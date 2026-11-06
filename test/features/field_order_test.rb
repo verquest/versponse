@@ -16,7 +16,6 @@ class FieldOrderTest < Minitest::Test
     version "2025-09" do
       identifier :public_id
       field :name, type: :string
-      field :public_id, type: :string
       field :email, type: :string, if: ->(contact) { contact[:email] }
       object :details do
         field :zip, type: :string
@@ -37,7 +36,7 @@ class FieldOrderTest < Minitest::Test
   def test_declaration_order_by_default
     rendered = ContactResponse.serialize(contact, version: "2025-09")
 
-    assert_equal %w[name public_id email details address], rendered.keys
+    assert_equal %w[public_id name email details address], rendered.keys
     assert_equal %w[zip age], rendered["details"].keys
   end
 

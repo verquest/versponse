@@ -10,7 +10,6 @@ class CollapseIfTest < Minitest::Test
   class StageResponse < Versponse::Base
     version "2025-09" do
       identifier :id, map: "public_id", collapse_if: ->(stage) { !stage.archived }
-      field :id, type: :string, map: "public_id", unless: ->(stage) { stage.archived }
       field :name, type: :string
     end
 
@@ -40,7 +39,6 @@ class CollapseIfTest < Minitest::Test
   class ContextStageResponse < Versponse::Base
     version "2025-09" do
       identifier :id, collapse_if: ->(_stage, context) { context[:collapse] }
-      field :id, type: :string
       field :name, type: :string
     end
   end
@@ -65,7 +63,6 @@ class CollapseIfTest < Minitest::Test
     version "2025-09" do
       identifier :id, map: "public_id", collapse_if: ->(stage) { !stage.archived }
       const :object, value: "stage"
-      field :id, type: :string, map: "public_id", unless: ->(stage) { stage.archived }
       field :name, type: :string
     end
   end
@@ -85,7 +82,6 @@ class CollapseIfTest < Minitest::Test
   class PipelineResponse < Versponse::Base
     version "2025-09" do
       identifier :id
-      field :id, type: :string
       field :name, type: :string
     end
   end
@@ -168,11 +164,18 @@ class CollapseIfTest < Minitest::Test
     assert_equal [{"id" => "s1", "name" => "Open"}], result["stages"]
   end
 
+  def test_full_shape_leaves_the_identifier_out_when_the_condition_is_false
+    assert_equal({"id" => "s1", "name" => "Open"}, StageResponse.serialize(open_stage, version: "2025-09"))
+    assert_equal({"name" => "Won"}, StageResponse.serialize(archived_stage, version: "2025-09"))
+    refute_includes StageResponse.to_schema(version: "2025-09")["required"], "id"
+    assert_includes StageResponse.to_schema(version: "2026-03")["required"], "id"
+  end
+
   def test_condition_gets_the_context
     object = {stage: {id: "s1", name: "Open"}}
 
     assert_equal({"stage" => {"id" => "s1"}}, ContextDealResponse.serialize(object, version: "2025-09", context: {collapse: true}))
-    assert_equal({"stage" => {"id" => "s1", "name" => "Open"}}, ContextDealResponse.serialize(object, version: "2025-09", context: {collapse: false}))
+    assert_equal({"stage" => {"name" => "Open"}}, ContextDealResponse.serialize(object, version: "2025-09", context: {collapse: false}))
   end
 
   def test_one_of_variants_decide_per_value
@@ -209,14 +212,15 @@ class CollapseIfTest < Minitest::Test
   def pipeline_deal(stage, expand: nil, calls: nil) =
     PipelineDealResponse.serialize(PipelineDeal.new(stage, [stage]), version: "2025-09", expand:, context: {calls:})
 
-  def test_wildcard_renders_in_full_without_calling_the_condition
+  # The condition runs only for the identifier field of the full shape, once per stage
+  def test_wildcard_renders_in_full_without_deciding_collapse
     calls = []
     result = pipeline_deal(pipeline_stage(false), expand: ["*"], calls:)
-    full = {"name" => "Open", "pipeline" => {"id" => "p1", "name" => "Sales"}}
+    full = {"id" => "s1", "name" => "Open", "pipeline" => {"id" => "p1", "name" => "Sales"}}
 
     assert_equal full, result["stage"]
     assert_equal [full], result["stages"]
-    assert_empty calls
+    assert_equal %w[Open Open], calls
   end
 
   def test_nested_expansion_under_an_archived_item_rendered_in_full

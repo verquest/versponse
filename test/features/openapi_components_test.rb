@@ -8,7 +8,6 @@ class OpenapiComponentsTest < Minitest::Test
     class SiteResponse < Versponse::Base
       version "2025-09" do
         identifier :id
-        field :id, type: :string
         field :name, type: :string
       end
     end

@@ -12,7 +12,6 @@ class ExpansionTest < Minitest::Test
   class SiteResponse < Versponse::Base
     version "2025-09" do
       identifier :id, map: "public_id"
-      field :id, type: :string, map: "public_id"
       field :name, type: :string
     end
   end
@@ -20,7 +19,6 @@ class ExpansionTest < Minitest::Test
   class PriceResponse < Versponse::Base
     version "2025-09" do
       identifier :id
-      field :id, type: :string
       field :amount, type: :integer
     end
   end
@@ -28,7 +26,6 @@ class ExpansionTest < Minitest::Test
   class StageResponse < Versponse::Base
     version "2025-09" do
       identifier :id
-      field :id, type: :string
       field :name, type: :string
     end
   end
@@ -139,7 +136,6 @@ class ExpansionTest < Minitest::Test
 
     version "2025-09" do
       identifier :id
-      field :id, type: :string
       field :x, type: :string
     end
   end

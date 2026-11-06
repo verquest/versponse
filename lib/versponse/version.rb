@@ -35,17 +35,21 @@ module Versponse
 
     # @param property [Versponse::Properties::Base] property to add or replace
     # @return [Versponse::Properties::Base] the property
+    # @raise [Versponse::DefinitionError] when an identifier declares the key
     def add(property)
+      raise DefinitionError, "#{label}: #{property.key} is declared by identifier" if identifiers.key?(property.key)
+
       properties[property.key] = property
     end
 
     # The first identifier declared in a version replaces the inherited ones (and their collapse_if); later ones add to it
     #
     # @param property [Versponse::Properties::Field] identifier field
+    # @param property_in_full [Versponse::Properties::Field] the field in the full shape (conditional with collapse_if)
     # @param collapse_if [#call, nil] normalized condition, at most one per version
     # @return [Versponse::Properties::Field] the field
     # @raise [Versponse::DefinitionError] when another identifier of the version already declares collapse_if
-    def add_identifier(property, collapse_if: nil)
+    def add_identifier(property, property_in_full: property, collapse_if: nil)
       if @inherited_identifiers
         @identifiers = {}
         @collapse_if = nil
@@ -56,6 +60,7 @@ module Versponse
 
         @collapse_if = collapse_if
       end
+      properties[property.key] = property_in_full
       identifiers[property.key] = property
     end
 

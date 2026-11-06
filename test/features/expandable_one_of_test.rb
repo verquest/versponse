@@ -11,7 +11,6 @@ class ExpandableOneOfTest < Minitest::Test
     version "2025-09" do
       identifier :id
       const :object, value: "order"
-      field :id, type: :string
       field :total, type: :integer
     end
   end
@@ -20,7 +19,6 @@ class ExpandableOneOfTest < Minitest::Test
     version "2025-09" do
       identifier :id
       const :object, value: "task"
-      field :id, type: :string
       field :title, type: :string
     end
   end

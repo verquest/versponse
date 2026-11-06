@@ -7,8 +7,7 @@ class IdentifierTest < Minitest::Test
 
   class SiteResponse < Versponse::Base
     version "2025-09" do
-      identifier :id, map: "public_id"
-      field :id, type: :string, map: "public_id"
+      identifier :id, map: "public_id", description: "Site ID"
       field :name, type: :string
     end
 
@@ -29,7 +28,6 @@ class IdentifierTest < Minitest::Test
 
     version "2025-09" do
       identifier :id
-      field :id, type: :string
       field :x, type: :string
     end
   end
@@ -47,7 +45,7 @@ class IdentifierTest < Minitest::Test
   end
 
   def test_collapsed_schema_and_component
-    expected = {"type" => "object", "required" => ["id"], "properties" => {"id" => {"type" => "string"}}, "additionalProperties" => false}
+    expected = {"type" => "object", "required" => ["id"], "properties" => {"id" => {"type" => "string", "description" => "Site ID"}}, "additionalProperties" => false}
 
     assert_equal expected, SiteResponse.to_schema(version: "2025-09", view: :collapsed)
     assert_equal "SiteResponseCollapsed", SiteResponse.component_name(view: :collapsed)
@@ -80,6 +78,34 @@ class IdentifierTest < Minitest::Test
 
   def test_collapsed_without_an_identifier_raises
     assert_raises(Versponse::DefinitionError) { PlainResponse.serialize({id: "x"}, version: "2025-09", view: :collapsed) }
+  end
+
+  def test_full_shape_renders_the_identifier
+    assert_equal({"id" => "site_1", "name" => "Leeds"}, SiteResponse.serialize(site, version: "2025-09"))
+  end
+
+  def test_full_schema_describes_the_identifier
+    schema = SiteResponse.to_schema(version: "2025-09")
+
+    assert_equal({"type" => "string", "description" => "Site ID"}, schema["properties"]["id"])
+    assert_includes schema["required"], "id"
+  end
+
+  def test_redeclared_identifier_adds_its_property
+    assert_equal({"code" => "LDS", "id" => "site_1", "name" => "Leeds"}, SiteResponse.serialize(site, version: "2026-01").sort.to_h)
+  end
+
+  def test_property_with_the_identifier_key_raises
+    error = assert_raises(Versponse::DefinitionError) do
+      define do
+        version "2025-09" do
+          identifier :id
+          field :id, type: :string
+        end
+      end
+    end
+
+    assert_match(/id is declared by identifier/, error.message)
   end
 
   def test_definition_errors

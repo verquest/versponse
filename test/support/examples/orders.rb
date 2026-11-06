@@ -8,7 +8,6 @@ module Examples
     version "2025-09" do
       identifier :id
       const :object, value: "order"
-      field :id, type: :string
       reference :tenancy, from: TenancyResponse, view: :embedded, nullable: true
 
       view :embedded do
@@ -21,7 +20,6 @@ module Examples
     version "2025-09" do
       identifier :id
       const :object, value: "tenancy"
-      field :id, type: :string
       reference :order, from: OrderResponse, view: :embedded
 
       view :embedded do

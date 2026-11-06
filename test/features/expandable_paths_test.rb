@@ -13,7 +13,6 @@ class ExpandablePathsTest < Minitest::Test
   class StageResponse < Versponse::Base
     version "2025-09" do
       identifier :id
-      field :id, type: :string
     end
   end
 
@@ -27,7 +26,6 @@ class ExpandablePathsTest < Minitest::Test
   class CategoryResponse < Versponse::Base
     version "2025-09" do
       identifier :id
-      field :id, type: :string
       collection :children, item: CategoryResponse, expandable: true
     end
   end

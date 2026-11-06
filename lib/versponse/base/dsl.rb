@@ -81,13 +81,14 @@ module Versponse
       add_property(Properties::Field, name:, type: type || default_options[:type], block:, **options)
     end
 
-    # Declares a field of the collapsed shape, rendered for expandable associations that aren't expanded
+    # Declares a field of both the full shape and the collapsed shape, rendered for expandable associations that aren't expanded
     #
     # @param name [Symbol] output key
     # @param type [Symbol, nil] field type (with_options type:, else :string)
     # @param collapse_if [Proc, #call, nil] (not taken from with_options) called with (object) or (object, context); when it returns false the
-    #   association renders in full instead (a collection item: when it is false for any item). One per version.
-    # @param options [Hash] map:, nullable: and JSON Schema keywords (no if:/unless:); with_options defaults apply
+    #   association renders in full instead (a collection item: when it is false for any item), and the full shape leaves this field out.
+    #   One per version.
+    # @param options [Hash] map:, nullable:, description: and JSON Schema keywords (no if:/unless:); with_options defaults apply
     # @return [void]
     # @raise [Versponse::DefinitionError] outside a version, with if:/unless:, or with a collapse_if: that doesn't respond to call
     def identifier(name, type: nil, collapse_if: nil, **options, &block)
@@ -97,7 +98,9 @@ module Versponse
 
       defaults = default_options.except(:type, :if, :unless, :collapse_if)
       type ||= default_options[:type] || :string
-      @current_scope.add_identifier(Properties::Field.new(**defaults, name:, type:, block:, **options), collapse_if: Callable.normalize(collapse_if))
+      identifier = Properties::Field.new(**defaults, name:, type:, block:, **options)
+      property = collapse_if ? Properties::Field.new(**defaults, name:, type:, block:, if: collapse_if, **options) : identifier
+      @current_scope.add_identifier(identifier, property_in_full: property, collapse_if: Callable.normalize(collapse_if))
     end
 
     # Declares a value from a fixed list
