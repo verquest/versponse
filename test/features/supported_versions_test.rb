@@ -114,6 +114,32 @@ class SupportedVersionsTest < Minitest::Test
     assert_equal({"reason" => "x"}, LegacyResponse.serialize({reason: "x"}, version: "2025-09"))
   end
 
+  # No class declares 2025-04-15, so requests must not snap to 2025-01 before the range check
+  def test_min_that_no_class_declares
+    klass = define do
+      supported_versions min: "2025-04-15"
+      version("2025-01") { field :a, type: :string }
+      version("2025-08") { field :b, type: :string }
+    end
+
+    assert_equal({"a" => "x"}, klass.serialize({a: "x"}, version: "2025-04-15"))
+    assert_equal({"a" => "x"}, klass.serialize({a: "x"}, version: "2025-05"))
+    assert_equal "2025-01", klass.resolve("2025-05").name
+    assert_raises(Versponse::VersionNotFoundError) { klass.serialize({a: "x"}, version: "2025-04") }
+  end
+
+  # No class declares 2025-06-15, so later requests must not snap back into the range
+  def test_max_that_no_class_declares
+    klass = define do
+      supported_versions max: "2025-06-15"
+      version("2025-01") { field :a, type: :string }
+    end
+
+    assert_equal({"a" => "x"}, klass.serialize({a: "x"}, version: "2025-06-15"))
+    assert_raises(Versponse::VersionNotFoundError) { klass.serialize({a: "x"}, version: "2025-06-20") }
+    assert_raises(Versponse::VersionNotFoundError) { klass.resolve("2025-07") }
+  end
+
   def test_min_defaults_to_the_first_declared_version
     assert_raises(Versponse::VersionNotFoundError) { LegacyResponse.serialize({reason: "x"}, version: "2025-01") }
   end

@@ -17,7 +17,7 @@ module Versponse
     # @raise [Versponse::VersionNotFoundError] when there is none, or supported_versions leaves it out
     # @raise [Versponse::DefinitionError] when supported_versions max sorts before every declared version
     def resolve(version)
-      versions.resolve(version.to_s, supported: supported_version_range)
+      versions.resolve(Registry.canonical(version.to_s), supported: supported_version_range)
     end
 
     # @return [Versponse::SupportedVersions, nil] range declared with supported_versions on this class
@@ -232,12 +232,10 @@ module Versponse
       end
     end
 
-    # Maps the requested version to a declared version name (of any class) before it reaches a cache,
-    # so arbitrary client-sent strings can't grow the caches. Assumes the resolver picks the closest
-    # earlier version, like the default one.
+    # Maps the requested version to a registered name before it reaches a cache (see Registry.canonical).
+    # Assumes the resolver picks the closest earlier version, like the default one.
     def version_name(version)
-      requested = version&.to_s || current_version_name
-      Versponse.configuration.version_resolver.call(requested, Registry.version_names) || requested
+      Registry.canonical(version&.to_s || current_version_name)
     end
 
     def current_version_name

@@ -34,6 +34,7 @@ module Versponse
       raise DefinitionError, "supported_versions can only be set on the class" if @current_scope
 
       @supported_versions = (min.nil? && max.nil?) ? nil : SupportedVersions.new(min:, max:)
+      Registry.add_range(@supported_versions) if @supported_versions
       Versponse.reset_caches!
     end
 

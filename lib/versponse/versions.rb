@@ -104,10 +104,9 @@ module Versponse
 
     private
 
-    # The closest version any class declares: the name serialize and to_schema cache under,
-    # so resolve("2026-04") and serialize(version: "2026-04") agree
+    # The name serialize and to_schema cache under, so resolve("2026-04") and serialize(version: "2026-04") agree
     def canonical_name(name)
-      Versponse.configuration.version_resolver.call(name, Registry.version_names) || name
+      Registry.canonical(name)
     end
   end
 end

@@ -131,7 +131,7 @@ class SerializeTest < Minitest::Test
   end
 
   def test_requested_versions_are_canonicalized_before_caching
-    assert_includes Versponse::Registry.version_names, UnitTypeResponse.send(:version_name, "2099-01-01-anything")
+    assert_equal UnitTypeResponse.send(:version_name, "2099-01-01-a"), UnitTypeResponse.send(:version_name, "2099-01-01-b")
   end
 
   def test_root_and_meta
