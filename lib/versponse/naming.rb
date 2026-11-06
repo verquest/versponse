@@ -20,7 +20,8 @@ module Versponse
 
     # @param hash [Hash] snake_case keys, nested schema Hashes and Arrays of them included
     # @return [Hash{String => Object}] camelCase String keys at every schema level; keys of
-    #   name maps (properties, patternProperties, $defs, dependentRequired) are only stringified
+    #   name maps (properties, patternProperties, $defs, dependentRequired) are only stringified,
+    #   and a Regexp pattern becomes its source
     def self.camelize_keys(hash)
       hash.to_h do |key, value|
         key = camelize(key)
@@ -30,6 +31,7 @@ module Versponse
 
     def self.camelize_value(key, value)
       return value if VALUE_KEYWORDS.include?(key)
+      return value.source if key == "pattern" && value.is_a?(Regexp)
       return camelize_name_map(value) if NAME_MAPS.include?(key) && value.is_a?(Hash)
 
       camelize_nested(value)

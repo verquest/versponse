@@ -24,6 +24,13 @@ class Versponse::NamingTest < Minitest::Test
     assert_equal expected, Versponse::Naming.camelize_keys(example: {created_at: "x"}, default: {"first_name" => "a"})
   end
 
+  # A Ruby Regexp would be written as "(?-mix:...)", which isn't an ECMA pattern
+  def test_regexp_patterns_become_their_source
+    expected = {"pattern" => "^site_", "items" => {"pattern" => "^[a-z]+$"}}
+
+    assert_equal expected, Versponse::Naming.camelize_keys(pattern: /^site_/, items: {pattern: /^[a-z]+$/})
+  end
+
   def test_camelize_keys_of_arrays
     assert_equal({"oneOf" => [{"maxLength" => 1}, "x"]}, Versponse::Naming.camelize_keys(one_of: [{max_length: 1}, "x"]))
   end
