@@ -17,16 +17,15 @@ module Versponse
 
       # @param values [Array] allowed values, each of the type
       # @param type [Symbol, String, Array<Symbol, String>, nil] a built-in type, a custom one (only its base type is used, its
-      #   schema options would duplicate or contradict the values) or a union of built-in types; required
+      #   schema options would duplicate or contradict the values) or a union of built-in types; nil infers it from the values
       # @param options [Hash] see {Base#initialize}
-      # @raise [Versponse::DefinitionError] when values is empty, type is missing or unknown, or a value isn't of the type
+      # @raise [Versponse::DefinitionError] when values is empty, type is unknown or can't be inferred, or a value isn't of the type
       def initialize(values:, type: nil, **options)
         super(**options)
         raise DefinitionError, "#{key}: values must be a non-empty Array" unless values.is_a?(::Array) && !values.empty?
-        raise DefinitionError, "#{key}: enum needs type: (one of #{FieldType::BUILT_IN.join(", ")}, a custom type or a union)" if type.nil?
 
-        @type = FieldType.resolve(type, key).first
         @values = values.dup.freeze
+        @type = type.nil? ? inferred_type : FieldType.resolve(type, key).first
         check_values!
       end
 
@@ -48,6 +47,27 @@ module Versponse
       end
 
       private
+
+      # Like verquest's query coercion: one type per value class, number when integers and floats mix
+      def inferred_type
+        types = @values.compact.map do |value|
+          json_type(value) || raise(DefinitionError, "#{key}: can't infer the enum type from #{value.inspect}, pass type:#{" (Symbols render as Symbols, use Strings)" if value.is_a?(::Symbol)}")
+        end.uniq
+        raise DefinitionError, "#{key}: can't infer the enum type from nil alone, pass type:" if types.empty?
+
+        types.delete("integer") if types.include?("number")
+        (types.size == 1) ? types.first : FieldType.union(types, key)
+      end
+
+      def json_type(value)
+        case value
+        when ::String then "string"
+        when ::Integer then "integer"
+        when ::Numeric then "number"
+        when true, false then "boolean"
+        when ::Hash then "object"
+        end
+      end
 
       def check_values!
         types = Array(@type)

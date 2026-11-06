@@ -101,10 +101,10 @@ class DslErrorsTest < Minitest::Test
     assert_equal({"type" => %w[string null], "enum" => ["a", nil]}, properties["status"])
   end
 
-  def test_enum_without_type
-    error = assert_raises(Versponse::DefinitionError) { define { version("2025-09") { enum :status, values: %w[a] } } }
+  def test_enum_without_type_infers_it
+    klass = define { version("2025-09") { enum :status, values: %w[a] } }
 
-    assert_match "enum needs type:", error.message
+    assert_equal({"type" => "string", "enum" => ["a"]}, klass.to_schema(version: "2025-09")["properties"]["status"])
   end
 
   def test_class_level_options_must_come_before_versions

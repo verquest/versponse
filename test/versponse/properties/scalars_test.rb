@@ -57,11 +57,23 @@ class Versponse::Properties::ScalarsTest < Minitest::Test
     assert_raises(Versponse::DefinitionError) { Versponse::Properties::Enum.new(name: :status, type: :string, values: []) }
   end
 
-  def test_enum_requires_a_type
-    error = assert_raises(Versponse::DefinitionError) { Versponse::Properties::Enum.new(name: :status, values: %w[a]) }
+  def enum_schema(values, **options) = Versponse::Properties::Enum.new(name: :status, values:, **options).schema(nil)
 
-    assert_equal "status: enum needs type: (one of string, number, integer, boolean, object, a custom type or a union)", error.message
-    assert_raises(Versponse::DefinitionError) { Versponse::Properties::Enum.new(name: :status, type: nil, values: %w[a]) }
+  # Without type:, the type comes from the values, like verquest's query coercion
+  def test_enum_infers_the_type_from_its_values
+    assert_equal({"type" => "string", "enum" => %w[a b]}, enum_schema(%w[a b]))
+    assert_equal({"type" => "integer", "enum" => [1, 2]}, enum_schema([1, 2]))
+    assert_equal({"type" => "number", "enum" => [1, 2.5]}, enum_schema([1, 2.5]))
+    assert_equal({"type" => "boolean", "enum" => [true, false]}, enum_schema([true, false]))
+    assert_equal({"type" => %w[integer string], "enum" => [1, "a"]}, enum_schema([1, "a"]))
+    assert_equal({"type" => %w[string null], "enum" => ["a", nil]}, enum_schema(["a", nil], nullable: true))
+  end
+
+  def test_enum_type_that_cannot_be_inferred
+    error = assert_raises(Versponse::DefinitionError) { Versponse::Properties::Enum.new(name: :status, values: %i[a b]) }
+
+    assert_equal "status: can't infer the enum type from :a, pass type: (Symbols render as Symbols, use Strings)", error.message
+    assert_raises(Versponse::DefinitionError) { Versponse::Properties::Enum.new(name: :status, values: [nil], nullable: true) }
     assert_raises(Versponse::DefinitionError) { Versponse::Properties::Enum.new(name: :status, type: :text, values: %w[a]) }
   end
 

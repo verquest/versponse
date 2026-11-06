@@ -98,7 +98,7 @@ UnitTypeResponse.serialize(unit_types, version: "2025-09", view: :embedded, root
 | Method | What it renders |
 |---|---|
 | `field` | A scalar: `string`, `number`, `integer`, `boolean`, `object` for a free-form map, or a union such as `[:integer, :string]` |
-| `enum` | A value from a fixed list (`type:`, `values:`) |
+| `enum` | A value from a fixed list (`values:`, optional `type:`) |
 | `const` | A constant (`value:`) |
 | `array` | An array of scalars (`type:`, `item_schema_options:`) |
 | `object` | An inline object; its block declares the properties |
@@ -120,11 +120,11 @@ Options shared by every property:
 - `type:` on `field` and `array` takes a union of two or more built-in types. `field :notice_period, type: [:integer, :string], nullable: true` writes `"type": ["integer", "string", "null"]`, and under `json_schema_version = :openapi30` an `anyOf` of single types with `nullable: true`. `format:` and its formatter still apply.
 - A union can be narrowed with `any_of:`, as in `field :notice_period, type: [:integer, :string], nullable: true, any_of: [{"type" => "integer"}, {"enum" => ["send_immediately"]}, {"type" => "null"}]`. Under OpenAPI 3.0 the two `anyOf`s are combined with `allOf`. `nullable:` adds `"null"` to `type` but never adds a null branch to your `any_of:`, so list `{"type" => "null"}` yourself when the field is nullable. Otherwise `nil` matches no alternative.
 - A user-supplied `any_of:` is written verbatim, in documents and validation schemas alike. `{"type" => "null"}` isn't valid OpenAPI 3.0, so under `:openapi30` it ends up in the document as is, but leaving it out makes `nil` fail output validation. For a nullable union under OpenAPI 3.0, `enum:` with `nil` in its values avoids the problem.
-- `enum` needs `type:`, like `field`: a built-in type, a union or a custom type, of which only the base type is used. Every value must be of that type, or `enum` raises `Versponse::DefinitionError`. `with_options type:` applies too. `nullable: true` adds `"null"` to `type` and `nil` to the values, or writes `nullable: true` under OpenAPI 3.0:
+- `enum` writes a `type` next to its values. Without `type:` it's inferred from them: Strings are `string`, Integers `integer`, Integers with Floats `number`, `true`/`false` `boolean`, and mixed values a union. Pass `type:` (or `with_options type:`) for a custom type, of which only the base type is used, or to say `number` for whole numbers. Every value must be of the type, and a value with no JSON type, such as a Symbol, raises `Versponse::DefinitionError`. `nullable: true` adds `"null"` to `type` and `nil` to the values, or writes `nullable: true` under OpenAPI 3.0:
   ```ruby
-  enum :status, type: :string, values: %w[active archived], nullable: true
+  enum :status, values: %w[active archived], nullable: true
   # => {"type" => ["string", "null"], "enum" => ["active", "archived", nil]}
-  enum :notice_period, type: [:integer, :string], values: [7, 30, "send_immediately"]
+  enum :notice_period, values: [7, 30, "send_immediately"]
   # => {"type" => ["integer", "string"], "enum" => [7, 30, "send_immediately"]}
   ```
 - Other options are JSON Schema keywords in snake case, such as `description:`, `format:` or `max_length:`. They're written in camel case (`maxLength`). OpenAPI extensions go in as written (`"x-internal": true`). Anything else raises `Versponse::DefinitionError`, with a suggestion for typos such as `nulable:`.
@@ -420,7 +420,7 @@ A verquest request can reference a versponse class with a verquest version that 
 Definitions can be copied between the gems (`one_of name:` and `inherit:` behave the same), except where responses differ from requests:
 
 - `required:` raises. Every key is rendered, so it's required in the schema unless `if:` or `unless:` makes it conditional.
-- `enum` needs `type:`, and checks its values against it. verquest writes only `enum`.
+- `enum` writes its `type`, given or inferred from the values. verquest infers it only to convert query strings.
 - Response-only DSL: `view`, `include_view`, `view:` on `reference` and `collection`, `match:` on `one_of` variants, `identifier`, `expandable:` and `source`.
 - Request-only DSL: `location`, `parameter_examples:`, `explode:` and conditions (`condition`, `depends_on`).
 
