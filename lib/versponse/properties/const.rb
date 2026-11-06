@@ -13,7 +13,7 @@ module Versponse
         super(**options)
         raise DefinitionError, "#{key}: const takes no block, map: or nullable:" if block || map || nullable?
 
-        @constant = value.frozen? ? value : value.dup.freeze
+        @constant = DeepFreeze.call(value)
       end
 
       # @return [Object] the frozen constant value

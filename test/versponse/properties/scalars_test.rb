@@ -165,6 +165,16 @@ class Versponse::Properties::ScalarsTest < Minitest::Test
     assert_predicate render(Versponse::Properties::Const.new(name: :object, value:), Item.new)["object"], :frozen?
   end
 
+  # The same value goes into every response, so a nested change must not leak into later ones
+  def test_const_value_is_deeply_frozen
+    value = {"a" => [+"x"]}
+    rendered = render(Versponse::Properties::Const.new(name: :meta, value:), Item.new)["meta"]
+
+    refute_predicate value["a"], :frozen?
+    assert_predicate rendered["a"], :frozen?
+    assert_predicate rendered["a"].first, :frozen?
+  end
+
   def test_nullable_enum_does_not_duplicate_nil
     enum = Versponse::Properties::Enum.new(name: :status, type: :string, values: ["a", nil], nullable: true)
 
