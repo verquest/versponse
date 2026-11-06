@@ -7,8 +7,8 @@ module Versponse
     #
     # @api private
     module RefCheck
-      # Keywords whose values are data, so a "$ref" key in them isn't a reference ("examples" too when it's
-      # a schema's Array; a Hash of Example Objects is walked)
+      # Keywords whose values are data inside a Schema Object, so a "$ref" key in them isn't a reference ("examples"
+      # too when it's a schema's Array). Outside schemas only "example" is data: "default" is a response there.
       DATA_KEYWORDS = %w[example default const enum].freeze
 
       # Keywords whose keys are names (a property may be called "default"), not keywords
@@ -22,25 +22,34 @@ module Versponse
         errors
       end
 
-      def self.walk(value, pointer, document, errors, names: false)
+      # schema: true inside a Schema Object (below a "schema" key or a components/schemas entry)
+      def self.walk(value, pointer, document, errors, names: false, schema: false)
         case value
-        when Hash then names ? walk_names(value, pointer, document, errors) : walk_object(value, pointer, document, errors)
-        when Array then value.each_with_index { |item, index| walk(item, "#{pointer}/#{index}", document, errors) }
+        when Hash then names ? walk_names(value, pointer, document, errors, schema:) : walk_object(value, pointer, document, errors, schema:)
+        when Array then value.each_with_index { |item, index| walk(item, "#{pointer}/#{index}", document, errors, schema:) }
         end
       end
 
-      def self.walk_names(map, pointer, document, errors)
-        map.each { |name, item| walk(item, "#{pointer}/#{escape(name)}", document, errors) }
+      def self.walk_names(map, pointer, document, errors, schema:)
+        map.each { |name, item| walk(item, "#{pointer}/#{escape(name)}", document, errors, schema:) }
       end
 
-      def self.walk_object(object, pointer, document, errors)
+      def self.walk_object(object, pointer, document, errors, schema:)
         check(object["$ref"], pointer, document, errors) if object["$ref"].is_a?(String)
         check_mapping(object["discriminator"], "#{pointer}/discriminator", document, errors)
         object.each do |key, item|
-          next if DATA_KEYWORDS.include?(key) || (key == "examples" && !item.is_a?(Hash))
+          next if data?(key, item, schema:)
 
-          walk(item, "#{pointer}/#{escape(key)}", document, errors, names: NAME_MAPS.include?(key))
+          components = key == "schemas" && pointer == "/components"
+          walk(item, "#{pointer}/#{escape(key)}", document, errors,
+            names: components || (schema && NAME_MAPS.include?(key)), schema: schema || components || key == "schema")
         end
+      end
+
+      def self.data?(key, item, schema:)
+        return key == "example" unless schema
+
+        DATA_KEYWORDS.include?(key) || (key == "examples" && !item.is_a?(Hash))
       end
 
       def self.check_mapping(discriminator, pointer, document, errors)
@@ -74,7 +83,7 @@ module Versponse
         key.to_s.gsub("~", "~0").gsub("/", "~1")
       end
 
-      private_class_method :walk, :walk_names, :walk_object, :check_mapping, :check, :resolves?, :escape
+      private_class_method :walk, :walk_names, :walk_object, :data?, :check_mapping, :check, :resolves?, :escape
     end
   end
 end

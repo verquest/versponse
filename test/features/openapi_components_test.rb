@@ -142,6 +142,20 @@ class OpenapiComponentsTest < Minitest::Test
     assert_equal %w[#/components/examples/Missing #/components/schemas/ApiSiteResponse #/components/schemas/Missing], refs.sort
   end
 
+  # "default" is data inside a schema, but a response everywhere else
+  def test_validate_checks_default_responses
+    document = Class.new(Versponse::OpenAPI::Document) do
+      info "title" => "API"
+      finalize do |built, _version|
+        built["paths"]["/x"] = {"get" => {"responses" => {"default" => {"$ref" => "#/components/responses/Missing"}}}}
+      end
+    end
+
+    refs = document.validate(version: "2025-09").select { |error| error[:type] == "ref" }.map { |error| error[:details]["ref"] }
+
+    assert_equal ["#/components/responses/Missing"], refs
+  end
+
   def test_schema_collisions_raise
     document = Class.new(ApiDocument) { schema "ApiMetaResponse", {"type" => "object"} }
 
