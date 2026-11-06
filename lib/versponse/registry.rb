@@ -13,10 +13,16 @@ module Versponse
       # @return [Array<String>] every version declared by any response class, oldest first
       attr_reader :version_names
 
+      # Replaces a registered class with the same name, so code reloading doesn't keep stale classes.
+      #
       # @param klass [Class] response class
       # @return [void]
       def add(klass)
-        @mutex.synchronize { @classes << klass }
+        name = klass.name
+        @mutex.synchronize do
+          @classes.reject! { |registered| registered.name == name } if name
+          @classes << klass
+        end
       end
 
       # @param name [String] declared version name
@@ -25,7 +31,7 @@ module Versponse
         @mutex.synchronize { @version_names = (@version_names | [name]).sort.freeze }
       end
 
-      # @return [Array<Class>] every registered class, including anonymous and reloaded ones
+      # @return [Array<Class>] every registered class, including anonymous ones
       def all
         @mutex.synchronize { @classes.dup }
       end

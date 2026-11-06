@@ -33,3 +33,4 @@
 ### Fixed
 
 - `Versponse::OpenAPI.rswag_specs` writes security scheme `type` and `in` as symbols, so rswag sends API key headers.
+- The class registry replaces a class when one with the same name is defined again, so code reloading in development no longer grows it.
