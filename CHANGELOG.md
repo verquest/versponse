@@ -4,7 +4,8 @@
 
 ### Added
 
-- Response DSL shared with verquest: `field`, `enum`, `const`, `array`, `object`, `collection`, `reference`, `one_of`, `with_options`.
+- Response DSL shared with verquest: `field`, `enum`, `const`, `array`, `object`, `collection`, `reference`, `one_of`, `with_options` (a nested block replaces the outer options and ignores `map:`, as in verquest; `view:` and `discriminator:` apply).
+- Class-level `description` and `schema_options` reach subclasses unless they set their own, like `supported_versions`.
 - `field type: :object` for free-form maps, and `one_of` with `source` and `match:` arrays.
 - Versions with inheritance and closest-earlier resolution.
 - Blueprinter-style views (`view`, `include_view`, `exclude_properties`) that later versions inherit.

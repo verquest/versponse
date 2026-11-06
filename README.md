@@ -79,14 +79,14 @@ end
 UnitTypeResponse.serialize(unit_type, version: "2025-09")
 # => {
 #   "object" => "unit_type", "id" => "ut_1", "name" => "Small", "stripe_product_id" => "prod_1",
-#   "status" => "active", "selling_points" => ["Dry"], "created_at" => "2025-09-01T10:00:00Z",
+#   "status" => "active", "selling_points" => ["Dry"], "created_at" => "2025-09-01T10:00:00.000Z",
 #   "site" => {"id" => "site_1", "name" => "Leeds", "address" => {"city" => "Leeds", "postcode" => nil}},
 #   "security_deposit" => nil,
 #   "prices" => [{"id" => "price_1", "amount" => {"amount" => 5000, "currency" => "GBP"}, "interval" => "month"}]
 # }
 ```
 
-`serialize` takes an object, a Hash (symbol or string keys), or anything that responds to `to_ary`, such as an Array or an ActiveRecord relation, or a Set. It returns String keys. `serialize_json` takes the same arguments and returns a String.
+`serialize` takes an object, a Hash (symbol or string keys), or anything that responds to `to_ary`, such as an Array or an ActiveRecord relation, or a Set. A `collection` property takes the same; any other value raises `Versponse::ExtractionError`. It returns String keys. `serialize_json` takes the same arguments and returns a String.
 
 ```ruby
 UnitTypeResponse.serialize(unit_types, version: "2025-09", view: :embedded, root: "unit_types", meta: {"request_id" => "r1"})
@@ -128,7 +128,7 @@ Options shared by every property:
   # => {"type" => ["integer", "string"], "enum" => [7, 30, "send_immediately"]}
   ```
 - Other options are JSON Schema keywords in snake case, such as `description:`, `format:` or `max_length:`. They're written in camel case (`maxLength`). OpenAPI extensions go in as written (`"x-internal": true`). Anything else raises `Versponse::DefinitionError`, with a suggestion for typos such as `nulable:`.
-- `with_options type: :string, nullable: true do ... end` applies options to every property in the block. Explicit options win.
+- `with_options type: :string, nullable: true do ... end` applies options to every property in the block, `view:` and `discriminator:` included. Explicit options win. As in verquest, a nested `with_options` replaces the outer options, and `map:` is ignored.
 
 `required` is computed for you: every property without `if:`/`unless:` is always emitted, so it's required.
 
@@ -214,7 +214,7 @@ OverlockResponse.serialize(overlock, version: "2026-06") # raises Versponse::Ver
 
 - `min` defaults to the first declared version. Set it when a class should appear later than its first `version` block. The range applies to the requested version, not to the blocks: with `supported_versions min: "preview"` and a single `version "2025-09"` block, `"preview"` is served by the 2025-09 block and `"2025-09"` raises. `max` defaults to no upper bound.
 - A version outside the range raises `Versponse::VersionNotFoundError`, like a version older than every declared one. `serialize`, schemas, references and `expandable_paths` raise it. `Versponse.components` and OpenAPI documents leave the class, and its wrappers, out of that version. `Versponse.eager_load!` compiles only the versions the range serves.
-- Versions are compared with `config.version_resolver`, so with the default resolver `"preview"` sorts after dated versions. Versponse first maps the request to the closest version any response class declares, then checks the range. So `"2026-04"` counts as `"2026-03"` until some class declares a later version. For the same reason, `min: "preview"` only takes effect once some response class declares a `version "preview"` block.
+- Versions are compared with `config.version_resolver`, so with the default resolver `"preview"` sorts after dated versions. Before caching, a request is mapped to the closest earlier registered name: every version any class declares, plus every `supported_versions` bound. So ranges hold exactly: `min: "preview"` works without any class declaring `"preview"`, and a request after a `max` stays outside it. Errors name the version that was requested.
 - `min` after `max` raises `Versponse::DefinitionError` when declared. A `max` before the first declared version would leave nothing to serve, so it raises `Versponse::DefinitionError` the first time the class resolves a version, and from `eager_load!`.
 - Declare it on the class before the first `version` block. Subclasses of an abstract base class inherit the range and can declare their own. `supported_versions` with no arguments removes an inherited range.
 
@@ -323,11 +323,13 @@ PriceListResponse.to_schema(version: "2025-09")
 ```
 
 - `to_schema(version:, view:)` returns the OpenAPI schema, with `$ref`s to other components.
-- `to_validation_schema(version:, view:, property: nil)` inlines every reference. A class that recurses into itself gets an `$anchor`.
+- `to_validation_schema(version:, view:, property: nil)` inlines every reference. A class that recurses into itself is named for `"#Name"` references: `$anchor` from draft 2019-09 and in OpenAPI 3.1, `$id: "#Name"` in drafts 6 and 7, `id: "#Name"` in draft 4 and OpenAPI 3.0.
 - `component_name(view:)` is the class name without its first namespace, squashed, plus the view: `PriceListResponse`, `PriceListResponseEmbedded` (`Api::V1::UserResponse` becomes `V1UserResponse`). Override `self.base_component_name` to rename, for example `def self.base_component_name = super.delete_suffix("Response")`.
-- `to_ref(view:, property: nil)` returns `"#/components/schemas/<name>"`.
+- `to_ref(view:, property: nil)` returns `"#/components/schemas/<name>"`. An anonymous class has no component name, so it raises `Versponse::DefinitionError`.
 - With `discriminator:`, `one_of` emits an OpenAPI `mapping` built from each variant's `const`, such as `{"order" => "#/components/schemas/OrderResponse"}`. A variant without that `const`, or two variants with the same value, raise `DefinitionError` when the schema is built.
-- `to_schema(root: "unit_types", meta: MetaResponse, collection: true)` returns a wrapper schema for the whole response body.
+- A `one_of` is a `oneOf`, in documents and validation schemas alike. Without `discriminator:`, its variants need shapes a client can tell apart: if one payload fits two variants, `oneOf` rejects it, so `validate_output` raises and strict consumers such as rswag's response validation fail. For polymorphic responses, prefer `discriminator:`.
+- `to_schema(root: "unit_types", meta: MetaResponse, collection: true)` returns a wrapper schema for the whole response body. The envelope is strict (`additionalProperties: false`) whatever `default_additional_properties` says.
+- `description` and `schema_options` on a class reach its subclasses unless they set their own, so an abstract `ApplicationResponse` can carry them.
 
 `Versponse.components(version:)` returns every component of every loaded class and view for an OpenAPI document. In rswag's `swagger_helper.rb`:
 
@@ -376,6 +378,8 @@ config.openapi_specs = Versponse::OpenAPI.rswag_specs(PublicApiDocument)
 # keys: "public_api/2025-09.json", "public_api/preview.json"
 ```
 
+Eager-load your app before this line (`Rails.application.eager_load!`): `responses namespace:` and `requests namespace:` only see loaded classes, and each document is built once, because rswag adds its paths to it.
+
 ## Output validation
 
 Turn it on in tests and development to check every render against its schema:
@@ -421,14 +425,13 @@ A verquest request can reference a versponse class with a verquest version that 
 Definitions can be copied between the gems (`one_of name:` and `inherit:` behave the same), except where responses differ from requests:
 
 - `required:` raises. Every key is rendered, so it's required in the schema unless `if:` or `unless:` makes it conditional.
-- `enum` writes its `type`, given or inferred from the values. verquest infers it only to convert query strings.
 - Response-only DSL: `view`, `include_view`, `view:` on `reference` and `collection`, `match:` on `one_of` variants, `identifier`, `expandable:` and `source`.
 - Request-only DSL: `location`, `parameter_examples:`, `explode:` and conditions (`condition`, `depends_on`).
 
 ## Formats and validation notes
 
 - Only properties with a `format:` are formatted. Blueprinter formats every Time, but here a Time field without `format: "date-time"` is emitted as is, and output validation fails it.
-- `date-time` formats Time, DateTime and Date (as midnight) as ISO 8601 in UTC with milliseconds, like Rails' JSON (`2025-09-01T10:00:00.000Z`); `date` formats Date and Time as an ISO 8601 date. For whole seconds, set `config.formatters = Versponse::Formatters::DEFAULTS.merge("date-time" => ->(time) { time.utc.iso8601 })`.
+- `date-time` formats Time, DateTime and Date (as midnight) as ISO 8601 in UTC with milliseconds, like Rails' JSON (`2025-09-01T10:00:00.000Z`); `date` formats Date and Time as an ISO 8601 date. For whole seconds, set `config.formatters = Versponse::Formatters::DEFAULTS.merge("date-time" => ->(time) { time.utc.iso8601 })`. `date` keeps the value's own calendar day while `date-time` converts to UTC, so 23:30 at -05:00 gives `2025-01-01` and `2025-01-02T04:30:00.000Z`.
 - Validation checks the rendered data only, not the `root:`/`meta:` envelope.
 - `field :metadata, type: :object, additional_properties: {type: "string"}` describes a free-form map; its value passes through.
 - In apps and test suites with many response classes, pass `classes:` to `Versponse.components`, or keep component names unique.
@@ -445,7 +448,7 @@ end
 | Setting | Default |
 |---|---|
 | `current_version` | none |
-| `version_resolver` | closest earlier version (a custom resolver must keep that behaviour) |
+| `version_resolver` | closest earlier version; a custom one is called with `(requested, names)`, `names` String-sorted, must return the closest name at or before `requested` (or nil), and also orders `supported_versions` bounds |
 | `json_generator` | `JSON.generate` (e.g. `->(hash) { Oj.dump(hash, mode: :compat) }`) |
 | `json_schema_version` | `:openapi31` (also `:openapi30`, `:draft2020_12`, `:draft2019_09`, `:draft7`, `:draft6`, `:draft4`, as in verquest) |
 | `validate_output` | `false` |
