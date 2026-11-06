@@ -29,12 +29,13 @@ module Versponse
 
       # @param version [String] unused by scalars
       # @param formatters [Hash{String => #call}] formatters by JSON Schema format, for the compiling class and version
-      # @return [Versponse::Steps::Value] compiled step; items are formatted by their format
+      # @return [Versponse::Steps::Value] compiled step; like a collection, the value is read with {Collections.items}
+      #   (to_ary values and Sets; anything else raises), and items are formatted by their format
       def step(version:, formatters:)
         formatter = formatters[@item_schema_options["format"]]
-        return value_step unless formatter
+        return value_step(formatter: ->(items) { Collections.items(items) }) unless formatter
 
-        value_step(formatter: ->(items) { items.map { |item| item.nil? ? nil : formatter.call(item) } })
+        value_step(formatter: ->(items) { Collections.items(items).map { |item| item.nil? ? nil : formatter.call(item) } })
       end
 
       private

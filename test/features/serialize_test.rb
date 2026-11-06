@@ -245,6 +245,15 @@ class SerializeTest < Minitest::Test
     assert_equal({"r" => {"a" => {"b" => "x"}}}, klass.serialize({a: {b: "x"}}, version: "2025-09", root: :r))
   end
 
+  # Like collection: to_ary values and Sets render as arrays, anything else raises
+  def test_scalar_arrays_take_sets_and_reject_non_collections
+    klass = Class.new(Versponse::Base) { version("2025-09") { array :tags, type: :string } }
+
+    assert_equal({"tags" => %w[a b]}, klass.serialize({tags: Set["a", "b"]}, version: "2025-09"))
+    error = assert_raises(Versponse::ExtractionError) { klass.serialize({tags: "a"}, version: "2025-09") }
+    assert_match(/tags: expected a collection, got String/, error.message)
+  end
+
   def test_meta_keys_are_strings
     meta = {page: {next: "c2", sizes: [{per: 10}]}}
     result = UnitTypeResponse.serialize(unit_type, version: "2025-09", root: :unit_type, meta:)
