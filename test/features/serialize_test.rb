@@ -160,6 +160,13 @@ class SerializeTest < Minitest::Test
     assert_equal({"request_id" => "r1"}, result["meta"])
   end
 
+  def test_meta_keys_are_strings
+    meta = {page: {next: "c2", sizes: [{per: 10}]}}
+    result = UnitTypeResponse.serialize(unit_type, version: "2025-09", root: :unit_type, meta:)
+
+    assert_equal({"page" => {"next" => "c2", "sizes" => [{"per" => 10}]}}, result["meta"])
+  end
+
   def test_collection_under_root
     assert_equal ["ut_1"], UnitTypeResponse.serialize([unit_type], version: "2025-09", root: "unit_types")["unit_types"].map { |item| item["id"] }
   end

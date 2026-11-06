@@ -21,7 +21,7 @@ module Versponse
     # @param view [Symbol] view name
     # @param context [Hash] passed to blocks and conditions
     # @param root [String, Symbol, nil] wraps the result under this key
-    # @param meta [Hash, nil] added under "meta" (requires root:)
+    # @param meta [Hash, nil] added under "meta" with String keys (requires root:)
     # @return [Hash, Array<Hash>] rendered output
     # @param expand [Array<String, Symbol>, nil] dotted paths of expandable associations to expand, or "*"
     # @raise [ArgumentError] without a version or with meta: but no root:
@@ -125,8 +125,16 @@ module Versponse
       return data if root.nil?
 
       wrapped = {root.to_s => data}
-      wrapped["meta"] = meta if meta
+      wrapped["meta"] = string_keys(meta) if meta
       wrapped
+    end
+
+    def string_keys(value)
+      case value
+      when Hash then value.to_h { |key, item| [key.to_s, string_keys(item)] }
+      when Array then value.map { |item| string_keys(item) }
+      else value
+      end
     end
   end
 end
