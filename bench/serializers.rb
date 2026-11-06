@@ -65,6 +65,24 @@ module V
     end
   end
 
+  class ExpandableSiteResponse < Versponse::Base
+    version("2025-09") do
+      identifier :id
+      field :name, type: :string
+      field :city, type: :string
+      field :postcode, type: :string, nullable: true
+    end
+  end
+
+  class ExpandableUnitTypeResponse < Versponse::Base
+    version("2025-09") do
+      instance_exec(&VERSPONSE_FLAT)
+      reference :site, from: ExpandableSiteResponse, expandable: true
+      reference :deposit, from: MoneyResponse
+      collection :prices, item: PriceResponse
+    end
+  end
+
   class FlatUnitTypeResponse < Versponse::Base
     version("2025-09") { instance_exec(&VERSPONSE_FLAT) }
   end
@@ -169,6 +187,10 @@ CASES = {
     "versponse + validation" => -> { with_validation { V::UnitTypeResponse.serialize(ONE, version: "2025-09") } },
     "alba" => -> { A::UnitTypeResource.new(ONE).serializable_hash },
     "blueprinter" => -> { B::UnitTypeBlueprint.render_as_hash(ONE) }
+  },
+  "nested with expand: [\"site\"]" => {
+    "versponse" => -> { V::ExpandableUnitTypeResponse.serialize(ONE, version: "2025-09", expand: ["site"]) },
+    "versponse + validation" => -> { with_validation { V::ExpandableUnitTypeResponse.serialize(ONE, version: "2025-09", expand: ["site"]) } }
   },
   "collection (1000 nested)" => {
     "versponse" => -> { V::UnitTypeResponse.serialize(MANY, version: "2025-09") },
