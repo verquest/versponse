@@ -136,6 +136,9 @@ module Versponse
     # @return [Versponse::Plan] compiled, cached plan
     def plan(version:, view: :default)
       fresh!
+      compiled = @plans[version]&.[](view)
+      return compiled if compiled
+
       # Keyed by version, then view, so a cached lookup allocates no key Array. resolve raises for an unknown
       # version before the outer entry is stored, so client strings can't grow the cache.
       @plans.fetch(version) { resolve(version) && Cache.new }.fetch(view.to_sym) do
