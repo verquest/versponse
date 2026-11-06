@@ -17,6 +17,9 @@ module Versponse
         "object" => ->(data) { data.is_a?(Hash) }
       }.freeze
 
+      # Types that are a class test, checked without a lambda when a schema allows only that type
+      CLASSES = {"number" => Numeric, "string" => String, "array" => Array, "object" => Hash}.freeze
+
       # Draft 4 and OpenAPI 3.0 (based on it) accept only Integers; later versions also accept 1.0
       INTEGER_ONLY = %i[draft4 openapi30].freeze
 
@@ -35,7 +38,10 @@ module Versponse
       def self.build(schema, _compiler)
         return unless schema.key?("type")
 
-        new(Array(schema["type"]).map { |type| test_for(type) })
+        types = Array(schema["type"])
+        return ClassCheck.new(CLASSES.fetch(types.first)) if types.one? && CLASSES.key?(types.first)
+
+        new(types.map { |type| test_for(type) })
       end
 
       def self.test_for(type)
@@ -55,6 +61,23 @@ module Versponse
       # @return [Boolean] true when data has one of the types
       def valid?(data)
         @tests.any? { |test| test.call(data) }
+      end
+    end
+
+    # A type check that is one class test (a schema allowing only number, string, array or object)
+    #
+    # @api private
+    class ClassCheck
+      # @param klass [Class] the class data must be
+      def initialize(klass)
+        @klass = klass
+        freeze
+      end
+
+      # @param data [Object] value to check
+      # @return [Boolean] true when data is of the class
+      def valid?(data)
+        data.is_a?(@klass)
       end
     end
   end

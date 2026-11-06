@@ -41,16 +41,14 @@ module Versponse
       # @return [Boolean] true when the Hash matches
       def valid?(data)
         return true unless data.is_a?(Hash)
+        return false unless @sizes.cover?(data.size)
 
-        @sizes.cover?(data.size) && @required.all? { |key| data.key?(key) } && data.all? { |key, value| member_valid?(key, value) }
-      end
-
-      private
-
-      def member_valid?(key, value)
-        throw Root::DEFER unless key.is_a?(String)
-
-        @properties.fetch(key, @additional).valid?(value)
+        @required.each { |key| return false unless data.key?(key) }
+        data.each do |key, value|
+          throw Root::DEFER unless key.is_a?(String)
+          return false unless (@properties[key] || @additional).valid?(value)
+        end
+        true
       end
     end
   end
