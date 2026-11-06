@@ -82,6 +82,18 @@ class OpenapiComponentsTest < Minitest::Test
     assert_equal %w[ApiMetaResponse ApiSiteCreateRequest], schemas(document).keys.sort
   end
 
+  # Hooks get a copy, so they can change components without touching the classes' cached schemas
+  def test_finalize_hooks_can_change_components
+    document = Class.new(Versponse::OpenAPI::Document) do
+      info "title" => "API"
+      responses [Api::MetaResponse]
+      finalize { |built, _version| built["components"]["schemas"]["ApiMetaResponse"]["x-tag"] = "meta" }
+    end
+
+    assert_equal "meta", schemas(document)["ApiMetaResponse"]["x-tag"]
+    refute Api::MetaResponse.to_schema(version: "2025-09").key?("x-tag")
+  end
+
   def test_schema_collisions_raise
     document = Class.new(ApiDocument) { schema "ApiMetaResponse", {"type" => "object"} }
 

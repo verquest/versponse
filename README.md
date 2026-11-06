@@ -365,6 +365,7 @@ PublicApiDocument.validate(version: "2025-09")   # => [] when valid OpenAPI 3.1
 
 - Values use OpenAPI's own key names, which are never camelized. A block that takes an argument receives the version.
 - `openapi` defaults to `"3.1.1"`, or `"3.0.3"` under `config.json_schema_version = :openapi30`, to match how schemas are written. Declaring `openapi "3.0.3"` while schemas are written for 3.1 (or the other way round) raises `Versponse::DefinitionError` on `build`.
+- `finalize` hooks run last, on a copy of the document they can change freely, components included.
 - Subclasses inherit declarations, which is handy for sharing a base between documents.
 - Two components with the same name raise `Versponse::DefinitionError`.
 

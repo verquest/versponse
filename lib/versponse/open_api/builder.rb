@@ -19,6 +19,10 @@ module Versponse
       def call
         check_version!
         document = base.merge("components" => components)
+        return document if @declarations.finalizers.empty?
+
+        # Components are the classes' frozen, cached schemas, so hooks change a copy
+        document = mutable(document)
         @declarations.finalizers.each { |hook| hook.call(document, @version) }
         document
       end
@@ -43,6 +47,15 @@ module Versponse
           "paths" => {},
           "webhooks" => resolve(@declarations.webhooks)
         }.compact
+      end
+
+      def mutable(value)
+        case value
+        when Hash then value.to_h { |key, item| [key, mutable(item)] }
+        when Array then value.map { |item| mutable(item) }
+        when String then value.dup
+        else value
+        end
       end
 
       def components
