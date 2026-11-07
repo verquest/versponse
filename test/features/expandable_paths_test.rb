@@ -173,6 +173,38 @@ class ExpandablePathsTest < Minitest::Test
     end
   end
 
+  class OwnerResponse < Versponse::Base
+    version "2025-09" do
+      field :id, type: :string
+      one_of :owner, expandable: true do
+        reference from: StageResponse, match: ->(object) { object[:kind] == "stage" }
+        reference from: CategoryResponse, match: ->(object) { object[:kind] == "category" }
+      end
+      collection :stages, item: StageResponse, expandable: true
+    end
+  end
+
+  class LeftResponse < Versponse::Base
+    version "2025-09" do
+      reference :site, from: StageResponse, expandable: true
+    end
+  end
+
+  class RightResponse < Versponse::Base
+    version "2025-09" do
+      reference :site, from: CategoryResponse, expandable: true
+    end
+  end
+
+  class EitherResponse < Versponse::Base
+    version "2025-09" do
+      one_of :r do
+        reference from: LeftResponse, match: ->(object) { object[:kind] == "left" }
+        reference from: RightResponse, match: ->(object) { object[:kind] == "right" }
+      end
+    end
+  end
+
   def test_variants_sharing_a_key
     result = HolderResponse.serialize({r: {kind: "expandable", site: {id: "s1"}}}, version: "2025-09", expand: ["r.site"])
 
@@ -192,6 +224,53 @@ class ExpandablePathsTest < Minitest::Test
     result = CategoryResponse.serialize(cyclic, version: "2025-09", expand: ["*"])
 
     assert_equal({"id" => "c1", "children" => [{"id" => "c1", "children" => [{"id" => "c1"}]}]}, result)
+  end
+
+  def test_targets_list_the_classes_each_path_renders
+    expected = {
+      "category" => [CategoryResponse],
+      "category.children" => [CategoryResponse],
+      "deal.stage" => [StageResponse],
+      "meta.stage" => [StageResponse]
+    }
+
+    assert_equal expected, UnitResponse.expandable_targets(version: "2025-09")
+  end
+
+  def test_targets_of_one_of_variants_and_collections
+    expected = {"owner" => [StageResponse, CategoryResponse], "owner.children" => [CategoryResponse], "stages" => [StageResponse]}
+
+    assert_equal expected, OwnerResponse.expandable_targets(version: "2025-09")
+  end
+
+  # A path reached through several variants lists every class it can render
+  def test_targets_of_a_path_reached_through_several_variants
+    expected = {"r.site" => [StageResponse, CategoryResponse], "r.site.children" => [CategoryResponse]}
+
+    assert_equal expected, EitherResponse.expandable_targets(version: "2025-09")
+  end
+
+  def test_target_keys_are_the_expandable_paths
+    [UnitResponse, OwnerResponse, EitherResponse, HolderResponse, CategoryResponse].each do |response|
+      assert_equal response.expandable_paths(version: "2025-09"), response.expandable_targets(version: "2025-09").keys, response.name
+    end
+  end
+
+  def test_targets_are_cached_and_frozen
+    targets = UnitResponse.expandable_targets(version: "2025-09")
+
+    assert_same targets, UnitResponse.expandable_targets(version: "2025-09")
+    assert_predicate targets, :frozen?
+    assert targets.each_value.all?(&:frozen?)
+  end
+
+  # Only a call builds the targets; expandable_paths and renders leave its cache empty
+  def test_targets_are_built_only_when_asked_for
+    Versponse.reset_caches!
+    UnitResponse.expandable_paths(version: "2025-09")
+    serialize(["*"])
+
+    assert_nil UnitResponse.versponse.instance_variable_get(:@expandable_targets)[["2025-09", :default]]
   end
 
   def test_unknown_expand_setting_is_validated

@@ -32,6 +32,7 @@ module Versponse
       @checkers = Cache.new
       @validating_plans = Cache.new
       @expandable_paths = Cache.new
+      @expandable_targets = Cache.new
       @selectable_paths = Cache.new
       @expansions = Cache.new(limit: EXPANSION_LIMIT)
       @raw_expansions = Cache.new
@@ -297,7 +298,20 @@ module Versponse
     def expandable_paths(version:, view:)
       fresh!
       @expandable_paths.fetch([version, view.to_sym]) do
-        References.nested_paths(@klass, view: view.to_sym, version:, prefix: [], stack: []).map { |path| path.join(".") }.uniq.sort.freeze
+        expandable_entries(version, view).map { |path, _classes| path.join(".") }.uniq.sort.freeze
+      end
+    end
+
+    # @param version [String] canonical version name
+    # @param view [Symbol] view name
+    # @return [Hash{String => Array<Class>}] frozen, keyed by the sorted expandable paths; each value lists the
+    #   classes the path renders, in declaration order
+    def expandable_targets(version:, view:)
+      fresh!
+      @expandable_targets.fetch([version, view.to_sym]) do
+        targets = Hash.new { |hash, path| hash[path] = [] }
+        expandable_entries(version, view).each { |path, classes| targets[path.join(".")] |= classes }
+        targets.sort.to_h { |path, classes| [path, classes.freeze] }.freeze
       end
     end
 
@@ -380,6 +394,10 @@ module Versponse
 
     private
 
+    def expandable_entries(version, view)
+      References.nested_entries(@klass, view: view.to_sym, version:, prefix: [], stack: [])
+    end
+
     # Version-specific rewrites of a generated schema, then a frozen copy
     def finished(schema)
       DeepFreeze.call(Versponse.configuration.const_keyword? ? schema : ConstAsEnum.call(schema))
@@ -404,6 +422,7 @@ module Versponse
       @checkers = Cache.new
       @validating_plans = Cache.new
       @expandable_paths = Cache.new
+      @expandable_targets = Cache.new
       @selectable_paths = Cache.new
       @expansions = Cache.new(limit: EXPANSION_LIMIT)
       @raw_expansions = Cache.new

@@ -324,6 +324,7 @@ UnitResponse.serialize(unit, version: "2025-09", expand: ["site", "deal.stage"])
 - `expand:` paths through recursive classes go as deep as you like (`children.children`); `expandable_paths` lists each recursive association once.
 - Schemas describe both shapes as `anyOf: [{$ref Site}, {$ref SiteCollapsed}]`, and each class with an identifier gets a `<Name>Collapsed` component.
 - `UnitResponse.expandable_paths(version: "2025-09")` lists every path (`["deal.stage", "prices", "site"]`), for scope checks.
+- `UnitResponse.expandable_targets(version: "2025-09")` maps each of those paths to the classes it renders (`{"deal.stage" => [StageResponse], ...}`): a `reference`'s `from:`, a `collection`'s `item:`, or every `one_of` variant. Use it to derive per-path metadata from the classes, such as the scopes an expand needs. It's built on first call and cached.
 - An unknown path raises `Versponse::InvalidExpandError` (its `paths` lists them), unless `config.unknown_expand = :ignore`.
 
 ## Field selection

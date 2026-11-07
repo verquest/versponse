@@ -126,8 +126,9 @@ module Versponse
       # @param version [String] canonical version name
       # @param prefix [Array<String>] output keys leading to this property
       # @param stack [Array<Array(Class, Symbol)>] classes and views being walked, to stop recursion
-      # @return [Array<Array<String>>] expandable paths under this property
-      def expandable_paths(version:, prefix:, stack:)
+      # @return [Array<Array(Array<String>, Array<Class>)>] expandable paths under this property, each with the
+      #   classes it renders
+      def expandable_entries(version:, prefix:, stack:)
         []
       end
 

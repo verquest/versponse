@@ -77,13 +77,13 @@ module Versponse
       # @param version [String] canonical version name
       # @param prefix [Array<String>] output keys leading here
       # @param stack [Array<Array(Class, Symbol)>] classes and views being walked
-      # @return [Array<Array<String>>] expandable paths of the items
-      def expandable_paths(version:, prefix:, stack:)
-        return @items_one_of.expandable_paths(version:, prefix:, stack:) if @items_one_of
+      # @return [Array<Array(Array<String>, Array<Class>)>] entries of the items
+      def expandable_entries(version:, prefix:, stack:)
+        return @items_one_of.expandable_entries(version:, prefix:, stack:) if @items_one_of
         return super unless @item
 
         path = prefix + [key]
-        (expandable? ? [path] : []) + References.nested_paths(@item, view: @view, version:, prefix: path, stack:)
+        (expandable? ? [[path, [@item]]] : []) + References.nested_entries(@item, view: @view, version:, prefix: path, stack:)
       end
 
       # @return [Boolean] true when the items (or the item one_of) are expandable

@@ -139,6 +139,16 @@ module Versponse
       versponse.requesting(version) { |canonical| versponse.expandable_paths(version: canonical, view:) }
     end
 
+    # The response classes each expandable path renders, for metadata such as scopes declared on the classes
+    #
+    # @param version [String, nil] requested version, config.current_version when nil
+    # @param view [Symbol] view name
+    # @return [Hash{String => Array<Class>}] frozen, keyed like expandable_paths: a reference's from:, a
+    #   collection's item: or every one_of variant's class, such as {"site" => [SiteResponse]}
+    def expandable_targets(version: nil, view: :default)
+      versponse.requesting(version) { |canonical| versponse.expandable_targets(version: canonical, view:) }
+    end
+
     # Every dotted path serialize fields: accepts, for docs and scope checks
     #
     # @param version [String, nil] requested version, config.current_version when nil

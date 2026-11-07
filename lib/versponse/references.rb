@@ -148,13 +148,14 @@ module Versponse
     # @param version [String] canonical version name
     # @param prefix [Array<String>] output keys leading here
     # @param stack [Array<Array(Class, Symbol)>] classes and views being walked, to stop recursion
-    # @return [Array<Array<String>>] expandable paths under the class's view
-    def self.nested_paths(klass, view:, version:, prefix:, stack:)
+    # @return [Array<Array(Array<String>, Array<Class>)>] expandable paths under the class's view, each with the
+    #   classes it renders
+    def self.nested_entries(klass, view:, version:, prefix:, stack:)
       return [] unless versponse?(klass)
       return [] if stack.include?([klass, view])
 
       klass.versponse.resolve(version).properties_for(view).flat_map do |property|
-        property.expandable_paths(version:, prefix:, stack: [*stack, [klass, view]])
+        property.expandable_entries(version:, prefix:, stack: [*stack, [klass, view]])
       end
     end
   end

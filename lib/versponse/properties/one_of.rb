@@ -101,11 +101,12 @@ module Versponse
       # @param version [String] canonical version name
       # @param prefix [Array<String>] output keys leading here
       # @param stack [Array<Array(Class, Symbol)>] classes and views being walked
-      # @return [Array<Array<String>>] this path when expandable, plus every variant's paths
-      def expandable_paths(version:, prefix:, stack:)
+      # @return [Array<Array(Array<String>, Array<Class>)>] this path with every variant's class when expandable,
+      #   plus every variant's entries
+      def expandable_entries(version:, prefix:, stack:)
         path = prefix + [key]
-        own = expandable? ? [path] : []
-        own + @variants.flat_map { |variant| References.nested_paths(variant.from, view: variant.view, version:, prefix: path, stack:) }
+        own = expandable? ? [[path, @variants.map(&:from).uniq]] : []
+        own + @variants.flat_map { |variant| References.nested_entries(variant.from, view: variant.view, version:, prefix: path, stack:) }
       end
 
       # @return [Boolean] true when expandable
