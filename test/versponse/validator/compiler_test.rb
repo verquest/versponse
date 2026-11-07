@@ -62,12 +62,31 @@ class Versponse::Validator::CompilerTest < Minitest::Test
     assert_checks({"type" => "string", "nullable" => true}, valid: ["x"], invalid: [nil])
   end
 
-  # json_schemer reads Symbol keys as Strings, so a missing required key can't be a certain false inside oneOf
-  def test_symbol_keys_defer_before_a_false_answer
+  # json_schemer reads Symbol keys as Strings, and so do the checks: {a: "x"} has "a", so both branches match
+  def test_symbol_keys_count_as_strings_inside_one_of
     schema = {"oneOf" => [{"type" => "object", "required" => ["a"]}, true]}
 
     refute compile(schema).valid?({a: "x"})
     assert compile(schema).valid?({"b" => "x"})
+  end
+
+  def test_symbol_keys_are_read_as_strings
+    open = {"type" => "object", "properties" => {"a" => {"type" => "string"}}, "required" => ["a"]}
+    closed = open.merge("additionalProperties" => false)
+
+    [open, closed].each do |schema|
+      assert_checks(schema, valid: [{a: "x"}], invalid: [{a: 1}, {b: "x"}])
+    end
+    assert_checks({"type" => "object", "properties" => {"a" => {"type" => "object", "properties" => {"b" => {"type" => "string"}}, "additionalProperties" => false}}},
+      valid: [{a: {b: "x"}}], invalid: [{a: {b: 1}}, {a: {c: "x"}}])
+  end
+
+  # A Symbol and a String naming the same key, or a key that's neither, is left to json_schemer
+  def test_other_keys_and_colliding_keys_defer
+    closed = {"properties" => {"a" => {}}, "additionalProperties" => false}
+
+    assert_throws(Versponse::Validator::Root::DEFER) { compiled(closed).valid?({"a" => 1, :a => 2}) }
+    assert_throws(Versponse::Validator::Root::DEFER) { compiled({"properties" => {"a" => {}}}).valid?({1 => "x"}) }
   end
 
   def test_closed_objects
@@ -77,7 +96,7 @@ class Versponse::Validator::CompilerTest < Minitest::Test
     assert_kind_of Versponse::Validator::ObjectCheck, compiled(closed.merge("required" => ["x"]))
     assert_kind_of Versponse::Validator::ObjectCheck, compiled(closed.except("additionalProperties"))
     assert_checks(closed.merge("maxProperties" => 1), valid: [{"a" => "x"}, 1], invalid: [{"a" => "x", "b" => 1}, {"b" => 1}, {"a" => "x", "c" => 1}])
-    assert_throws(Versponse::Validator::Root::DEFER) { compiled(closed).valid?({"a" => "x", :b => 1}) }
+    assert compiled(closed).valid?({"a" => "x", :b => 1})
   end
 
   def test_types_fold_into_the_check_of_their_shape
@@ -105,7 +124,7 @@ class Versponse::Validator::CompilerTest < Minitest::Test
   def test_objects
     schema = {"type" => "object", "required" => ["a"], "properties" => {"a" => {"type" => "string"}}, "additionalProperties" => false}
 
-    assert_checks(schema, valid: [{"a" => "x"}], invalid: [{}, {"a" => 1}, {"a" => "x", "b" => 1}, {a: "x"}])
+    assert_checks(schema, valid: [{"a" => "x"}, {a: "x"}], invalid: [{}, {"a" => 1}, {"a" => "x", "b" => 1}, {a: 1}])
     assert_checks({"required" => ["a"]}, valid: ["not an object"])
   end
 

@@ -56,4 +56,19 @@ class Versponse::InlineValidationTest < Minitest::Test
 
     assert_same klass.versponse.validating_plan(version: "2025-09", view: :default), klass.versponse.validating_plan(version: "2025-09", view: "default")
   end
+
+  # Image URLs built as Symbol-keyed Hashes (stora's images) pass inline, without the full validator
+  def test_symbol_keyed_hashes_pass_inline
+    klass = Class.new(Versponse::Base) do
+      version "2025-09" do
+        field :images, type: :object, additional_properties: false,
+          properties: {"photo" => {"type" => ["object", "null"], "additionalProperties" => false, "properties" => {"original" => {"type" => "string"}}}}
+      end
+    end
+    plan = klass.versponse.validating_plan(version: "2025-09")
+
+    refute_nil plan
+    refute Versponse::InlineValidation.run { plan.call({images: {photo: {original: "https://x"}}}, {}) }
+    assert Versponse::InlineValidation.run { plan.call({images: {photo: {original: 1}}}, {}) }
+  end
 end

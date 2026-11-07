@@ -57,13 +57,20 @@ module Versponse
 
       private
 
-      # json_schemer reads Symbol keys as Strings, so a false is certain only for a Hash with String keys;
-      # any other Hash throws {Root::DEFER}
+      # json_schemer reads Symbol keys as Strings, so a false is certain only for a Hash with String keys; one with
+      # Symbol keys is checked again with their Strings, and any other Hash throws {Root::DEFER}
       #
       # @param data [Hash] value being checked
-      # @return [false]
+      # @return [Boolean] false, or the answer for the Hash with String keys
       def reject(data)
-        data.each_key { |key| throw Root::DEFER unless key.is_a?(String) }
+        data.each_key do |key|
+          next if key.is_a?(String)
+
+          strings = StringKeys.call(data)
+          throw Root::DEFER unless strings
+
+          return valid?(strings)
+        end
         false
       end
     end

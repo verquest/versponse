@@ -47,7 +47,8 @@ module Versponse
         self.class.new(properties: @properties, required: @required, additional: @additional, sizes: @sizes, strict: true)
       end
 
-      # A Hash with a non-String key throws {Root::DEFER}, which hands it to json_schemer
+      # A Hash with Symbol keys is checked with their Strings; any other non-String key throws {Root::DEFER}, which
+      # hands it to json_schemer
       #
       # @param data [Object] value to check; anything but a Hash passes unless strict
       # @return [Boolean] true when the Hash matches
@@ -57,7 +58,7 @@ module Versponse
 
         @required.each { |key| return reject(data) unless data.key?(key) }
         data.each do |key, value|
-          throw Root::DEFER unless key.is_a?(String)
+          return with_string_keys(data) unless key.is_a?(String)
           return false unless (@properties[key] || @additional).valid?(value)
         end
         true
@@ -65,14 +66,25 @@ module Versponse
 
       private
 
-      # json_schemer reads Symbol keys as Strings, so a false is certain only for a Hash with String keys;
-      # any other Hash throws {Root::DEFER} (inside oneOf or not, a false would be read as a real answer)
+      # json_schemer reads Symbol keys as Strings, so a false is certain only for a Hash with String keys; one with
+      # Symbol keys is checked again with their Strings
       #
       # @param data [Hash] value being checked
-      # @return [false]
+      # @return [Boolean] false, or the answer for the Hash with String keys
       def reject(data)
-        data.each_key { |key| throw Root::DEFER unless key.is_a?(String) }
+        data.each_key { |key| return with_string_keys(data) unless key.is_a?(String) }
         false
+      end
+
+      # @param data [Hash] value with a non-String key
+      # @return [Boolean] the answer for the Hash with String keys
+      # @throw [Symbol] {Root::DEFER} when the keys can't all be read as Strings (inside oneOf or not, a false would
+      #   be read as a real answer)
+      def with_string_keys(data)
+        strings = StringKeys.call(data)
+        throw Root::DEFER unless strings
+
+        valid?(strings)
       end
     end
   end

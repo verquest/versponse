@@ -11,6 +11,10 @@
 
 - `default:` on `reference`, `collection`, `object`, `one_of` and `const` raises `DefinitionError`. On `field`, `enum` and `array` a static value must match the property's schema, and `default: nil` means no default (it no longer writes `"default": null`).
 
+### Fixed
+
+- Validation reads Symbol keys of rendered Hashes as their Strings, like json_schemer, instead of deferring the whole output to json_schemer. Inline validation no longer reports a failure for such values (for example image URL Hashes built with Symbol keys), which made every such render validate twice.
+
 ## [0.1.0] - 2026-11-06
 
 ### Added
