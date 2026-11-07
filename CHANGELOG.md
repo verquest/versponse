@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Added
+
+- `context:` on `reference`, `collection`, `object`, `one_of` and `one_of` variants renders the subtree with its own context: a Hash merged over the parent context, or a callable returning it.
+
 ## [0.1.0] - 2026-11-06
 
 ### Added

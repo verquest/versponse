@@ -9,13 +9,17 @@ module Versponse
       # @return [Array<String>] keywords this property type writes itself
       def self.written_keywords = %w[items properties required].freeze
 
+      # @return [Boolean] true: the subtree can render with its own context
+      def self.context_option? = true
+
       include Container
 
       # @param item [Class, nil] class implementing the reference protocol
       # @param view [Symbol] view of item
       # @param expandable [Boolean] render items collapsed unless expanded (item: must be a Versponse class)
       # @param options [Hash] see {Base#initialize}
-      # @raise [Versponse::DefinitionError] when item does not implement the protocol, or expandable: without a Versponse item:
+      # @raise [Versponse::DefinitionError] when item does not implement the protocol, expandable: without a Versponse item:,
+      #   or context: with a non-Versponse item:
       def initialize(item: nil, view: :default, expandable: false, **options)
         super(**options)
         raise DefinitionError, "#{key}: item: must respond to to_ref and to_validation_schema" if item && !(item.respond_to?(:to_ref) && item.respond_to?(:to_validation_schema))
@@ -24,6 +28,7 @@ module Versponse
         @item = item
         @view = view.to_sym
         @expandable = expandable
+        raise DefinitionError, "#{key}: context: needs a Versponse class to render with it" if context_override && @item && !References.versponse?(@item)
       end
 
       # @return [Boolean] true when items render collapsed unless expanded
@@ -65,7 +70,7 @@ module Versponse
         return value_step if plan.nil?
 
         collapse_if = (References.collapse_if(@item, version) if expandable?)
-        Steps::Nested.new(key:, extractor:, condition:, plan:, collapsed_plan: items_collapsed_plan(version), collapse_if:, collection: true)
+        Steps::Nested.new(key:, extractor:, condition:, plan:, collapsed_plan: items_collapsed_plan(version), collapse_if:, collection: true, context_override:)
       end
 
       # @param version [String] canonical version name

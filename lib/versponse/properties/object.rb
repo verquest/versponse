@@ -9,6 +9,9 @@ module Versponse
       # @return [Array<String>] keywords this property type writes itself
       def self.written_keywords = %w[properties required].freeze
 
+      # @return [Boolean] true: the subtree can render with its own context
+      def self.context_option? = true
+
       include Container
 
       # @param context [Versponse::SchemaContext] schema generation context
@@ -21,7 +24,7 @@ module Versponse
       # @param formatters [Hash{String => #call}] formatters by JSON Schema format, for the compiling class and version
       # @return [Versponse::Steps::Nested] compiled step with an inline child plan
       def step(version:, formatters:)
-        Steps::Nested.new(key:, extractor:, condition:, plan: inline_plan(version, formatters), collection: false)
+        Steps::Nested.new(key:, extractor:, condition:, plan: inline_plan(version, formatters), collection: false, context_override:)
       end
     end
   end

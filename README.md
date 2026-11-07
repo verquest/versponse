@@ -116,6 +116,16 @@ Options shared by every property:
   end
   ```
 - `if:` and `unless:` take `->(object)` or `->(object, context)` and emit the key only when the condition holds.
+- `context:` on `reference`, `collection`, `object` and `one_of` gives the property's subtree its own context. A Hash is merged over the parent context, and a callable `->(object, context)` returns the child context (a Hash):
+
+  ```ruby
+  reference :site, from: SiteResponse, context: {embedded: true}
+
+  collection :line_items, item: LineItemResponse,
+    context: ->(invoice, context) { context.merge(currency: invoice.currency) }
+  ```
+
+  It applies to everything below the property (full and collapsed shapes, `collapse_if`, blocks and conditions), while the parent and its other properties keep theirs. The callable runs once per value: once for a whole collection, and not at all for `nil` or a property its condition leaves out. A `one_of` variant takes `context:` too, applied after the `one_of`'s, and its callable gets the matched value. `reference property:` carries the reused property's `context:` over unless it declares its own, and `with_options context:` applies it to the associations in the block. A `reference` or `collection item:` of a non-Versponse class, and the unnamed `one_of` of a collection, reject `context:`.
 - `nullable: true` allows `null`.
 - `type:` on `field` and `array` takes a union of two or more built-in types. `field :notice_period, type: [:integer, :string], nullable: true` writes `"type": ["integer", "string", "null"]`, and under `json_schema_version = :openapi30` an `anyOf` of single types, each with `nullable: true` (3.0's `nullable` only applies next to a `type`). `format:` and its formatter still apply.
 - A union can be narrowed with `any_of:`, as in `field :notice_period, type: [:integer, :string], nullable: true, any_of: [{"type" => "integer"}, {"enum" => ["send_immediately"]}, {"type" => "null"}]`. Under OpenAPI 3.0 the two `anyOf`s are combined with `allOf`. `nullable:` adds `"null"` to `type` but never adds a null branch to your `any_of:`, so list `{"type" => "null"}` yourself when the field is nullable. Otherwise `nil` matches no alternative.
@@ -165,7 +175,7 @@ An item that matches no variant raises `Versponse::ExtractionError` with its ind
 reference :billing_address, from: ContactResponse, property: :address, map: "billing"
 ```
 
-This renders as if `ContactResponse`'s `address` were declared here. A `map:` or block on the reference overrides the source. The referenced property's `if:`/`unless:` don't carry over, and `nullable:` comes from the referenced property.
+This renders as if `ContactResponse`'s `address` were declared here. A `map:` or block on the reference overrides the source. The referenced property's `if:`/`unless:` don't carry over, and `nullable:` comes from the referenced property. `context:` carries over too, unless the reusing reference declares its own.
 
 ## Versions
 

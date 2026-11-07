@@ -6,6 +6,9 @@ module Versponse
     #
     # @api private
     class ItemOneOf < OneOf
+      # @return [Boolean] false: the collection's context: covers the items
+      def self.context_option? = false
+
       # @param _block [Proc] unused
       # @raise [Versponse::DefinitionError] always, the collection owns the value source
       def source=(_block)

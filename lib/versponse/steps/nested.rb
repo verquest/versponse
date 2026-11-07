@@ -18,7 +18,8 @@ module Versponse
       # @param collapse_if [#call, nil] the referenced identifier's condition; when it is false for the value
       #   (for a collection: for any item) the full plan is used instead of collapsed_plan
       # @param nil_fails [Boolean] in a validating plan, a nil value fails its schema (see InlineValidation)
-      def initialize(key:, extractor:, condition:, plan:, collection:, collapsed_plan: nil, collapse_if: nil, nil_fails: false)
+      # @param context_override [#call, nil] computes the subtree's context from (object, context)
+      def initialize(key:, extractor:, condition:, plan:, collection:, collapsed_plan: nil, collapse_if: nil, nil_fails: false, context_override: nil)
         @key = key
         @extractor = extractor
         @condition = condition
@@ -27,6 +28,7 @@ module Versponse
         @collapsed_plan = collapsed_plan
         @collapse_if = collapse_if
         @nil_fails = nil_fails
+        @context_override = context_override
         freeze
       end
 
@@ -51,7 +53,7 @@ module Versponse
       # @return [Nested] the same step rendering with these plans
       def with_plans(plan:, collapsed_plan:, nil_fails: false)
         self.class.new(key: @key, extractor: @extractor, condition: @condition, plan:, collection: @collection,
-          collapsed_plan:, collapse_if: @collapse_if, nil_fails:)
+          collapsed_plan:, collapse_if: @collapse_if, nil_fails:, context_override: @context_override)
       end
 
       # @param object [Object] source
@@ -69,6 +71,7 @@ module Versponse
           InlineValidation.failed! if @nil_fails
           nil
         else
+          context = @context_override.call(object, context) if @context_override
           collapse = @collapsed_plan && !expansion.expand?(@key) && (@collapse_if.nil? || collapse?(value, context))
           plan = collapse ? @collapsed_plan : @plan
           node = expansion.child(@key)

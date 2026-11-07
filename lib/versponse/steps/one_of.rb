@@ -14,12 +14,14 @@ module Versponse
       # @param condition [Versponse::Condition, nil] if:/unless:
       # @param dispatcher [Versponse::VariantDispatcher] variant matching
       # @param collapsed_dispatcher [Versponse::VariantDispatcher, nil] matching to collapsed variants (expandable one_of)
-      def initialize(key:, extractor:, condition:, dispatcher:, collapsed_dispatcher: nil)
+      # @param context_override [#call, nil] computes the variants' context from (object, context)
+      def initialize(key:, extractor:, condition:, dispatcher:, collapsed_dispatcher: nil, context_override: nil)
         @key = key
         @extractor = extractor
         @condition = condition
         @dispatcher = dispatcher
         @collapsed_dispatcher = collapsed_dispatcher
+        @context_override = context_override
         freeze
       end
 
@@ -41,6 +43,7 @@ module Versponse
         value = @extractor.call(object, hash, context)
         return output[@key] = nil if value.nil?
 
+        context = @context_override.call(object, context) if @context_override
         dispatcher = (@collapsed_dispatcher && !expansion.expand?(@key)) ? @collapsed_dispatcher : @dispatcher
         output[@key] = dispatcher.call(value, context, expansion.child(@key))
       end

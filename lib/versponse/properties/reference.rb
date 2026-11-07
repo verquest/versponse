@@ -7,13 +7,16 @@ module Versponse
     #
     # @api private
     class Reference < Base
+      # @return [Boolean] true: the subtree can render with its own context
+      def self.context_option? = true
+
       # @param from [Class] class implementing the reference protocol
       # @param view [Symbol] view of from
       # @param property [Symbol, nil] reuse one property of from instead of the whole class
       # @param expandable [Boolean] render collapsed unless expanded
       # @param options [Hash] see {Base#initialize}
       # @raise [Versponse::DefinitionError] for an invalid from:, nullable: with a versponse property:,
-      #   or expandable: on a foreign class or with property:
+      #   expandable: on a foreign class or with property:, or context: with a non-Versponse class
       def initialize(from:, view: :default, property: nil, expandable: false, **options)
         super(**options)
         raise DefinitionError, "#{key}: from: must respond to to_ref and to_validation_schema" unless from.respond_to?(:to_ref) && from.respond_to?(:to_validation_schema)
@@ -24,6 +27,7 @@ module Versponse
         @expandable = expandable
         raise DefinitionError, "#{key}: nullable comes from the referenced property" if versponse_property? && nullable?
         raise DefinitionError, "#{key}: expandable: needs a Versponse class without property:" if expandable && (!References.versponse?(from) || @property)
+        raise DefinitionError, "#{key}: context: needs a Versponse class to render with it" if context_override && !References.versponse?(@from)
       end
 
       # @return [Boolean] true when the reference renders collapsed unless expanded
@@ -55,7 +59,7 @@ module Versponse
 
         collapsed_plan = (References.collapsed_plan(@from, version) if expandable?)
         collapse_if = (References.collapse_if(@from, version) if expandable?)
-        Steps::Nested.new(key:, extractor:, condition:, plan: References.lazy_plan(@from, version:, view: @view, key:), collapsed_plan:, collapse_if:, collection: false)
+        Steps::Nested.new(key:, extractor:, condition:, plan: References.lazy_plan(@from, version:, view: @view, key:), collapsed_plan:, collapse_if:, collection: false, context_override:)
       end
 
       # @param version [String] canonical version name
@@ -100,7 +104,7 @@ module Versponse
       def referenced_property(version)
         original = @from.versponse.resolve(version).properties_for(@view).find { |property| property.key == @property } ||
           raise(DefinitionError, "#{key}: property #{@property} not found in #{@from.name} #{version}/#{@view}")
-        original.renamed(name:, map:, block:, condition:)
+        original.renamed(name:, map:, block:, condition:, context_override:)
       end
 
       # OpenAPI 3.0 ignores keywords next to a $ref, so a bare $ref with keywords is wrapped in allOf

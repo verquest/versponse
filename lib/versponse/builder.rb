@@ -137,7 +137,7 @@ module Versponse
       raise DefinitionError, "identifier #{name} takes no if: or unless:" if options.key?(:if) || options.key?(:unless)
       raise DefinitionError, "identifier #{name}: collapse_if: must respond to call" unless collapse_if.nil? || collapse_if.respond_to?(:call)
 
-      defaults = default_options.except(:type, :if, :unless, :collapse_if, :view, :discriminator)
+      defaults = default_options.except(:type, :if, :unless, :collapse_if, :view, :discriminator, :context)
       type ||= default_options[:type] || :string
       identifier = Properties::Field.new(**defaults, name:, type:, block:, **options)
       property = collapse_if ? Properties::Field.new(**defaults, name:, type:, block:, if: collapse_if, **options) : identifier
@@ -216,11 +216,13 @@ module Versponse
     # @return [void]
     def reference(name = nil, from:, view: nil, property: nil, match: nil, **options, &block)
       view ||= default_options[:view] || :default
-      return one_of_variant(name, from:, view:, match:, extra: options.any? || block || property) if @current_scope.is_a?(Properties::OneOf)
+      if @current_scope.is_a?(Properties::OneOf)
+        return one_of_variant(name, from:, view:, match:, context: options[:context], extra: options.except(:context).any? || block || property)
+      end
       raise DefinitionError, "reference needs a name outside one_of" if name.nil?
       raise DefinitionError, "#{name}: match: is only used for one_of variants" if match
 
-      ignore_defaults = (property && References.versponse?(from)) ? %i[nullable] : []
+      ignore_defaults = (property && References.versponse?(from)) ? %i[nullable context] : []
       add_property(Properties::Reference, name:, from:, view:, property:, block:, ignore_defaults:, **options)
     end
 
@@ -334,16 +336,18 @@ module Versponse
       Versponse.reset_caches!
     end
 
-    def one_of_variant(name, from:, view:, match:, extra:)
-      raise DefinitionError, "one_of variants take no name, options or block (use source inside one_of)" if name || extra
+    def one_of_variant(name, from:, view:, match:, context:, extra:)
+      raise DefinitionError, "one_of variants take no name, block or options besides view:, match: and context: (use source inside one_of)" if name || extra
 
-      @current_scope.add_variant(from:, match:, view:)
+      @current_scope.add_variant(from:, match:, view:, context:)
     end
 
     def item_one_of(discriminator:, **options, &block)
       collection = @current_scope
       raise DefinitionError, "one_of without a name is only allowed inside a collection block" unless collection.is_a?(Properties::Collection)
-      raise DefinitionError, "#{collection.key}: the item one_of takes no map:, if: or unless:" if options.key?(:map) || options.key?(:if) || options.key?(:unless)
+      if options.key?(:map) || options.key?(:if) || options.key?(:unless) || options.key?(:context)
+        raise DefinitionError, "#{collection.key}: the item one_of takes no map:, if:, unless: or context: (give context: to the collection)"
+      end
 
       property = Properties::ItemOneOf.new(name: collection.key, discriminator:, **default_options.slice(:nullable), **options)
       collection.items_one_of = property
@@ -353,7 +357,11 @@ module Versponse
 
     def add_property(klass, ignore_defaults: [], **options)
       scope = @current_scope || raise(DefinitionError, "Properties must be declared inside a version block")
-      property = klass.new(**default_options.except(:type, :collapse_if, :view, :discriminator, *ignore_defaults), **options)
+      defaults = default_options.except(:type, :collapse_if, :view, :discriminator, *ignore_defaults)
+      target = options[:from] || options[:item]
+      takes_context = klass.context_option? && (target.nil? || References.versponse?(target))
+      defaults = defaults.except(:context) unless takes_context
+      property = klass.new(**defaults, **options)
       if scope.is_a?(View) && @view_version&.identifiers&.key?(property.key)
         raise DefinitionError, "#{@view_version.label}: #{property.key} is declared by identifier"
       end

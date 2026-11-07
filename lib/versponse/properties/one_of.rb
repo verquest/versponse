@@ -9,8 +9,11 @@ module Versponse
       # @return [Array<String>] keywords this property type writes itself
       def self.written_keywords = %w[oneOf anyOf discriminator].freeze
 
-      # One variant: response class, matcher and view
-      Variant = Data.define(:from, :match, :view)
+      # @return [Boolean] true: the subtree can render with its own context
+      def self.context_option? = true
+
+      # One variant: response class, matcher, view and context override
+      Variant = Data.define(:from, :match, :view, :context_override)
 
       # @param discriminator [String, Symbol, nil] OpenAPI discriminator property
       # @param expandable [Boolean] render variants collapsed unless expanded
@@ -31,13 +34,14 @@ module Versponse
       # @param from [Class] Versponse response class
       # @param match [Class, Proc, Array<Class, Proc>] compared with === against the value
       # @param view [Symbol] view of from
+      # @param context [Hash, #call, nil] the variant's context: (a callable gets the matched value)
       # @return [void]
       # @raise [Versponse::DefinitionError] without match: or with a non-Versponse class
-      def add_variant(from:, match:, view: :default)
+      def add_variant(from:, match:, view: :default, context: nil)
         raise DefinitionError, "#{key}: a one_of variant needs match:" if match.nil?
         raise DefinitionError, "#{key}: one_of variants must be Versponse response classes" unless References.versponse?(from)
 
-        @variants << Variant.new(from:, match:, view: view.to_sym)
+        @variants << Variant.new(from:, match:, view: view.to_sym, context_override: ContextOverride.build(context, key:))
       end
 
       # @return [Boolean] true when at least one variant is declared
@@ -73,7 +77,7 @@ module Versponse
       # @param version [String] canonical version name
       # @return [Versponse::VariantDispatcher] matching to the variants' full plans
       def dispatcher(version)
-        variants = @variants.map { |variant| [Array(variant.match).freeze, References.lazy_plan(variant.from, version:, view: variant.view, key:)] }
+        variants = @variants.map { |variant| [Array(variant.match).freeze, with_context(variant, References.lazy_plan(variant.from, version:, view: variant.view, key:))] }
         VariantDispatcher.new(variants, nullable: nullable?)
       end
 
@@ -81,7 +85,7 @@ module Versponse
       # @return [Versponse::VariantDispatcher] matching to the variants' collapsed plans (full plans when a variant's collapse_if is false)
       # @raise [Versponse::DefinitionError] when a variant class has no identifier
       def collapsed_dispatcher(version)
-        variants = @variants.map { |variant| [Array(variant.match).freeze, collapsed_variant_plan(variant, version)] }
+        variants = @variants.map { |variant| [Array(variant.match).freeze, with_context(variant, collapsed_variant_plan(variant, version))] }
         VariantDispatcher.new(variants, nullable: nullable?)
       end
 
@@ -90,7 +94,7 @@ module Versponse
       # @return [Versponse::Steps::OneOf] compiled step
       def step(version:, formatters:)
         collapsed_dispatcher = (collapsed_dispatcher(version) if expandable?)
-        Steps::OneOf.new(key:, extractor:, condition:, dispatcher: dispatcher(version), collapsed_dispatcher:)
+        Steps::OneOf.new(key:, extractor:, condition:, dispatcher: dispatcher(version), collapsed_dispatcher:, context_override:)
       end
 
       # @param version [String] canonical version name
@@ -120,6 +124,10 @@ module Versponse
       end
 
       private
+
+      def with_context(variant, plan)
+        variant.context_override ? ContextPlan.new(plan, variant.context_override) : plan
+      end
 
       def variant_schemas(variant, context)
         full = References.schema(variant.from, view: variant.view, property: nil, context:, key:)

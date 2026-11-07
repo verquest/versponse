@@ -25,8 +25,11 @@ module Versponse
       # @return [Array<String>] keywords this property type writes itself, so they can't be options
       def self.written_keywords = [].freeze
 
+      # @return [Boolean] true for properties whose subtree can render with its own context (context: option)
+      def self.context_option? = false
+
       # Options the DSL reads itself, suggested for typos
-      DSL_OPTIONS = %w[map nullable if unless].freeze
+      DSL_OPTIONS = %w[map nullable if unless context].freeze
 
       # @return [Symbol] property name, used to read the value
       attr_reader :name
@@ -40,6 +43,8 @@ module Versponse
       attr_reader :condition
       # @return [Hash{String => Object}] camelized JSON Schema keywords
       attr_reader :schema_options
+      # @return [Versponse::ContextOverride::Merge, Versponse::ContextOverride::Call, nil] context of the subtree
+      attr_reader :context_override
 
       # @param name [Symbol, String] property name and output key
       # @param block [Proc, nil] value block
@@ -52,6 +57,10 @@ module Versponse
         @map = options.delete(:map)&.to_s
         @nullable = options.delete(:nullable) || false
         @condition = Condition.build(options.delete(:if), options.delete(:unless))
+        context = options.delete(:context)
+        raise DefinitionError, "#{key}: context: only works on reference, collection, object and one_of" unless context.nil? || self.class.context_option?
+
+        @context_override = ContextOverride.build(context, key: @key)
         check_options!(options)
         @schema_options = Naming.camelize_keys(options)
         check_keywords!(options)
@@ -85,9 +94,11 @@ module Versponse
       # @param map [String, nil] replacement map:
       # @param block [Proc, nil] replacement value block
       # @param condition [Versponse::Condition, nil] condition of the copy (the original's is dropped)
+      # @param context_override [Versponse::ContextOverride::Merge, Versponse::ContextOverride::Call, nil] replaces the
+      #   copy's context: when given (only for properties that take context:)
       # @return [Versponse::Properties::Base] the copy
-      def renamed(name:, map:, block:, condition:)
-        dup.tap { |copy| copy.rename(name:, map:, block:, condition:) }
+      def renamed(name:, map:, block:, condition:, context_override: nil)
+        dup.tap { |copy| copy.rename(name:, map:, block:, condition:, context_override:) }
       end
 
       # @param context [Versponse::SchemaContext] schema generation context
@@ -140,12 +151,19 @@ module Versponse
       # @param map [String, nil] replacement map:
       # @param block [Proc, nil] replacement value block
       # @param condition [Versponse::Condition, nil] condition of the copy
+      # @param context_override [Versponse::ContextOverride::Merge, Versponse::ContextOverride::Call, nil] replaces the
+      #   copy's context: when given
       # @return [void]
-      def rename(name:, map:, block:, condition:)
+      # @raise [Versponse::DefinitionError] for a context_override on a property that doesn't take context:
+      def rename(name:, map:, block:, condition:, context_override: nil)
         replace_source(map, block)
         @name = name.to_sym
         @key = name.to_s.freeze
         @condition = condition
+        return if context_override.nil?
+        raise DefinitionError, "#{key}: context: only applies when the reused property is a reference, collection, object or one_of" unless self.class.context_option?
+
+        @context_override = context_override
       end
 
       private
