@@ -7,6 +7,8 @@ module Versponse
   class Plan
     # @return [String] label used in extraction errors, like "UserResponse[2025-09/default]"
     attr_reader :label
+    # @return [Array<#call>] compiled steps
+    attr_reader :steps
 
     # @param label [String] plan label
     # @param steps [Array<#call>] compiled steps

@@ -21,6 +21,11 @@ module Versponse
         freeze
       end
 
+      # @return [Boolean] false: a read has no if:/unless:
+      def conditional?
+        false
+      end
+
       # @param object [Object] source
       # @param hash [Boolean] whether the source is a Hash
       # @param _context [Hash] unused

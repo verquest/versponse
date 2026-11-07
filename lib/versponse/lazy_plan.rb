@@ -19,7 +19,12 @@ module Versponse
     # @param expansion [Versponse::Expansion] expand tree node
     # @return [Hash] rendered object
     def call(object, context, expansion = Expansion::NONE)
-      (@plan ||= @klass.versponse.plan(version: @version, view: @view)).call(object, context, expansion)
+      (@plan ||= resolve).call(object, context, expansion)
+    end
+
+    # @return [Versponse::Plan] the compiled plan this handle renders with
+    def resolve
+      @klass.versponse.plan(version: @version, view: @view)
     end
   end
 end

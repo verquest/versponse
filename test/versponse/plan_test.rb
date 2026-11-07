@@ -95,4 +95,22 @@ class Versponse::PlanTest < Minitest::Test
     assert_match(/\.name: undefined method 'name'/, missing_method.message)
     assert_equal({"name" => "n", "at" => nil}, klass.serialize({"name" => "n", "created" => nil}, version: "2025-09"))
   end
+
+  def test_steps_expose_keys_conditions_and_child_plans
+    child = Class.new(Versponse::Base) { version("2025-09") { field :id, type: :string } }
+    klass = Class.new(Versponse::Base) do
+      version "2025-09" do
+        field :name, type: :string
+        field :note, type: :string, if: ->(object) { object[:note] }
+        reference :child, from: child
+      end
+    end
+    name, note, nested = klass.versponse.plan(version: "2025-09").steps
+
+    assert_equal [false, true, false], [name, note, nested].map(&:conditional?)
+    assert_equal child.versponse.plan(version: "2025-09"), nested.plans.first.resolve
+    other = Versponse::Plan.new(label: "Other", steps: [Versponse::Steps::Const.new(key: "k", value: 1, condition: nil)])
+
+    assert_equal({"k" => 1}, Versponse::Plan.new(label: "P", steps: [nested.with_plans(plan: other, collapsed_plan: nil)]).call({child: {}}, {})["child"])
+  end
 end

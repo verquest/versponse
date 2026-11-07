@@ -28,6 +28,24 @@ module Versponse
         freeze
       end
 
+      # @return [Boolean] true with if:/unless:
+      def conditional?
+        !@condition.nil?
+      end
+
+      # @return [Array<#call>] the child plan, and the collapsed plan when there is one
+      def plans
+        [@plan, @collapsed_plan].compact
+      end
+
+      # @param plan [#call] child plan
+      # @param collapsed_plan [#call, nil] plan used when collapsed
+      # @return [Nested] the same step rendering with these plans
+      def with_plans(plan:, collapsed_plan:)
+        self.class.new(key: @key, extractor: @extractor, condition: @condition, plan:, collection: @collection,
+          collapsed_plan:, collapse_if: @collapse_if)
+      end
+
       # @param object [Object] source
       # @param hash [Boolean] whether the source is a Hash
       # @param context [Hash] serialize context

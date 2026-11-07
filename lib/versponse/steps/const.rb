@@ -8,6 +8,8 @@ module Versponse
     class Const
       # @return [String] output key
       attr_reader :key
+      # @return [Object] the rendered constant
+      attr_reader :value
 
       # @param key [String] output key
       # @param value [Object] constant value
@@ -17,6 +19,11 @@ module Versponse
         @value = value
         @condition = condition
         freeze
+      end
+
+      # @return [Boolean] true with if:/unless:
+      def conditional?
+        !@condition.nil?
       end
 
       # @param object [Object] source

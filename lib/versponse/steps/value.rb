@@ -22,6 +22,11 @@ module Versponse
         freeze
       end
 
+      # @return [Boolean] true with if:/unless:
+      def conditional?
+        !@condition.nil?
+      end
+
       # @param object [Object] source
       # @param hash [Boolean] whether the source is a Hash
       # @param context [Hash] serialize context
