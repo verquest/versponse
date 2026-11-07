@@ -427,7 +427,7 @@ end
 
 The sample is drawn per render (a sampled collection is validated in full) and before the callable runs, so the callable runs only for sampled renders. A lambda or method must accept the response class: `-> { ... }` raises `ArgumentError` when it is set.
 
-Each validation schema is compiled once into plain Ruby checks, and each field is checked as it is rendered, so a valid render costs about 1.4x a plain one. json_schemer runs only to build the error list when a check fails, and for schemas that use keywords the compiler doesn't support (they fall back automatically). Because values are checked when they are written, a block or formatter that changes a value an earlier field already rendered (the same String, Array or Hash) isn't caught.
+Each validation schema is compiled once into plain Ruby checks, and each field is checked as it is rendered, so a valid render costs about 1.4x a plain one. json_schemer runs only to build the error list when a check fails, and for schemas that use keywords the compiler doesn't support (they fall back automatically). Arrays and Hashes that aren't frozen are checked again once the render has finished, so a later block that changes one in place is caught; a String changed in place later in the same render isn't.
 
 ## Sharing references with verquest
 

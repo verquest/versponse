@@ -22,9 +22,10 @@ module Versponse
       end
 
       # @param check [#valid?] checker of the property's schema
+      # @param recheck [Boolean] check an unfrozen value again after the render
       # @return [CheckedRead] the same read, checking what it writes
-      def checked(check)
-        CheckedRead.new(key: @key, name: @string, formatter: @formatter, check:)
+      def checked(check, recheck:)
+        CheckedRead.new(key: @key, name: @string, formatter: @formatter, check:, recheck:)
       end
 
       # @return [Boolean] false: a read has no if:/unless:

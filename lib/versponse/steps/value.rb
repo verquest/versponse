@@ -23,9 +23,10 @@ module Versponse
       end
 
       # @param check [#valid?] checker of the property's schema
+      # @param recheck [Boolean] check an unfrozen value again after the render
       # @return [CheckedValue] the same step, checking what it writes
-      def checked(check)
-        CheckedValue.new(key: @key, extractor: @extractor, condition: @condition, formatter: @formatter, check:)
+      def checked(check, recheck:)
+        CheckedValue.new(key: @key, extractor: @extractor, condition: @condition, formatter: @formatter, check:, recheck:)
       end
 
       # @return [Boolean] true with if:/unless:

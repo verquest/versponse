@@ -118,6 +118,52 @@ class OutputValidationTest < Minitest::Test
     end
   end
 
+  class MutatingResponse < Versponse::Base
+    version "2025-09" do
+      array :tags, type: :string, min_items: 1
+      field(:first, type: :string) { |object| object[:tags].shift }
+      field :meta, type: :object, additional_properties: {type: "string"}
+      field(:touched, type: :boolean) { |object| object[:meta].store("count", 1) && true }
+    end
+  end
+
+  # Unfrozen Arrays and Hashes are checked again after the render, so changing them in place later is caught
+  def test_values_changed_later_in_the_render_are_caught
+    with_configuration(validate_output: true) do
+      refute_nil MutatingResponse.versponse.validating_plan(version: "2025-09")
+      error = assert_raises(Versponse::InvalidOutputError) { MutatingResponse.serialize({tags: ["a"], meta: {}}, version: "2025-09") }
+
+      assert_equal %w[/meta/count /tags], error.errors.map { |item| item[:pointer] }.sort
+    end
+  end
+
+  def test_frozen_values_are_not_rechecked
+    with_configuration(validate_output: true) do
+      tags = ["a", "b"].freeze
+      klass = Class.new(Versponse::Base) { version("2025-09") { array :tags, type: :string } }
+
+      assert_equal({"tags" => %w[a b]}, klass.serialize({tags:}, version: "2025-09"))
+    end
+  end
+
+  class ItemResponse < Versponse::Base
+    version("2025-09") { array :names, type: :string }
+  end
+
+  class EitherResponse < Versponse::Base
+    version "2025-09" do
+      one_of(:either) { reference from: ItemResponse, match: Hash }
+      field(:later, type: :boolean) { |object| object[:either][:names] << 1 && true }
+    end
+  end
+
+  # A one_of is checked as a whole after it renders; its rendered Hash still holds the source's Array
+  def test_subtrees_changed_later_in_the_render_are_caught
+    with_configuration(validate_output: true) do
+      assert_raises(Versponse::InvalidOutputError) { EitherResponse.serialize({either: {names: ["a"]}}, version: "2025-09") }
+    end
+  end
+
   def test_the_suite_runs_with_validation_on
     assert Versponse.configuration.validate_output
   end

@@ -10,8 +10,11 @@ module Versponse
       # @param name [String, Symbol] method or Hash key to read
       # @param formatter [#call, nil] formatter (used by CheckedReadFormatted)
       # @param check [#valid?] checker of the property's schema
-      def initialize(key:, name:, formatter:, check:)
+      # @param recheck [Boolean] the schema may accept an Array or Hash, so an unfrozen value is checked again after
+      #   the render (see InlineValidation.recheck_later)
+      def initialize(key:, name:, formatter:, check:, recheck:)
         @check = check
+        @recheck = recheck
         super(key:, name:, formatter:)
       end
 
@@ -29,7 +32,11 @@ module Versponse
         rescue
           false
         end
-        InlineValidation.failed! unless ok
+        if !ok
+          InlineValidation.failed!
+        elsif @recheck && !value.frozen?
+          InlineValidation.recheck_later(@check, value)
+        end
       end
     end
   end

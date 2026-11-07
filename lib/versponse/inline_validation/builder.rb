@@ -12,6 +12,9 @@ module Versponse
       # Object keywords a plan guarantees by construction (type object, additionalProperties false)
       OBJECT_KEYWORDS = %w[type properties required additionalProperties].freeze
 
+      # Types whose values can't be changed in place later in the render (Strings aside, see the README)
+      SCALAR_TYPES = %w[string number integer boolean null].freeze
+
       # Keywords that never change validity, besides x- extensions
       INERT = (Validator::Compiler::ANNOTATIONS + Validator::Compiler::ANCHORS).freeze
 
@@ -55,11 +58,16 @@ module Versponse
 
       def checked(step, schema)
         case step
-        when Steps::Read, Steps::Value then step.checked(@compiler.checker_for(schema))
+        when Steps::Read, Steps::Value then step.checked(@compiler.checker_for(schema), recheck: !scalar?(schema))
         when Steps::Const then step if root(schema).valid?(step.value)
         when Steps::Nested then nested(step, schema)
         when Steps::OneOf then Steps::Checked.new(step, root(schema))
         end
+      end
+
+      # A schema whose accepted values are never an Array or Hash needs no recheck after the render
+      def scalar?(schema)
+        schema.is_a?(Hash) && schema.key?("type") && Array(schema["type"]).all? { |type| SCALAR_TYPES.include?(type) }
       end
 
       def root(schema)

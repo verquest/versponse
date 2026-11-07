@@ -21,7 +21,11 @@ module Versponse
         rescue
           false
         end
-        InlineValidation.failed! unless ok
+        if !ok
+          InlineValidation.failed!
+        elsif @recheck && !value.frozen?
+          InlineValidation.recheck_later(@check, value)
+        end
       end
     end
   end

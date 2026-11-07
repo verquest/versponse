@@ -15,6 +15,19 @@ class Versponse::InlineValidationTest < Minitest::Test
     refute Versponse::InlineValidation.run { Versponse::InlineValidation.run { Versponse::InlineValidation.failed! } }
   end
 
+  def test_rechecks_run_after_the_render_and_stay_in_their_run
+    check = Versponse::Validator::ClassCheck.new(Array)
+    value = []
+    failed = Versponse::InlineValidation.run do
+      Versponse::InlineValidation.recheck_later(check, value)
+
+      refute Versponse::InlineValidation.run { nil }
+    end
+
+    refute failed
+    assert(Versponse::InlineValidation.run { Versponse::InlineValidation.recheck_later(Versponse::Validator::ClassCheck.new(Hash), value) })
+  end
+
   def test_run_restores_the_flag_after_an_exception
     Versponse::InlineValidation.run do
       Versponse::InlineValidation.failed!
@@ -31,7 +44,7 @@ class Versponse::InlineValidationTest < Minitest::Test
     deferring = Object.new.tap { |check| def check.valid?(_data) = throw(Versponse::Validator::Root::DEFER) }
 
     [raising, deferring].each do |check|
-      step = Versponse::Steps::Read.new(key: "a", name: :a).checked(check)
+      step = Versponse::Steps::Read.new(key: "a", name: :a).checked(check, recheck: false)
 
       assert(Versponse::InlineValidation.run { step.call({a: 1}, true, {}, {}, Versponse::Expansion::NONE) })
     end

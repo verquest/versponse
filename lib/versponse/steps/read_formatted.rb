@@ -7,9 +7,10 @@ module Versponse
     # @api private
     class ReadFormatted < Read
       # @param check [#valid?] checker of the property's schema
+      # @param recheck [Boolean] check an unfrozen value again after the render
       # @return [CheckedReadFormatted] the same read, checking the formatted value it writes
-      def checked(check)
-        CheckedReadFormatted.new(key: @key, name: @string, formatter: @formatter, check:)
+      def checked(check, recheck:)
+        CheckedReadFormatted.new(key: @key, name: @string, formatter: @formatter, check:, recheck:)
       end
 
       # @param object [Object] source
