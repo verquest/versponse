@@ -70,6 +70,16 @@ class Versponse::Validator::CompilerTest < Minitest::Test
     assert compile(schema).valid?({"b" => "x"})
   end
 
+  def test_closed_objects
+    closed = {"properties" => {"a" => {"type" => "string"}, "b" => {}}, "required" => ["a"], "additionalProperties" => false}
+
+    assert_kind_of Versponse::Validator::ClosedObjectCheck, compiled(closed)
+    assert_kind_of Versponse::Validator::ObjectCheck, compiled(closed.merge("required" => ["x"]))
+    assert_kind_of Versponse::Validator::ObjectCheck, compiled(closed.except("additionalProperties"))
+    assert_checks(closed.merge("maxProperties" => 1), valid: [{"a" => "x"}, 1], invalid: [{"a" => "x", "b" => 1}, {"b" => 1}, {"a" => "x", "c" => 1}])
+    assert_throws(Versponse::Validator::Root::DEFER) { compiled(closed).valid?({"a" => "x", :b => 1}) }
+  end
+
   def test_objects
     schema = {"type" => "object", "required" => ["a"], "properties" => {"a" => {"type" => "string"}}, "additionalProperties" => false}
 

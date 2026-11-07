@@ -11,16 +11,18 @@ module Versponse
 
       # @param schema [Hash] schema
       # @param compiler [Versponse::Validator::Compiler] compiles subschemas
-      # @return [ObjectCheck, nil] the check, nil without object keywords
+      # @return [ObjectCheck, ClosedObjectCheck, nil] the check, nil without object keywords
       def self.build(schema, compiler)
         return unless keywords.any? { |keyword| schema.key?(keyword) }
 
-        new(
-          properties: schema.fetch("properties", {}).transform_values { |property| compiler.compile(property) },
-          required: schema.fetch("required", []),
-          additional: compiler.compile(schema.fetch("additionalProperties", true)),
-          sizes: Range.new(schema["minProperties"], schema["maxProperties"])
-        )
+        properties = schema.fetch("properties", {}).transform_values { |property| compiler.compile(property) }
+        required = schema.fetch("required", [])
+        sizes = Range.new(schema["minProperties"], schema["maxProperties"])
+        if schema["additionalProperties"] == false && required.all? { |key| properties.key?(key) }
+          return ClosedObjectCheck.new(properties:, required:, sizes:)
+        end
+
+        new(properties:, required:, additional: compiler.compile(schema.fetch("additionalProperties", true)), sizes:)
       end
 
       # @param properties [Hash{String => #valid?}] checkers of named properties
