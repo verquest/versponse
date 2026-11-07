@@ -23,7 +23,7 @@ module Versponse
       # @return [void]
       def call(object, hash, _context, output, _expansion)
         value = output[@key] = hash ? object.fetch(@symbol) { object.fetch(@string) } : object.public_send(@symbol)
-        # The rescue covers the check only (a raising or deferring check is a failure); see InlineValidation.ok?
+        # The rescue covers the check only: a check that raises, or defers (UncaughtThrowError outside Root), fails
         ok = begin
           @check.valid?(value)
         rescue

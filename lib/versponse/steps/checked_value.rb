@@ -28,7 +28,7 @@ module Versponse
         value = @extractor.call(object, hash, context)
         value = @formatter.call(value) if @formatter && !value.nil?
         output[@key] = value
-        # The rescue covers the check only (a raising or deferring check is a failure); see InlineValidation.ok?
+        # The rescue covers the check only: a check that raises, or defers (UncaughtThrowError outside Root), fails
         ok = begin
           @check.valid?(value)
         rescue

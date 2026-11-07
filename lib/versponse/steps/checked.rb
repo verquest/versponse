@@ -34,7 +34,7 @@ module Versponse
         @step.call(object, hash, context, output, expansion)
         return unless output.key?(@key)
 
-        # The rescue covers the check only (a raising or deferring check is a failure); see InlineValidation.ok?
+        # The rescue covers the check only: a check that raises, or defers (UncaughtThrowError outside Root), fails
         ok = begin
           @check.valid?(output[@key])
         rescue

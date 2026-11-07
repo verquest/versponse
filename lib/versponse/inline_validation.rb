@@ -27,15 +27,5 @@ module Versponse
     ensure
       Thread.current[FLAG] = previous
     end
-
-    # @param check [#valid?] compiled checker
-    # @param value [Object] written value
-    # @return [Boolean] true when the check accepts the value; a check that raises (or defers, which raises
-    #   UncaughtThrowError outside Root) counts as a failure, so json_schemer decides
-    def self.ok?(check, value)
-      check.valid?(value)
-    rescue
-      false
-    end
   end
 end

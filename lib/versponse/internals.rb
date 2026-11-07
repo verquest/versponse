@@ -232,13 +232,15 @@ module Versponse
     #   the validation schema doesn't prove one
     def validating_plan(version:, view: :default)
       fresh!
-      cached = @validating_plans[version]&.[](view)
+      view = view.to_sym
+      cache = @validating_plans
+      cached = cache[version]&.[](view)
       return (cached unless UNPROVEN.equal?(cached)) if cached
 
-      # Built outside the cache lock, so it never holds this class's lock while reading other classes' plans;
-      # a duplicate build in a race is harmless
+      # Built outside the cache lock, so it never holds this class's lock while reading other classes' plans (a
+      # duplicate build in a race is harmless); stored into the cache read above, so a reset meanwhile discards it
       built = build_validating_plan(version:, view:) || UNPROVEN
-      stored = @validating_plans.fetch(version) { resolve(version) && Cache.new }.fetch(view.to_sym) { built }
+      stored = cache.fetch(version) { resolve(version) && Cache.new }.fetch(view) { built }
       stored unless UNPROVEN.equal?(stored)
     end
 
