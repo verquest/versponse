@@ -25,8 +25,11 @@ module Versponse
       # Keywords naming a schema for "#Name" references, by JSON Schema version (see Configuration#anchor)
       ANCHORS = %w[$anchor $id id].freeze
 
+      # Keywords holding schemas that are only referenced (SelectionSchema keeps anchored originals there)
+      DEFINITIONS = %w[$defs definitions].freeze
+
       # Every keyword the compiler accepts
-      KEYWORDS = (ANNOTATIONS + CHECKS.flat_map(&:keywords) + ANCHORS).freeze
+      KEYWORDS = (ANNOTATIONS + CHECKS.flat_map(&:keywords) + ANCHORS + DEFINITIONS).freeze
 
       # @param schema [Hash] validation schema
       # @param schemer [JSONSchemer::Schema] json_schemer schema of the same Hash, used for patterns and formats
@@ -79,6 +82,7 @@ module Versponse
       # @return [#valid?] the checker
       def compile_hash(schema)
         schema = schema.slice("$ref", *ANCHORS) if schema.key?("$ref") && REF_ONLY.include?(Versponse.configuration.json_schema_version)
+        DEFINITIONS.each { |keyword| schema[keyword].each_value { |definition| compile(definition) } if schema[keyword].is_a?(Hash) }
         raise Unsupported, schema.inspect unless schema.keys.all? { |key| KEYWORDS.include?(key) || key.start_with?("x-") }
 
         name = anchor_name(schema)

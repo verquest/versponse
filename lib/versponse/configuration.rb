@@ -53,6 +53,8 @@ module Versponse
     attr_reader :json_schema_version
     # @return [Symbol] :raise (default) or :ignore for expand paths that match no expandable association
     attr_reader :unknown_expand
+    # @return [Symbol] :raise (default) or :ignore for fields: paths that are unknown or below unexpanded associations
+    attr_reader :unknown_fields
     # @return [Symbol] :declaration (default) or :alphabetical (identifiers first, then by output key,
     #   like blueprinter's sort_fields_by :name_asc)
     attr_reader :field_order
@@ -72,6 +74,7 @@ module Versponse
       @default_additional_properties = false
       @json_schema_version = :openapi31
       @unknown_expand = :raise
+      @unknown_fields = :raise
       @field_order = :declaration
       @version_resolver = VersionResolver
       @json_generator = JSON.method(:generate)
@@ -145,6 +148,14 @@ module Versponse
       raise ArgumentError, "unknown_expand must be :raise or :ignore" unless %i[raise ignore].include?(value)
 
       @unknown_expand = value
+    end
+
+    # @param value [Symbol] :raise or :ignore
+    # @raise [ArgumentError] for any other value
+    def unknown_fields=(value)
+      raise ArgumentError, "unknown_fields must be :raise or :ignore" unless %i[raise ignore].include?(value)
+
+      @unknown_fields = value
     end
 
     # @param value [Symbol] :declaration or :alphabetical

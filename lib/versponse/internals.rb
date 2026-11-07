@@ -10,6 +10,9 @@ module Versponse
     # Most expand: combinations cached per class; they come from requests, so further ones are rebuilt each time
     EXPANSION_LIMIT = 256
 
+    # Most fields: combinations cached per class (checked paths, pruned validation schemas)
+    SELECTION_LIMIT = 64
+
     # @return [Versponse::Versions] declared versions
     attr_reader :versions
     # @return [Versponse::SupportedVersions, nil] range declared with supported_versions, nil to remove an inherited one
@@ -29,8 +32,11 @@ module Versponse
       @checkers = Cache.new
       @validating_plans = Cache.new
       @expandable_paths = Cache.new
+      @selectable_paths = Cache.new
       @expansions = Cache.new(limit: EXPANSION_LIMIT)
       @raw_expansions = Cache.new
+      @field_paths = Cache.new(limit: SELECTION_LIMIT)
+      @selected_validators = Cache.new(limit: SELECTION_LIMIT)
       @time_precisions = {}
       @generation = Versponse.cache_generation
     end
@@ -172,7 +178,8 @@ module Versponse
         policies = self.policies
         properties = definition.properties_for(view)
         steps = properties.map { |property| property.step(version:, formatters:, policies:) }
-        Plan.new(label: "#{@klass.name}[#{definition.name}/#{view}]", steps:, recoveries: ErrorPolicy.recoveries(properties, policies, version))
+        Plan.new(label: "#{@klass.name}[#{definition.name}/#{view}]", steps:, recoveries: ErrorPolicy.recoveries(properties, policies, version),
+          always: definition.identifiers.keys)
       end
     end
 
@@ -251,6 +258,21 @@ module Versponse
       end
     end
 
+    # @param version [String] canonical version name
+    # @param view [Symbol] view name
+    # @param selection [Versponse::Selection] a root selection (not ALL)
+    # @return [Array(#valid?, JSONSchemer::Schema)] compiled checker (nil when unsupported) and json_schemer schema of
+    #   the validation schema pruned for the selection, cached by its signature
+    def selected_validators(version:, view:, selection:)
+      fresh!
+      @selected_validators.fetch([version, view.to_sym, selection.signature]) do
+        require "json_schemer"
+        schema = DeepFreeze.call(SelectionSchema.call(validation_schema(version:, view:), selection))
+        schemer = JSONSchemer.schema(schema, meta_schema: Versponse.configuration.json_schema_uri)
+        [Validator::Compiler.call(schema, schemer), schemer].freeze
+      end
+    end
+
     # @param version [String] canonical (declared) version name
     # @param view [Symbol] view name
     # @return [Versponse::Plan, nil] plan that validates while rendering (see {InlineValidation::Builder}), nil when
@@ -279,6 +301,18 @@ module Versponse
       end
     end
 
+    # @param version [String] canonical version name
+    # @param view [Symbol] view name
+    # @return [Array<String>] sorted, frozen paths fields: accepts (without wildcards)
+    def selectable_paths(version:, view:)
+      fresh!
+      @selectable_paths.fetch([version, view.to_sym]) do
+        paths = []
+        collect_field_paths(resolve(version).properties_for(view), [], version, [], paths)
+        paths.uniq.sort.freeze
+      end
+    end
+
     # Trees are cached by their sorted paths, up to {EXPANSION_LIMIT} combinations. A list with unknown paths
     # (config.unknown_expand = :ignore) is cached under its valid paths only, so junk can't take the slots.
     #
@@ -301,6 +335,31 @@ module Versponse
       return remember_expansion(expand, tree, version:, view:) if tree
 
       validated_expansion(paths, version:, view:) { |known| remember_expansion(expand, known, version:, view:) }
+    end
+
+    # @param fields [Array<String, Symbol>, nil] requested paths: dotted, "*", or ending in ".*"
+    # @param version [String] canonical version name
+    # @param view [Symbol] view name
+    # @param expansion [Versponse::Expansion] the render's expand tree
+    # @return [Versponse::Selection] the selection, ALL for no paths
+    # @raise [Versponse::InvalidFieldsError] for unknown paths and paths below unexpanded associations
+    #   (config.unknown_fields = :raise)
+    def selection(fields, version:, view:, expansion:)
+      return Selection::ALL if fields.nil?
+
+      paths = Array(fields).map(&:to_s).uniq
+      return Selection::ALL if paths.empty? || paths.include?("*")
+
+      fresh!
+      # The checked selection is cached with its step-index memo; expansions are cached trees, so the same expand:
+      # gives the same key
+      selection, reasons = @field_paths.fetch([version, view.to_sym, paths.sort, expansion]) do
+        problems = paths.to_h { |path| [path, field_path_problem(path, version:, view:, expansion:)] }.compact
+        [Selection.build(paths - problems.keys), problems.freeze].freeze
+      end
+      raise InvalidFieldsError.new(paths: reasons.keys, reasons:) if reasons.any? && Versponse.configuration.unknown_fields == :raise
+
+      selection
     end
 
     # Checks without compiling that every referenced class serves the version and view, in every view,
@@ -345,8 +404,11 @@ module Versponse
       @checkers = Cache.new
       @validating_plans = Cache.new
       @expandable_paths = Cache.new
+      @selectable_paths = Cache.new
       @expansions = Cache.new(limit: EXPANSION_LIMIT)
       @raw_expansions = Cache.new
+      @field_paths = Cache.new(limit: SELECTION_LIMIT)
+      @selected_validators = Cache.new(limit: SELECTION_LIMIT)
       versions.clear_resolved
       @generation = generation
     end
@@ -429,6 +491,46 @@ module Versponse
       properties.select { |property| property.key == head }.any? do |property|
         target = property.path_target(version)
         rest.empty? ? target.expandable_path? : path_known?(target.path_children(version), rest, version)
+      end
+    end
+
+    # nil for a valid path, else why it isn't
+    def field_path_problem(path, version:, view:, expansion:)
+      segments = path.delete_suffix(".*").split(".", -1)
+      return "unknown" if segments.empty? || segments.include?("") || segments.include?("*")
+
+      field_walk(resolve(version).properties_for(view), segments, version, expansion, [])
+    end
+
+    # Every property with a matching key is tried, because one_of variants can share keys
+    def field_walk(properties, segments, version, expansion, walked)
+      head, *rest = segments
+      candidates = properties.select { |property| property.key == head }
+      return "unknown" if candidates.empty?
+      return if rest.empty?
+
+      problems = candidates.map do |property|
+        target = property.path_target(version)
+        next "#{[*walked, head].join(".")} isn't expanded" if target.expandable_path? && !expansion.expand?(head)
+
+        field_walk(target.path_children(version), rest, version, expansion.child(head), [*walked, head])
+      end
+      problems.include?(nil) ? nil : problems.first
+    end
+
+    # Deepest walk for reused copies (reference property:), whose objects differ on every call
+    FIELD_PATH_DEPTH = 32
+    private_constant :FIELD_PATH_DEPTH
+
+    # A property already on the walked stack (a recursive association) is listed, but not walked again
+    def collect_field_paths(properties, prefix, version, stack, paths)
+      properties.each do |property|
+        path = [*prefix, property.key]
+        paths << path.join(".")
+        target = property.path_target(version)
+        next if stack.any? { |walked| walked.equal?(target) } || stack.size >= FIELD_PATH_DEPTH
+
+        collect_field_paths(target.path_children(version), path, version, [*stack, target], paths)
       end
     end
   end

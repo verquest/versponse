@@ -131,4 +131,19 @@ class Versponse::ConfigurationTest < Minitest::Test
 
     assert_same Versponse.configuration, yielded
   end
+
+  def test_unknown_fields
+    assert_equal :raise, @config.unknown_fields
+    @config.unknown_fields = :ignore
+
+    assert_equal :ignore, @config.unknown_fields
+    assert_raises(ArgumentError) { @config.unknown_fields = :warn }
+  end
+
+  def test_invalid_fields_error_lists_paths_and_reasons
+    error = Versponse::InvalidFieldsError.new(paths: %w[nope site.name], reasons: {"nope" => "unknown", "site.name" => "site isn't expanded"})
+
+    assert_equal %w[nope site.name], error.paths
+    assert_equal "Invalid fields paths: \"nope\" (unknown), \"site.name\" (site isn't expanded)", error.message
+  end
 end

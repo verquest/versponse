@@ -70,7 +70,9 @@ module Versponse
     # @return [Recovery, nil] nil when the property raises
     def self.resolve(property, target, policies)
       own = property.on_error || target.on_error
-      return (Recovery.new(own, key: property.key, response: policies.response, explicit: true) unless own == :raise) if own
+      if own
+        return (own == :raise) ? nil : Recovery.new(own, key: property.key, response: policies.response, explicit: true)
+      end
 
       [policies.on_error, Versponse.configuration.on_error].each do |level|
         next if level.nil?

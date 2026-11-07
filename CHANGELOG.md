@@ -5,6 +5,7 @@
 - `context:` on `reference`, `collection`, `object`, `one_of` and `one_of` variants renders the subtree with its own context: a Hash merged over the parent context, or a callable returning it.
 - `default:` on `field`, `enum` and `array`, and class-level `on_nil`, replace nil values.
 - `on_error` on properties, classes and `config` recovers failed properties (`:nullify`, `:omit` or a handler), with `config.recoverable_errors` and the `config.on_recovered_error` hook.
+- `fields:` on `serialize` renders a selection of fields, `selectable_paths` lists the paths, and `config.unknown_fields` sets what happens to invalid ones.
 
 ### Changed
 

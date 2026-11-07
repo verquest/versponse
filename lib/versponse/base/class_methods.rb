@@ -24,22 +24,31 @@ module Versponse
     # @param meta [Hash, nil] added under "meta" with String keys (requires root:)
     # @return [Hash, Array<Hash>] rendered output
     # @param expand [Array<String, Symbol>, nil] dotted paths of expandable associations to expand, or "*"
+    # @param fields [Array<String, Symbol>, nil] dotted paths of the fields to render (identifiers and consts always
+    #   render), "*" or nil for all
     # @raise [ArgumentError] without a version or with meta: but no root:
     # @raise [Versponse::InvalidExpandError] for unknown expand paths (config.unknown_expand = :raise)
+    # @raise [Versponse::InvalidFieldsError] for unknown paths or paths below unexpanded associations
+    #   (config.unknown_fields = :raise)
     # @raise [Versponse::VersionNotFoundError] when no declared version matches, or supported_versions leaves it out
     # @raise [Versponse::ViewNotFoundError] for an unknown view
     # @raise [Versponse::ExtractionError] when reading a value fails
-    def serialize(object, version: nil, view: :default, context: EMPTY_CONTEXT, root: nil, meta: nil, expand: nil)
+    def serialize(object, version: nil, view: :default, context: EMPTY_CONTEXT, root: nil, meta: nil, expand: nil, fields: nil)
       raise ArgumentError, "meta: requires root:" if meta && root.nil?
 
       internals = versponse
       internals.requesting(version) do |canonical|
         plan = internals.plan(version: canonical, view:)
         expansion = internals.expansion(expand, version: canonical, view:)
+        selection = internals.selection(fields, version: canonical, view:, expansion:) unless fields.nil?
         context = context.frozen? ? context : context.dup.freeze
         validate = Versponse.configuration.validate_output && OutputValidator.enabled?(self)
+        if selection && !selection.all?
+          # Validating plans prove the full shape, so a selection renders with the plain plan
+          data = render(object, plan, context, Selection::Scope.new(expansion, selection))
+          OutputValidator.call(self, data, version: canonical, view:, selection:) if validate
         # A validating plan checks while rendering; the output goes through OutputValidator only when a check failed
-        if validate && (inline = internals.validating_plan(version: canonical, view:))
+        elsif validate && (inline = internals.validating_plan(version: canonical, view:))
           data = nil
           failed = InlineValidation.run { data = render(object, inline, context, expansion) }
           OutputValidator.call(self, data, version: canonical, view:) if failed
@@ -130,12 +139,22 @@ module Versponse
       versponse.requesting(version) { |canonical| versponse.expandable_paths(version: canonical, view:) }
     end
 
+    # Every dotted path serialize fields: accepts, for docs and scope checks
+    #
+    # @param version [String, nil] requested version, config.current_version when nil
+    # @param view [Symbol] view name
+    # @return [Array<String>] sorted, frozen paths such as ["id", "site", "site.name"]
+    def selectable_paths(version: nil, view: :default)
+      versponse.requesting(version) { |canonical| versponse.selectable_paths(version: canonical, view:) }
+    end
+
     private
 
     # @param object [Object] source, or a collection of them
     # @param plan [#call] plan of one object
     # @param context [Hash] frozen serialize context
-    # @param expansion [Versponse::Expansion] expand tree
+    # @param expansion [Versponse::Expansion, Versponse::Selection::Scope] expand tree, paired with the selection in a
+    #   selected render
     # @return [Hash, Array<Hash>] rendered output
     def render(object, plan, context, expansion)
       Collections.collection?(object) ? Collections.map(Collections.items(object)) { |item| plan.call(item, context, expansion) } : plan.call(object, context, expansion)

@@ -86,6 +86,20 @@ module Versponse
     end
   end
 
+  # Raised when fields: names unknown paths, or paths below associations the render doesn't expand
+  # (config.unknown_fields = :raise)
+  class InvalidFieldsError < Error
+    # @return [Array<String>] the invalid paths
+    attr_reader :paths
+
+    # @param paths [Array<String>] invalid paths
+    # @param reasons [Hash{String => String}] why each path is invalid
+    def initialize(paths:, reasons:)
+      @paths = paths
+      super("Invalid fields paths: #{paths.map { |path| "#{path.inspect} (#{reasons.fetch(path)})" }.join(", ")}")
+    end
+  end
+
   class << self
     # @return [Versponse::Configuration] global configuration
     def configuration

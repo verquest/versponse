@@ -9,12 +9,15 @@ module Versponse
     # @param data [Hash, Array<Hash>] rendered output, before root/meta wrapping
     # @param version [String] requested version name
     # @param view [Symbol] view name
+    # @param selection [Versponse::Selection] the render's selection; a selected render is checked against the
+    #   pruned validation schema
     # @return [void]
     # @raise [Versponse::InvalidOutputError] when the output does not match
-    def self.call(klass, data, version:, view:)
-      return if valid?(klass.versponse.checker(version:, view:), data)
+    def self.call(klass, data, version:, view:, selection: Selection::ALL)
+      checker, schemer = selection.all? ? [klass.versponse.checker(version:, view:), nil] : klass.versponse.selected_validators(version:, view:, selection:)
+      return if valid?(checker, data)
 
-      schemer = klass.versponse.schemer(version:, view:)
+      schemer ||= klass.versponse.schemer(version:, view:)
       errors = if data.is_a?(Array)
         data.each_with_index.flat_map { |item, index| errors_for(schemer, item, "/#{index}") }
       else

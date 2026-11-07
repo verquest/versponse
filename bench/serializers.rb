@@ -192,6 +192,9 @@ CASES = {
     "versponse" => -> { V::ExpandableUnitTypeResponse.serialize(ONE, version: "2025-09", expand: ["site"]) },
     "versponse + validation" => -> { with_validation { V::ExpandableUnitTypeResponse.serialize(ONE, version: "2025-09", expand: ["site"]) } }
   },
+  "nested, fields: [\"name\", \"site.name\"]" => {
+    "versponse" => -> { V::UnitTypeResponse.serialize(ONE, version: "2025-09", fields: %w[name site.name]) }
+  },
   "collection (1000 nested)" => {
     "versponse" => -> { V::UnitTypeResponse.serialize(MANY, version: "2025-09") },
     "versponse + validation" => -> { with_validation { V::UnitTypeResponse.serialize(MANY, version: "2025-09") } },

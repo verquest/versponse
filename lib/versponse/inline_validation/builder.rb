@@ -35,7 +35,7 @@ module Versponse
         return unless plan.steps.reject(&:conditional?).map(&:key).sort == schema.fetch("required", []).sort
 
         steps = plan.steps.map { |step| checked(step, properties.fetch(step.key)) }
-        Plan.new(label: plan.label, steps:, recoveries: plan.recoveries) unless steps.include?(nil)
+        Plan.new(label: plan.label, steps:, recoveries: plan.recoveries, always: plan.always) unless steps.include?(nil)
       rescue Validator::Compiler::Unsupported
         nil
       end

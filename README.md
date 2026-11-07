@@ -25,6 +25,7 @@ Sponsored by [Stora](https://stora.co)
 - [Versions](#versions)
 - [Views](#views)
 - [Expansion](#expansion)
+- [Field selection](#field-selection)
 - [Schemas](#schemas)
 - [OpenAPI documents and rswag](#openapi-documents-and-rswag)
 - [Output validation](#output-validation)
@@ -325,6 +326,21 @@ UnitResponse.serialize(unit, version: "2025-09", expand: ["site", "deal.stage"])
 - `UnitResponse.expandable_paths(version: "2025-09")` lists every path (`["deal.stage", "prices", "site"]`), for scope checks.
 - An unknown path raises `Versponse::InvalidExpandError` (its `paths` lists them), unless `config.unknown_expand = :ignore`.
 
+## Field selection
+
+`fields:` renders a subset, with dotted paths like `expand:`:
+
+```ruby
+OrderResponse.serialize(order, fields: ["status", "total", "line_items.price"], expand: ["line_items"])
+```
+
+- `"line_items"` selects the whole association, and `"line_items.price"` only `price` inside it (and implies the `line_items` key). `"line_items.*"` and `"*"` select everything at that level. `nil` or `[]` renders everything.
+- Identifiers and `const` properties (one_of discriminators among them) always render.
+- Unselected properties never run their blocks, so their queries are skipped too.
+- A path below an expandable association needs that association expanded. Otherwise, like an unknown path, it raises `Versponse::InvalidFieldsError` (`paths` lists them), unless `config.unknown_fields = :ignore`.
+- `UnitResponse.selectable_paths(version: "2025-09")` lists every path.
+- Schemas describe the full shape. With `validate_output`, a selected render is validated against a copy of its schema that requires only the selected keys.
+
 ## Schemas
 
 ```ruby
@@ -527,6 +543,7 @@ end
 | `custom_field_types` | `{}`; verquest-shaped custom types (see below) |
 | `default_additional_properties` | `false` |
 | `unknown_expand` | `:raise` (or `:ignore`) |
+| `unknown_fields` | `:raise` (or `:ignore`) |
 | `field_order` | `:declaration` (or `:alphabetical`: identifier fields first, then by key, like blueprinter's `sort_fields_by :name_asc`) |
 | `on_error` | `:raise` (or `:nullify`, `:omit`, a handler `->(error, object, key, context)`) |
 | `recoverable_errors` | `[StandardError]` |
