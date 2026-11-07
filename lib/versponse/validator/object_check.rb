@@ -41,14 +41,26 @@ module Versponse
       # @return [Boolean] true when the Hash matches
       def valid?(data)
         return true unless data.is_a?(Hash)
-        return false unless @sizes.cover?(data.size)
+        return reject(data) unless @sizes.cover?(data.size)
 
-        @required.each { |key| return false unless data.key?(key) }
+        @required.each { |key| return reject(data) unless data.key?(key) }
         data.each do |key, value|
           throw Root::DEFER unless key.is_a?(String)
           return false unless (@properties[key] || @additional).valid?(value)
         end
         true
+      end
+
+      private
+
+      # json_schemer reads Symbol keys as Strings, so a false is certain only for a Hash with String keys;
+      # any other Hash throws {Root::DEFER} (inside oneOf or not, a false would be read as a real answer)
+      #
+      # @param data [Hash] value being checked
+      # @return [false]
+      def reject(data)
+        data.each_key { |key| throw Root::DEFER unless key.is_a?(String) }
+        false
       end
     end
   end

@@ -32,6 +32,14 @@ class Versponse::Validator::CompilerTest < Minitest::Test
     )
   end
 
+  # json_schemer reads Symbol keys as Strings, so a missing required key can't be a certain false inside oneOf
+  def test_symbol_keys_defer_before_a_false_answer
+    schema = {"oneOf" => [{"type" => "object", "required" => ["a"]}, true]}
+
+    refute compile(schema).valid?({a: "x"})
+    assert compile(schema).valid?({"b" => "x"})
+  end
+
   def test_objects
     schema = {"type" => "object", "required" => ["a"], "properties" => {"a" => {"type" => "string"}}, "additionalProperties" => false}
 
