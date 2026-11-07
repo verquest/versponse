@@ -38,6 +38,22 @@ class OutputValidationTest < Minitest::Test
     end
   end
 
+  # Checkers are cached per version and view; an unsupported schema's nil is cached too, so it compiles once
+  def test_checkers_compile_once
+    klass = Class.new(Versponse::Base) { version("2025-09") { field :code, type: :string, content_encoding: "base64" } }
+    compiler = Versponse::Validator::Compiler.singleton_class
+    calls = 0
+    compiler.alias_method(:original_call, :call)
+    compiler.define_method(:call) { |*args| (calls += 1) && original_call(*args) }
+
+    2.times { assert_nil klass.versponse.checker(version: "2025-09") }
+
+    assert_equal 1, calls
+  ensure
+    compiler.alias_method(:call, :original_call)
+    compiler.remove_method(:original_call)
+  end
+
   def test_the_suite_runs_with_validation_on
     assert Versponse.configuration.validate_output
   end

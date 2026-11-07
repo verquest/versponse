@@ -215,7 +215,12 @@ module Versponse
     # @return [#valid?, nil] fast checker compiled from the validation schema, nil when it uses keywords the compiler does not support
     def checker(version:, view: :default)
       fresh!
-      @checkers.fetch([version, view.to_sym]) do
+      compiled = @checkers[version]&.[](view)
+      return compiled if compiled
+
+      # Keyed by version, then view, like plan, so a hit allocates no key Array; a nil checker (unsupported
+      # schema) misses the line above and is found by the nested fetch, which allocates nothing either
+      @checkers.fetch(version) { resolve(version) && Cache.new }.fetch(view.to_sym) do
         Validator::Compiler.call(validation_schema(version:, view:), schemer(version:, view:))
       end
     end
