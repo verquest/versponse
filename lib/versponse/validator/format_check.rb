@@ -9,6 +9,9 @@ module Versponse
       # @return [Array<String>] keywords this check owns
       def self.keywords = %w[format]
 
+      # @return [Class] the class a type folded into this check requires
+      def self.shape = String
+
       # @param schema [Hash] schema
       # @param compiler [Versponse::Validator::Compiler] looks formats up like json_schemer
       # @return [FormatCheck, nil] the check, nil without format or for an unknown one (which accepts anything)
@@ -23,16 +26,23 @@ module Versponse
 
       # @param name [String] format name
       # @param check [Proc] json_schemer's check, called with (data, name)
-      def initialize(name, check)
+      # @param strict [Boolean] true when anything but a String fails (type: "string" folded in)
+      def initialize(name, check, strict: false)
         @name = name
         @check = check
+        @strict = strict
         freeze
       end
 
-      # @param data [Object] value to check (each format proc skips types it doesn't apply to)
+      # @return [FormatCheck] the same check, failing anything but a String
+      def strict
+        self.class.new(@name, @check, strict: true)
+      end
+
+      # @param data [Object] value to check (each format proc skips types it doesn't apply to; strict fails them)
       # @return [Boolean] true when data matches the format
       def valid?(data)
-        @check.call(data, @name)
+        (@strict && !data.is_a?(String)) ? false : @check.call(data, @name)
       end
     end
   end

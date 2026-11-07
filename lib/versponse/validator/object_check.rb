@@ -9,6 +9,9 @@ module Versponse
       # @return [Array<String>] keywords this check owns
       def self.keywords = %w[properties required additionalProperties minProperties maxProperties]
 
+      # @return [Class] the class a type folded into this check requires
+      def self.shape = Hash
+
       # @param schema [Hash] schema
       # @param compiler [Versponse::Validator::Compiler] compiles subschemas
       # @return [ObjectCheck, ClosedObjectCheck, nil] the check, nil without object keywords
@@ -29,20 +32,27 @@ module Versponse
       # @param required [Array<String>] required keys
       # @param additional [#valid?] checker of other properties
       # @param sizes [Range] allowed number of properties
-      def initialize(properties:, required:, additional:, sizes:)
+      # @param strict [Boolean] true when anything but a Hash fails (type: "object" folded in)
+      def initialize(properties:, required:, additional:, sizes:, strict: false)
         @properties = properties.freeze
         @required = required.freeze
         @additional = additional
         @sizes = sizes
+        @strict = strict
         freeze
+      end
+
+      # @return [ObjectCheck] the same check, failing anything but a Hash
+      def strict
+        self.class.new(properties: @properties, required: @required, additional: @additional, sizes: @sizes, strict: true)
       end
 
       # A Hash with a non-String key throws {Root::DEFER}, which hands it to json_schemer
       #
-      # @param data [Object] value to check; anything but a Hash passes
+      # @param data [Object] value to check; anything but a Hash passes unless strict
       # @return [Boolean] true when the Hash matches
       def valid?(data)
-        return true unless data.is_a?(Hash)
+        return !@strict unless data.is_a?(Hash)
         return reject(data) unless @sizes.cover?(data.size)
 
         @required.each { |key| return reject(data) unless data.key?(key) }

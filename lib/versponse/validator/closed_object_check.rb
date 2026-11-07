@@ -11,21 +11,33 @@ module Versponse
       MISSING = Object.new.freeze
       private_constant :MISSING
 
+      # @return [Class] the class a type folded into this check requires
+      def self.shape = Hash
+
       # @param properties [Hash{String => #valid?}] checkers of the declared properties
       # @param required [Array<String>] required keys, all of them declared properties
       # @param sizes [Range] allowed number of properties
-      def initialize(properties:, required:, sizes:)
+      # @param strict [Boolean] true when anything but a Hash fails (type: "object" folded in)
+      def initialize(properties:, required:, sizes:, strict: false)
+        @properties = properties
+        @required_keys = required
         @keys = properties.keys.freeze
         @checks = properties.values.freeze
         @required = @keys.map { |key| required.include?(key) }.freeze
         @sizes = sizes
+        @strict = strict
         freeze
       end
 
-      # @param data [Object] value to check; anything but a Hash passes
+      # @return [ClosedObjectCheck] the same check, failing anything but a Hash
+      def strict
+        self.class.new(properties: @properties, required: @required_keys, sizes: @sizes, strict: true)
+      end
+
+      # @param data [Object] value to check; anything but a Hash passes unless strict
       # @return [Boolean] true when the Hash matches
       def valid?(data)
-        return true unless data.is_a?(Hash)
+        return !@strict unless data.is_a?(Hash)
 
         found = 0
         index = 0

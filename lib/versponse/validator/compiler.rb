@@ -66,9 +66,25 @@ module Versponse
         raise Unsupported, schema.inspect unless schema.keys.all? { |key| KEYWORDS.include?(key) || key.start_with?("x-") }
 
         name = anchor_name(schema)
-        checker = All.for(CHECKS.filter_map { |check| check.build(schema, self) })
+        checker = All.for(fold(CHECKS.filter_map { |check| check.build(schema, self) }))
         @anchors[name] = checker if name
         checker
+      end
+
+      # type: "object", "array" or "string" folds into the one check built for that shape, made strict, so a
+      # value takes one check instead of two. With no such check (an unknown format builds none) or two (string
+      # keywords and a format), the type check stays.
+      #
+      # @param checks [Array<#valid?>] checks built from one schema; TypeCheck comes first in CHECKS
+      # @return [Array<#valid?>] the checks, with the type folded in when it can be
+      def fold(checks)
+        type = checks.first
+        return checks unless type.is_a?(ClassCheck)
+
+        owners = checks.select { |check| check.class.respond_to?(:shape) && check.class.shape == type.klass }
+        return checks unless owners.one?
+
+        checks.drop(1).map { |check| check.equal?(owners.first) ? check.strict : check }
       end
 
       # $id and id name an anchor only as a plain "#Name" fragment; other ids change the base URI

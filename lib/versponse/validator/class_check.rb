@@ -6,6 +6,9 @@ module Versponse
     #
     # @api private
     class ClassCheck
+      # @return [Class] the class data must be
+      attr_reader :klass
+
       # @param klass [Class] the class data must be
       def initialize(klass)
         @klass = klass

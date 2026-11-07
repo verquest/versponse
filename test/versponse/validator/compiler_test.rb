@@ -80,6 +80,17 @@ class Versponse::Validator::CompilerTest < Minitest::Test
     assert_throws(Versponse::Validator::Root::DEFER) { compiled(closed).valid?({"a" => "x", :b => 1}) }
   end
 
+  def test_types_fold_into_the_check_of_their_shape
+    v = Versponse::Validator
+
+    assert_kind_of v::ClosedObjectCheck, compiled({"type" => "object", "properties" => {}, "additionalProperties" => false})
+    assert_kind_of v::DateTimeCheck, compiled({"type" => "string", "format" => "date-time"})
+    assert_kind_of v::ArrayCheck, compiled({"type" => "array", "items" => {}})
+    assert_kind_of v::Both, compiled({"type" => "string", "format" => "no-such-format", "enum" => ["x"]})
+    assert_kind_of v::All, compiled({"type" => "string", "format" => "date-time", "minLength" => 1})
+    assert_checks({"type" => "string", "format" => "date-time"}, valid: ["2025-09-01T10:00:00Z"], invalid: [1, nil, "now"])
+  end
+
   def test_objects
     schema = {"type" => "object", "required" => ["a"], "properties" => {"a" => {"type" => "string"}}, "additionalProperties" => false}
 
