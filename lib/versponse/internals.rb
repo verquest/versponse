@@ -23,6 +23,7 @@ module Versponse
       @schemas = Cache.new
       @schemers = Cache.new
       @checkers = Cache.new
+      @validating_plans = Cache.new
       @expandable_paths = Cache.new
       @expansions = Cache.new(limit: EXPANSION_LIMIT)
       @raw_expansions = Cache.new
@@ -225,6 +226,22 @@ module Versponse
       end
     end
 
+    # @param version [String] canonical (declared) version name
+    # @param view [Symbol] view name
+    # @return [Versponse::Plan, nil] plan that validates while rendering (see {InlineValidation::Builder}), nil when
+    #   the validation schema doesn't prove one
+    def validating_plan(version:, view: :default)
+      fresh!
+      cached = @validating_plans[version]&.[](view)
+      return (cached unless UNPROVEN.equal?(cached)) if cached
+
+      # Built outside the cache lock, so it never holds this class's lock while reading other classes' plans;
+      # a duplicate build in a race is harmless
+      built = build_validating_plan(version:, view:) || UNPROVEN
+      stored = @validating_plans.fetch(version) { resolve(version) && Cache.new }.fetch(view.to_sym) { built }
+      stored unless UNPROVEN.equal?(stored)
+    end
+
     # @param version [String] canonical version name
     # @param view [Symbol] view name
     # @return [Array<String>] sorted, frozen expandable paths
@@ -299,11 +316,27 @@ module Versponse
       @schemas = Cache.new
       @schemers = Cache.new
       @checkers = Cache.new
+      @validating_plans = Cache.new
       @expandable_paths = Cache.new
       @expansions = Cache.new(limit: EXPANSION_LIMIT)
       @raw_expansions = Cache.new
       versions.clear_resolved
       @generation = generation
+    end
+
+    # Stored for a class/view without a validating plan, so it isn't rebuilt on every render
+    UNPROVEN = Object.new.freeze
+    private_constant :UNPROVEN
+
+    def build_validating_plan(version:, view:)
+      return unless checker(version:, view:)
+
+      schema = validation_schema(version:, view:)
+      compiler = Validator::Compiler.new(schemer(version:, view:))
+      compiler.root(schema)
+      InlineValidation::Builder.new(compiler).prove(plan(version:, view:), schema)
+    rescue Validator::Compiler::Unsupported
+      nil
     end
 
     def current_version_name

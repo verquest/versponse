@@ -91,6 +91,17 @@ class Versponse::Validator::CompilerTest < Minitest::Test
     assert_checks({"type" => "string", "format" => "date-time"}, valid: ["2025-09-01T10:00:00Z"], invalid: [1, nil, "now"])
   end
 
+  def test_compiler_records_the_checker_of_every_subschema
+    property = {"type" => "string"}
+    schema = {"type" => "object", "properties" => {"a" => property}}
+    compiler = Versponse::Validator::Compiler.new(JSONSchemer.schema(schema))
+    compiler.root(schema)
+
+    assert compiler.checker_for(property).valid?("x")
+    refute compiler.checker_for(property).valid?(1)
+    assert_raises(Versponse::Validator::Compiler::Unsupported) { compiler.checker_for({"type" => "string"}) }
+  end
+
   def test_objects
     schema = {"type" => "object", "required" => ["a"], "properties" => {"a" => {"type" => "string"}}, "additionalProperties" => false}
 

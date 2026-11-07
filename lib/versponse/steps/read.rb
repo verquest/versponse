@@ -21,6 +21,12 @@ module Versponse
         freeze
       end
 
+      # @param check [#valid?] checker of the property's schema
+      # @return [CheckedRead] the same read, checking what it writes
+      def checked(check)
+        CheckedRead.new(key: @key, name: @string, formatter: @formatter, check:)
+      end
+
       # @return [Boolean] false: a read has no if:/unless:
       def conditional?
         false

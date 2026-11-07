@@ -37,8 +37,16 @@ module Versponse
         plan = internals.plan(version: canonical, view:)
         expansion = internals.expansion(expand, version: canonical, view:)
         context = context.frozen? ? context : context.dup.freeze
-        data = Collections.collection?(object) ? Collections.map(Collections.items(object)) { |item| plan.call(item, context, expansion) } : plan.call(object, context, expansion)
-        OutputValidator.call(self, data, version: canonical, view:) if Versponse.configuration.validate_output && OutputValidator.enabled?(self)
+        validate = Versponse.configuration.validate_output && OutputValidator.enabled?(self)
+        # A validating plan checks while rendering; the output goes through OutputValidator only when a check failed
+        if validate && (inline = internals.validating_plan(version: canonical, view:))
+          data = nil
+          failed = InlineValidation.run { data = render(object, inline, context, expansion) }
+          OutputValidator.call(self, data, version: canonical, view:) if failed
+        else
+          data = Collections.collection?(object) ? Collections.map(Collections.items(object)) { |item| plan.call(item, context, expansion) } : plan.call(object, context, expansion)
+          OutputValidator.call(self, data, version: canonical, view:) if validate
+        end
         Wrapper.wrap(data, root:, meta:)
       end
     end
@@ -120,6 +128,17 @@ module Versponse
     # @return [Array<String>] sorted, frozen paths such as ["deal.stage", "site"]
     def expandable_paths(version: nil, view: :default)
       versponse.requesting(version) { |canonical| versponse.expandable_paths(version: canonical, view:) }
+    end
+
+    private
+
+    # @param object [Object] source, or a collection of them
+    # @param plan [#call] plan of one object
+    # @param context [Hash] frozen serialize context
+    # @param expansion [Versponse::Expansion] expand tree
+    # @return [Hash, Array<Hash>] rendered output
+    def render(object, plan, context, expansion)
+      Collections.collection?(object) ? Collections.map(Collections.items(object)) { |item| plan.call(item, context, expansion) } : plan.call(object, context, expansion)
     end
   end
 end

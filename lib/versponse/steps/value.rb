@@ -22,6 +22,12 @@ module Versponse
         freeze
       end
 
+      # @param check [#valid?] checker of the property's schema
+      # @return [CheckedValue] the same step, checking what it writes
+      def checked(check)
+        CheckedValue.new(key: @key, extractor: @extractor, condition: @condition, formatter: @formatter, check:)
+      end
+
       # @return [Boolean] true with if:/unless:
       def conditional?
         !@condition.nil?

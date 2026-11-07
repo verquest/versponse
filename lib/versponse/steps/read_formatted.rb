@@ -6,6 +6,12 @@ module Versponse
     #
     # @api private
     class ReadFormatted < Read
+      # @param check [#valid?] checker of the property's schema
+      # @return [CheckedReadFormatted] the same read, checking the formatted value it writes
+      def checked(check)
+        CheckedReadFormatted.new(key: @key, name: @string, formatter: @formatter, check:)
+      end
+
       # @param object [Object] source
       # @param hash [Boolean] whether the source is a Hash
       # @param _context [Hash] unused

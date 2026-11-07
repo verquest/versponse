@@ -42,6 +42,7 @@ module Versponse
         @schemer = schemer
         @anchors = {}
         @refs = []
+        @compiled = {}.compare_by_identity
       end
 
       # @param schema [Hash] root validation schema
@@ -62,6 +63,21 @@ module Versponse
         return Constant.for(schema) if schema == true || schema == false
         raise Unsupported, schema.inspect unless schema.is_a?(Hash)
 
+        @compiled[schema] = compile_hash(schema)
+      end
+
+      # @param schema [Hash, Boolean] a subschema of the root compiled with {#root}, the same object
+      # @return [#valid?] its checker
+      # @raise [Unsupported] for a Hash this compiler hasn't compiled
+      def checker_for(schema)
+        return Constant.for(schema) if schema == true || schema == false
+
+        @compiled.fetch(schema) { raise Unsupported, "not compiled" }
+      end
+
+      # @param schema [Hash] schema or subschema
+      # @return [#valid?] the checker
+      def compile_hash(schema)
         schema = schema.slice("$ref", *ANCHORS) if schema.key?("$ref") && REF_ONLY.include?(Versponse.configuration.json_schema_version)
         raise Unsupported, schema.inspect unless schema.keys.all? { |key| KEYWORDS.include?(key) || key.start_with?("x-") }
 

@@ -17,7 +17,8 @@ module Versponse
       # @param collapsed_plan [#call, nil] plan used when the association is expandable and not expanded
       # @param collapse_if [#call, nil] the referenced identifier's condition; when it is false for the value
       #   (for a collection: for any item) the full plan is used instead of collapsed_plan
-      def initialize(key:, extractor:, condition:, plan:, collection:, collapsed_plan: nil, collapse_if: nil)
+      # @param nil_fails [Boolean] in a validating plan, a nil value fails its schema (see InlineValidation)
+      def initialize(key:, extractor:, condition:, plan:, collection:, collapsed_plan: nil, collapse_if: nil, nil_fails: false)
         @key = key
         @extractor = extractor
         @condition = condition
@@ -25,12 +26,18 @@ module Versponse
         @collection = collection
         @collapsed_plan = collapsed_plan
         @collapse_if = collapse_if
+        @nil_fails = nil_fails
         freeze
       end
 
       # @return [Boolean] true with if:/unless:
       def conditional?
         !@condition.nil?
+      end
+
+      # @return [Boolean] true when each item of a collection is rendered
+      def collection?
+        @collection
       end
 
       # @return [Array<#call>] the child plan, and the collapsed plan when there is one
@@ -40,10 +47,11 @@ module Versponse
 
       # @param plan [#call] child plan
       # @param collapsed_plan [#call, nil] plan used when collapsed
+      # @param nil_fails [Boolean] a nil value fails validation (validating plans only)
       # @return [Nested] the same step rendering with these plans
-      def with_plans(plan:, collapsed_plan:)
+      def with_plans(plan:, collapsed_plan:, nil_fails: false)
         self.class.new(key: @key, extractor: @extractor, condition: @condition, plan:, collection: @collection,
-          collapsed_plan:, collapse_if: @collapse_if)
+          collapsed_plan:, collapse_if: @collapse_if, nil_fails:)
       end
 
       # @param object [Object] source
@@ -58,6 +66,7 @@ module Versponse
 
         value = @extractor.call(object, hash, context)
         output[@key] = if value.nil?
+          InlineValidation.failed! if @nil_fails
           nil
         else
           collapse = @collapsed_plan && !expansion.expand?(@key) && (@collapse_if.nil? || collapse?(value, context))

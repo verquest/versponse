@@ -36,4 +36,26 @@ class ConcurrencyTest < Minitest::Test
 
     assert_empty Array.new(errors.size) { errors.pop }.map { |error| "#{error.class}: #{error.message}" }
   end
+
+  class OwnerResponse < Versponse::Base; end
+
+  class PetResponse < Versponse::Base
+    version("2025-09") { reference :owner, from: OwnerResponse, nullable: true }
+  end
+
+  OwnerResponse.class_eval { version("2025-09") { collection :pets, item: PetResponse } }
+
+  # Building one validating plan reads the other class's plan; neither holds a cache lock meanwhile
+  def test_validating_plans_of_mutually_referencing_classes_build_concurrently
+    threads = [OwnerResponse, PetResponse].map do |klass|
+      Thread.new do
+        200.times do
+          Versponse.reset_caches!
+          klass.versponse.validating_plan(version: "2025-09")
+        end
+      end
+    end
+
+    assert(threads.all? { |thread| thread.join(10) })
+  end
 end

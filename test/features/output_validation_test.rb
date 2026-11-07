@@ -100,6 +100,24 @@ class OutputValidationTest < Minitest::Test
     end
   end
 
+  class MapResponse < Versponse::Base
+    version("2025-09") { field :data, type: :object }
+  end
+
+  # Symbol keys make the inline check defer; json_schemer then reads them as Strings and accepts the output
+  def test_inline_failures_that_json_schemer_accepts_return_the_output
+    with_configuration(validate_output: true) do
+      assert_equal({"data" => {a: 1}}, MapResponse.serialize({data: {a: 1}}, version: "2025-09"))
+    end
+  end
+
+  def test_validated_renders_use_the_validating_plan
+    with_configuration(validate_output: true) do
+      refute_nil StrictResponse.versponse.validating_plan(version: "2025-09")
+      assert_equal({"id" => "a", "count" => 1}, StrictResponse.serialize({id: "a", count: 1}, version: "2025-09"))
+    end
+  end
+
   def test_the_suite_runs_with_validation_on
     assert Versponse.configuration.validate_output
   end

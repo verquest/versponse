@@ -12,7 +12,7 @@
 - `serialize` and `serialize_json` with root keys and meta.
 - OpenAPI schemas per version and view, validation schemas, component names and `$ref`s.
 - `Versponse.components` and `Versponse.eager_load!`.
-- Opt-in output validation (`validate_output`): `true`, or a callable called with the response class per render (e.g. reading Rails' `Current`), and `validate_output_sample_rate` to validate a share of renders.
+- Opt-in output validation (`validate_output`): `true`, or a callable called with the response class per render (e.g. reading Rails' `Current`), and `validate_output_sample_rate` to validate a share of renders. Fields are checked while rendering where the schema proves it equivalent (most classes), so validation costs about 0.4x of a render; a callable `validate_output` is called before the render.
 - References to verquest request schemas.
 - Polymorphic collections: an unnamed `one_of` inside a `collection` block types each item.
 - `reference property:` reuses a property of another response class.
