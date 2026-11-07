@@ -34,7 +34,8 @@ module Versponse
     # @return [Boolean, #call] validate every rendered response against its schema, none (default false), or those
     #   for which the callable, called with the response class, returns a truthy value
     attr_reader :validate_output
-    # @return [Numeric] share of renders validated when validate_output allows it, from 0 to 1 (default 1.0)
+    # @return [Numeric, #call] share of renders validated when validate_output allows it, from 0 to 1 (default 1.0),
+    #   or a callable returning it for the response class
     attr_reader :validate_output_sample_rate
     # @return [Boolean] additionalProperties of generated object schemas (default false)
     attr_reader :default_additional_properties
@@ -76,17 +77,21 @@ module Versponse
     #   truthy (called per render, e.g. to read Rails' Current)
     # @raise [ArgumentError] for anything else, or a lambda or Method that can't take the response class
     def validate_output=(value)
-      @validate_output = (value == true || value == false) ? value : validate_output_callable!(value)
+      @validate_output = (value == true || value == false) ? value : class_callable!(value, :validate_output, "true, false")
     end
 
-    # @param value [Numeric] share of renders validated when validate_output allows it, from 0 to 1
-    # @raise [ArgumentError] for anything but a real number from 0 to 1
+    # @param value [Numeric, #call] share of renders validated when validate_output allows it, from 0 to 1, or a
+    #   callable called with the response class per render that returns it
+    # @raise [ArgumentError] for anything but a real number from 0 to 1 or a callable, or a lambda or Method that
+    #   can't take the response class
     def validate_output_sample_rate=(value)
-      unless value.is_a?(Numeric) && value.real? && (0..1).cover?(value)
-        raise ArgumentError, "validate_output_sample_rate must be a number from 0 to 1"
-      end
+      @validate_output_sample_rate = self.class.sample_rate?(value) ? value : class_callable!(value, :validate_output_sample_rate, "a number from 0 to 1")
+    end
 
-      @validate_output_sample_rate = value
+    # @param value [Object] a sample rate, as set or as returned by a callable one
+    # @return [Boolean] true for a real number from 0 to 1
+    def self.sample_rate?(value)
+      value.is_a?(Numeric) && value.real? && (0..1).cover?(value)
     end
 
     # @param value [Boolean] additionalProperties of generated object schemas
@@ -199,15 +204,15 @@ module Versponse
     end
 
     # Lambdas and Methods check their arity, so one that can't take the response class fails here, not on a render
-    def validate_output_callable!(value)
-      raise ArgumentError, "validate_output must be true, false or respond to call" unless value.respond_to?(:call)
+    def class_callable!(value, name, alternatives)
+      raise ArgumentError, "#{name} must be #{alternatives} or respond to call" unless value.respond_to?(:call)
       strict = value.is_a?(Method) || (value.is_a?(Proc) && value.lambda?)
       return value unless strict
 
       types = value.parameters.map(&:first)
       required = types.count(:req)
       positional = required == 1 || (required.zero? && types.intersect?(%i[opt rest]))
-      raise ArgumentError, "validate_output must accept the response class" unless positional && !types.include?(:keyreq)
+      raise ArgumentError, "#{name} must accept the response class" unless positional && !types.include?(:keyreq)
 
       value
     end

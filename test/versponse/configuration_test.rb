@@ -74,9 +74,18 @@ class Versponse::ConfigurationTest < Minitest::Test
 
       assert_equal rate, @config.validate_output_sample_rate
     end
-    [-0.1, 1.1, Float::NAN, Complex(1, 0), "0.5", nil].each do |rate|
+    [-0.1, 1.1, Float::NAN, Complex(1, 0), "0.5", nil, -> {}].each do |rate|
       assert_raises(ArgumentError, rate.inspect) { @config.validate_output_sample_rate = rate }
     end
+  end
+
+  def test_validate_output_sample_rate_takes_callables_that_accept_the_response_class
+    rate = ->(_klass) { 0.5 }
+    @config.validate_output_sample_rate = rate
+
+    assert_same rate, @config.validate_output_sample_rate
+    error = assert_raises(ArgumentError) { @config.validate_output_sample_rate = ->(klass:) { klass } }
+    assert_equal "validate_output_sample_rate must accept the response class", error.message
   end
 
   def test_json_schema_version_rejects_unknown_versions

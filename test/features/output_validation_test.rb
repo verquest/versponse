@@ -87,6 +87,38 @@ class OutputValidationTest < Minitest::Test
     end
   end
 
+  def test_sample_rate_callable_decides_per_class
+    received = []
+    rate = ->(klass) { received << klass and (klass == StrictResponse) ? 1 : 0 }
+
+    with_configuration(validate_output: true, validate_output_sample_rate: rate) do
+      assert_raises(Versponse::InvalidOutputError) { StrictResponse.serialize(INVALID, version: "2025-09") }
+      other = Class.new(Versponse::Base) { version("2025-09") { field :count, type: :integer } }
+
+      assert_equal "many", other.serialize({count: "many"}, version: "2025-09")["count"]
+      assert_equal [StrictResponse, other], received
+    end
+  end
+
+  def test_sample_rate_callable_returning_anything_else_raises
+    with_configuration(validate_output: true, validate_output_sample_rate: ->(_klass) { "all" }) do
+      error = assert_raises(ArgumentError) { StrictResponse.serialize({id: "a", count: 1}, version: "2025-09") }
+
+      assert_match(/validate_output_sample_rate returned "all" for OutputValidationTest::StrictResponse/, error.message)
+    end
+  end
+
+  def test_sample_rate_callable_is_not_called_when_validate_output_is_false
+    called = false
+    rate = ->(_klass) { called = true }
+
+    with_configuration(validate_output: false, validate_output_sample_rate: rate) do
+      StrictResponse.serialize(INVALID, version: "2025-09")
+    end
+
+    refute called
+  end
+
   def test_sampling_draws_per_render
     with_configuration(validate_output: true, validate_output_sample_rate: 0.5) do
       outcomes = Array.new(40) do
