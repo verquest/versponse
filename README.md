@@ -414,6 +414,19 @@ error.errors
 
 Collection items are validated one by one, so pointers look like `/1/count`.
 
+To validate in production too, decide per request with a callable, and validate a share of renders with a sample rate:
+
+```ruby
+Versponse.configure do |config|
+  # Called with the response class on each render; a truthy result validates it
+  config.validate_output = ->(response_class) { Current.user&.staff? || Rails.env.local? }
+  # Validates 10% of the renders validate_output allows (default 1.0)
+  config.validate_output_sample_rate = 0.1
+end
+```
+
+The sample is drawn per render (a sampled collection is validated in full) and before the callable runs, so the callable runs only for sampled renders. A lambda or method must accept the response class: `-> { ... }` raises `ArgumentError` when it is set.
+
 Each validation schema is compiled once into plain Ruby checks, so a valid render costs little more than rendering. json_schemer runs only to build the error list when a check fails, and for schemas that use keywords the compiler doesn't support (they fall back automatically).
 
 ## Sharing references with verquest
@@ -471,7 +484,8 @@ end
 | `version_resolver` | closest earlier version; a custom one is called with `(requested, names)`, `names` String-sorted, must return the closest name at or before `requested` (or nil), and also orders `supported_versions` bounds |
 | `json_generator` | `JSON.generate` (e.g. `->(hash) { Oj.dump(hash, mode: :compat) }`) |
 | `json_schema_version` | `:openapi31` (also `:openapi30`, `:draft2020_12`, `:draft2019_09`, `:draft7`, `:draft6`, `:draft4`, as in verquest) |
-| `validate_output` | `false` |
+| `validate_output` | `false` (or `true`, or a callable called with the response class per render) |
+| `validate_output_sample_rate` | `1.0`; the share of renders `validate_output` allows that are validated |
 | `formatters` | `date-time` and `date`, keyed by JSON Schema format |
 | `custom_field_types` | `{}`; verquest-shaped custom types (see below) |
 | `default_additional_properties` | `false` |

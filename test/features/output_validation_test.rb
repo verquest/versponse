@@ -54,6 +54,52 @@ class OutputValidationTest < Minitest::Test
     compiler.remove_method(:original_call)
   end
 
+  INVALID = {id: "a", count: "many"}.freeze
+
+  def test_validate_output_callable_decides_per_render_with_the_class
+    received = []
+    with_configuration(validate_output: ->(klass) { received << klass and klass == StrictResponse }) do
+      assert_raises(Versponse::InvalidOutputError) { StrictResponse.serialize(INVALID, version: "2025-09") }
+      Class.new(Versponse::Base) { version("2025-09") { field :count, type: :integer } }.then do |other|
+        assert_equal "many", other.serialize({count: "many"}, version: "2025-09")["count"]
+        assert_equal [StrictResponse, other], received
+      end
+    end
+  end
+
+  def test_sample_rate_zero_never_validates_and_skips_the_callable
+    called = false
+    callable = ->(_klass) { called = true }
+
+    with_configuration(validate_output: callable, validate_output_sample_rate: 0) do
+      assert_equal "many", StrictResponse.serialize(INVALID, version: "2025-09")["count"]
+    end
+
+    refute called
+  end
+
+  def test_sample_rate_applies_on_top_of_validate_output
+    with_configuration(validate_output: true, validate_output_sample_rate: 1) do
+      assert_raises(Versponse::InvalidOutputError) { StrictResponse.serialize(INVALID, version: "2025-09") }
+    end
+    with_configuration(validate_output: false, validate_output_sample_rate: 1) do
+      assert_equal "many", StrictResponse.serialize(INVALID, version: "2025-09")["count"]
+    end
+  end
+
+  def test_sampling_draws_per_render
+    with_configuration(validate_output: true, validate_output_sample_rate: 0.5) do
+      outcomes = Array.new(40) do
+        StrictResponse.serialize(INVALID, version: "2025-09")
+        :skipped
+      rescue Versponse::InvalidOutputError
+        :validated
+      end
+
+      assert_equal %i[skipped validated], outcomes.uniq.sort
+    end
+  end
+
   def test_the_suite_runs_with_validation_on
     assert Versponse.configuration.validate_output
   end

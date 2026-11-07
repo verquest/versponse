@@ -25,6 +25,22 @@ module Versponse
       raise InvalidOutputError.new("#{klass.name || "AnonymousResponse"} output does not match its #{version}/#{view} schema", errors:)
     end
 
+    # Whether this render is validated: validate_output must allow it (true, or a callable returning truthy for
+    # the class), and the render must be sampled; the cheap checks run first, so a callable runs only on sampled renders
+    #
+    # @param klass [Class] response class serialize was called on
+    # @return [Boolean] true when the render is validated
+    def self.enabled?(klass)
+      config = Versponse.configuration
+      setting = config.validate_output
+      return false unless setting
+
+      rate = config.validate_output_sample_rate
+      return false if rate < 1 && Random.rand >= rate
+
+      setting == true || !!setting.call(klass)
+    end
+
     # The compiled checker is the fast path; json_schemer runs only when it fails or is missing
     #
     # @param checker [#valid?, nil] compiled checker of the schema

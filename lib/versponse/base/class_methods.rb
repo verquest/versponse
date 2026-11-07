@@ -38,7 +38,7 @@ module Versponse
         expansion = internals.expansion(expand, version: canonical, view:)
         context = context.frozen? ? context : context.dup.freeze
         data = Collections.collection?(object) ? Collections.map(Collections.items(object)) { |item| plan.call(item, context, expansion) } : plan.call(object, context, expansion)
-        OutputValidator.call(self, data, version: canonical, view:) if Versponse.configuration.validate_output
+        OutputValidator.call(self, data, version: canonical, view:) if Versponse.configuration.validate_output && OutputValidator.enabled?(self)
         Wrapper.wrap(data, root:, meta:)
       end
     end

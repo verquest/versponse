@@ -48,6 +48,37 @@ class Versponse::ConfigurationTest < Minitest::Test
     assert_raises(ArgumentError) { @config.default_additional_properties = nil }
   end
 
+  def one_argument(klass) = klass
+
+  def test_validate_output_takes_callables_that_accept_the_response_class
+    accepted = [->(klass) { klass }, ->(*) {}, ->(klass, extra = nil) { klass }, proc {}, method(:one_argument), method(:puts), Object.new.tap { |callable| def callable.call(_klass) = true }]
+
+    accepted.each do |callable|
+      @config.validate_output = callable
+
+      assert_same callable, @config.validate_output
+    end
+  end
+
+  def test_validate_output_rejects_callables_that_cant_take_the_response_class
+    [-> {}, ->(klass:) { klass }, ->(first, second) { first }, ->(**options) { options }, nil, 1].each do |value|
+      assert_raises(ArgumentError, value.inspect) { @config.validate_output = value }
+    end
+  end
+
+  def test_validate_output_sample_rate
+    assert_in_delta 1.0, @config.validate_output_sample_rate
+
+    [0, 0.5, 1, Rational(1, 3)].each do |rate|
+      @config.validate_output_sample_rate = rate
+
+      assert_equal rate, @config.validate_output_sample_rate
+    end
+    [-0.1, 1.1, Float::NAN, Complex(1, 0), "0.5", nil].each do |rate|
+      assert_raises(ArgumentError, rate.inspect) { @config.validate_output_sample_rate = rate }
+    end
+  end
+
   def test_json_schema_version_rejects_unknown_versions
     assert_raises(ArgumentError) { @config.json_schema_version = :draft3 }
   end

@@ -31,8 +31,11 @@ module Versponse
     # a plain-name $id in drafts 6 and 7, and id in draft 4 (which OpenAPI 3.0 is based on)
     ANCHOR_KEYWORDS = {draft4: "id", openapi30: "id", draft6: "$id", draft7: "$id"}.freeze
 
-    # @return [Boolean] validate every rendered response against its schema (default false)
+    # @return [Boolean, #call] validate every rendered response against its schema, none (default false), or those
+    #   for which the callable, called with the response class, returns a truthy value
     attr_reader :validate_output
+    # @return [Numeric] share of renders validated when validate_output allows it, from 0 to 1 (default 1.0)
+    attr_reader :validate_output_sample_rate
     # @return [Boolean] additionalProperties of generated object schemas (default false)
     attr_reader :default_additional_properties
     # @return [#call, nil] returns the version used when serialize gets no version:
@@ -58,6 +61,7 @@ module Versponse
     # @return [Configuration] configuration with default settings
     def initialize
       @validate_output = false
+      @validate_output_sample_rate = 1.0
       @default_additional_properties = false
       @json_schema_version = :openapi31
       @unknown_expand = :raise
@@ -68,10 +72,21 @@ module Versponse
       @custom_field_types = {}.freeze
     end
 
-    # @param value [Boolean] validate every rendered response against its schema
-    # @raise [ArgumentError] for a value that isn't true or false
+    # @param value [Boolean, #call] validate every render, none, or those for which value.call(response_class) is
+    #   truthy (called per render, e.g. to read Rails' Current)
+    # @raise [ArgumentError] for anything else, or a lambda or Method that can't take the response class
     def validate_output=(value)
-      @validate_output = boolean!(value, :validate_output)
+      @validate_output = (value == true || value == false) ? value : validate_output_callable!(value)
+    end
+
+    # @param value [Numeric] share of renders validated when validate_output allows it, from 0 to 1
+    # @raise [ArgumentError] for anything but a real number from 0 to 1
+    def validate_output_sample_rate=(value)
+      unless value.is_a?(Numeric) && value.real? && (0..1).cover?(value)
+        raise ArgumentError, "validate_output_sample_rate must be a number from 0 to 1"
+      end
+
+      @validate_output_sample_rate = value
     end
 
     # @param value [Boolean] additionalProperties of generated object schemas
@@ -179,6 +194,20 @@ module Versponse
 
     def boolean!(value, name)
       raise ArgumentError, "#{name} must be true or false" unless [true, false].include?(value)
+
+      value
+    end
+
+    # Lambdas and Methods check their arity, so one that can't take the response class fails here, not on a render
+    def validate_output_callable!(value)
+      raise ArgumentError, "validate_output must be true, false or respond to call" unless value.respond_to?(:call)
+      strict = value.is_a?(Method) || (value.is_a?(Proc) && value.lambda?)
+      return value unless strict
+
+      types = value.parameters.map(&:first)
+      required = types.count(:req)
+      positional = required == 1 || (required.zero? && types.intersect?(%i[opt rest]))
+      raise ArgumentError, "validate_output must accept the response class" unless positional && !types.include?(:keyreq)
 
       value
     end
