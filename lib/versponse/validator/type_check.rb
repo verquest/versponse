@@ -23,6 +23,9 @@ module Versponse
       # Draft 4 and OpenAPI 3.0 (based on it) accept only Integers; later versions also accept 1.0
       INTEGER_ONLY = %i[draft4 openapi30].freeze
 
+      # JSON Schema versions where nullable: true adds "null" to type (json_schemer's OpenAPI30::Vocab::Base::Type)
+      NULLABLE_TYPE = %i[openapi30].freeze
+
       # Integer test of draft 4 and OpenAPI 3.0
       STRICT_INTEGER = ->(data) { data.is_a?(Integer) }
 
@@ -39,6 +42,7 @@ module Versponse
         return unless schema.key?("type")
 
         types = Array(schema["type"])
+        types = (types + ["null"]).uniq if schema["nullable"] == true && NULLABLE_TYPE.include?(Versponse.configuration.json_schema_version)
         return ClassCheck.new(CLASSES.fetch(types.first)) if types.one? && CLASSES.key?(types.first)
 
         new(types.map { |type| test_for(type) })

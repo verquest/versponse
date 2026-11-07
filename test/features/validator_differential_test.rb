@@ -2,6 +2,7 @@
 
 require "test_helper"
 require "bigdecimal"
+require "json_schemer"
 require_relative "../support/stora_field_types"
 
 # The compiled checker must agree with json_schemer on rendered examples and on broken copies of them
@@ -22,6 +23,28 @@ class ValidatorDifferentialTest < Minitest::Test
   ].freeze
   ENUM_VALUES = ["a", "b", "site_1", "site_2", "", 0, 1, 2, 1.0, 1.5, true, false, nil, [], {}, {"a" => 1}].freeze
   UNION_VALUES = [1, 0, 1.0, 1.5, "x", "other", "now", "2025-09-01T12:30:00Z", "send_immediately", nil, true, [], {}].freeze
+
+  CLOSED = {"type" => "object", "properties" => {"a" => {"type" => "string"}, "b" => {"type" => "integer"}},
+            "required" => ["a"], "additionalProperties" => false}.freeze
+  SCHEMA_VALUES = [
+    nil, true, false, 0, 1, 1.0, 1.5, Float::NAN, Float::INFINITY, "", "x", "xxxx", "2025-09-01T10:00:00Z",
+    "2025-09-01t10:00:00z", [], ["x"], [1], {}, {"a" => "x"}, {"a" => "x", "b" => 1}, {"a" => "x", "b" => 1.0},
+    {"a" => "x", "c" => 1}, {"b" => 1}, {"a" => 1}, {a: "x"}, {"a" => "x", :a => "x"}, {"a" => "x", :b => 1}
+  ].freeze
+  # Schemas the checks specialize, each also compared inside oneOf and not, so false answers must agree too
+  SCHEMA_CASES = [
+    CLOSED, CLOSED.merge("minProperties" => 2), CLOSED.merge("maxProperties" => 1), CLOSED.except("type"),
+    {"type" => "object", "required" => ["x"], "properties" => {}, "additionalProperties" => false},
+    {"type" => "object", "properties" => {"a" => {"type" => "string"}}},
+    {"type" => "string", "format" => "date-time"}, {"type" => "string", "format" => "no-such-format"},
+    {"type" => "string", "format" => "date-time", "pattern" => "^2"}, {"type" => "string", "minLength" => 1},
+    {"type" => "string", "format" => "email"}, {"type" => "array", "items" => {"type" => "string"}},
+    {"type" => %w[integer null]}, {"type" => %w[null integer]}, {"type" => %w[string null], "format" => "date-time"},
+    {"type" => %w[boolean null]}, {"type" => "integer"}, {"type" => "boolean"}, {"type" => %w[object null]},
+    {"type" => "string", "nullable" => true}, {"nullable" => true}, {"type" => "integer", "nullable" => false},
+    {"type" => "string", "maxLength" => 3, "nullable" => true}, {"type" => ["string"], "nullable" => true},
+    {"type" => "string", "nullable" => "true"}, {"type" => "string", "enum" => %w[x]}
+  ].freeze
 
   def cases
     [
@@ -78,6 +101,35 @@ class ValidatorDifferentialTest < Minitest::Test
           view = options.fetch(:view, :default)
           rendered = klass.serialize(object, version:, view:, expand: options[:expand])
           disagreements(klass, version, view, [rendered] + mutations(rendered)).map { |found| [json_schema_version, *found] }
+        end
+      end
+    end
+
+    assert_empty found
+  end
+
+  # Equal answers, except where the checker defers (false, so json_schemer decides): Hashes with non-String keys,
+  # and values json_schemer raises for (NaN as an integer)
+  def agrees?(checker, schemer, value)
+    expected = begin
+      schemer.valid?(value)
+    rescue
+      return !checker.valid?(value)
+    end
+    return !checker.valid?(value) || expected if value.is_a?(Hash) && !value.each_key.all?(String)
+
+    checker.valid?(value) == expected
+  end
+
+  def test_compiled_checks_agree_on_schemas
+    found = VERSIONS.flat_map do |json_schema_version|
+      with_configuration(json_schema_version:) do
+        SCHEMA_CASES.flat_map { |schema| [schema, {"oneOf" => [schema, true]}, {"not" => schema}] }.flat_map do |schema|
+          schemer = JSONSchemer.schema(schema, meta_schema: Versponse.configuration.json_schema_uri)
+          checker = Versponse::Validator::Compiler.call(schema, schemer)
+          next [] unless checker
+
+          SCHEMA_VALUES.reject { |value| agrees?(checker, schemer, value) }.map { |value| [json_schema_version, schema, value] }
         end
       end
     end

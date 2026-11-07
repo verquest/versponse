@@ -32,6 +32,14 @@ class Versponse::Validator::CompilerTest < Minitest::Test
     )
   end
 
+  def test_openapi30_nullable_adds_null_to_type
+    with_configuration(json_schema_version: :openapi30) do
+      assert_checks({"type" => "string", "nullable" => true}, valid: ["x", nil], invalid: [1])
+      assert_checks({"nullable" => true}, valid: [nil, 1])
+    end
+    assert_checks({"type" => "string", "nullable" => true}, valid: ["x"], invalid: [nil])
+  end
+
   # json_schemer reads Symbol keys as Strings, so a missing required key can't be a certain false inside oneOf
   def test_symbol_keys_defer_before_a_false_answer
     schema = {"oneOf" => [{"type" => "object", "required" => ["a"]}, true]}
