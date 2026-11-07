@@ -10,6 +10,11 @@ class Versponse::Validator::CompilerTest < Minitest::Test
     Versponse::Validator::Compiler.call(schema, JSONSchemer.schema(schema, meta_schema: Versponse.configuration.json_schema_uri))
   end
 
+  # The checker under Root
+  def compiled(schema)
+    compile(schema).instance_variable_get(:@checker)
+  end
+
   def assert_checks(schema, valid: [], invalid: [])
     checker = compile(schema)
 
@@ -21,6 +26,23 @@ class Versponse::Validator::CompilerTest < Minitest::Test
     assert_checks({"type" => ["integer", "null"]}, valid: [1, 1.0, nil], invalid: [1.5, "1", true])
     assert_checks({"type" => "number"}, valid: [1, 1.5, Float::NAN], invalid: ["1", nil])
     assert_checks({"type" => "boolean"}, valid: [true, false], invalid: [0, nil])
+  end
+
+  def test_single_types_compile_to_their_own_checks
+    v = Versponse::Validator
+
+    assert_kind_of v::IntegerCheck, compiled({"type" => "integer"})
+    assert_kind_of v::BooleanCheck, compiled({"type" => "boolean"})
+    assert_kind_of v::NullableCheck, compiled({"type" => %w[integer null]})
+    assert_kind_of v::NullableCheck, compiled({"type" => %w[null string]})
+    assert_kind_of v::TypeCheck, compiled({"type" => %w[integer string]})
+    assert_kind_of v::TypeCheck, compiled({"type" => "null"})
+  end
+
+  def test_nullable_integer_follows_the_json_schema_version
+    with_configuration(json_schema_version: :draft4) do
+      assert_checks({"type" => %w[null integer]}, valid: [1, nil], invalid: [1.0, "1"])
+    end
   end
 
   def test_type_unions

@@ -43,10 +43,23 @@ module Versponse
 
         types = Array(schema["type"])
         types = (types + ["null"]).uniq if schema["nullable"] == true && NULLABLE_TYPE.include?(Versponse.configuration.json_schema_version)
-        return ClassCheck.new(CLASSES.fetch(types.first)) if types.one? && CLASSES.key?(types.first)
+        single = types.map { |type| single(type) }
+        return single.first if types.one? && single.first
+        return NullableCheck.new(single[types.index { |type| type != "null" }]) if types.size == 2 && types.include?("null") && single.compact.one?
 
         new(types.map { |type| test_for(type) })
       end
+
+      # @param type [String] one JSON Schema type
+      # @return [#valid?, nil] a check of only that type, nil for null and unknown types
+      def self.single(type)
+        return ClassCheck.new(CLASSES.fetch(type)) if CLASSES.key?(type)
+        return BooleanCheck.new if type == "boolean"
+        return unless type == "integer"
+
+        INTEGER_ONLY.include?(Versponse.configuration.json_schema_version) ? ClassCheck.new(Integer) : IntegerCheck.new
+      end
+      private_class_method :single
 
       def self.test_for(type)
         return STRICT_INTEGER if type == "integer" && INTEGER_ONLY.include?(Versponse.configuration.json_schema_version)

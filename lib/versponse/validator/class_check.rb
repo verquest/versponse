@@ -2,7 +2,7 @@
 
 module Versponse
   module Validator
-    # A type check that is one class test (a schema allowing only number, string, array or object)
+    # A type check that is one class test (only number, string, array, object, or integer where only Integers count)
     #
     # @api private
     class ClassCheck
