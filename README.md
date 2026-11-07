@@ -545,10 +545,10 @@ Iterations per second on Ruby 4.0.6 (arm64-darwin), higher is better:
 
 | Payload | versponse | versponse + validation | alba | blueprinter |
 |---|---|---|---|---|
-| flat (15 fields) | 445.4k | 209.6k | 202.6k | 105.5k |
-| nested (2 levels) | 183.6k | 90.2k | 63.6k | 37.8k |
-| nested with `expand: ["site"]` | 170.2k | 85.4k | | |
-| collection (1000 nested) | 202.2 | 106.0 | 64.1 | 38.0 |
+| flat (15 fields) | 459.1k | 273.2k | 204.1k | 105.7k |
+| nested (2 levels) | 183.0k | 127.4k | 63.2k | 37.3k |
+| nested with `expand: ["site"]` | 171.1k | 120.2k | | |
+| collection (1000 nested) | 201.5 | 148.0 | 63.4 | 37.9 |
 
 Measured without YJIT; with `ruby --yjit`, versponse renders these 1.7-2x faster again.
 
