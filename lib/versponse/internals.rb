@@ -14,6 +14,10 @@ module Versponse
     attr_reader :versions
     # @return [Versponse::SupportedVersions, nil] range declared with supported_versions, nil to remove an inherited one
     attr_writer :supported_version_range
+    # @return [#call, nil] on_nil declared on this class, nil to remove an inherited one
+    attr_writer :on_nil
+    # @return [Symbol, #call, nil] on_error declared on this class, nil to remove an inherited one
+    attr_writer :on_error
 
     # @param klass [Class] response class
     def initialize(klass)
@@ -54,6 +58,25 @@ module Versponse
       return @supported_version_range if defined?(@supported_version_range)
 
       ancestor&.supported_version_range
+    end
+
+    # @return [#call, nil] on_nil of this class or its closest ancestor that sets one
+    def on_nil
+      return @on_nil if defined?(@on_nil)
+
+      ancestor&.on_nil
+    end
+
+    # @return [Symbol, #call, nil] on_error of this class or its closest ancestor that sets one
+    def on_error
+      return @on_error if defined?(@on_error)
+
+      ancestor&.on_error
+    end
+
+    # @return [Versponse::ClassPolicies] class settings for compiling the class's steps
+    def policies
+      ClassPolicies.new(response: @klass, on_nil:, on_error:)
     end
 
     # @param digits [Integer] fraction digits
@@ -146,8 +169,10 @@ module Versponse
       @plans.fetch(version) { resolve(version) && Cache.new }.fetch(view.to_sym) do
         definition = resolve(version)
         formatters = formatters(version)
-        steps = definition.properties_for(view).map { |property| property.step(version:, formatters:) }
-        Plan.new(label: "#{@klass.name}[#{definition.name}/#{view}]", steps:)
+        policies = self.policies
+        properties = definition.properties_for(view)
+        steps = properties.map { |property| property.step(version:, formatters:, policies:) }
+        Plan.new(label: "#{@klass.name}[#{definition.name}/#{view}]", steps:, recoveries: ErrorPolicy.recoveries(properties, policies, version))
       end
     end
 

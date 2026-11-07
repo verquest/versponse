@@ -45,6 +45,26 @@ module Versponse
       versponse.builder.time_precision(digits, from:)
     end
 
+    # Replaces nil values of the class's field, enum and array properties without default:. Subclasses inherit it.
+    #
+    # @param callable [#call, nil] called with (object, key, context); nil removes an inherited one
+    # @return [void]
+    # @raise [Versponse::DefinitionError] inside a version, after the first version, or for a value that can't take
+    #   (object, key, context)
+    def on_nil(callable)
+      versponse.builder.on_nil(callable)
+    end
+
+    # Policy for the class's failing properties without their own on_error:. Subclasses inherit it.
+    #
+    # @param policy [Symbol, #call, nil] :raise, :nullify, :omit, a handler called with (error, object, key, context),
+    #   or nil to remove an inherited one
+    # @return [void]
+    # @raise [Versponse::DefinitionError] inside a version, after the first version, or for an unknown policy
+    def on_error(policy)
+      versponse.builder.on_error(policy)
+    end
+
     # Declares a version
     #
     # @param name [String] version name, compared as a String

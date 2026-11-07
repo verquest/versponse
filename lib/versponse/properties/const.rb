@@ -34,8 +34,9 @@ module Versponse
 
       # @param version [String] unused by constants
       # @param formatters [Hash{String => #call}] unused by constants
+      # @param policies [Versponse::ClassPolicies] class-level on_nil and on_error of the compiling class
       # @return [Versponse::Steps::Const] compiled step
-      def step(version:, formatters:)
+      def step(version:, formatters:, policies: ClassPolicies::NONE)
         Steps::Const.new(key:, value: @constant, condition:)
       end
     end

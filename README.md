@@ -28,6 +28,7 @@ Sponsored by [Stora](https://stora.co)
 - [Schemas](#schemas)
 - [OpenAPI documents and rswag](#openapi-documents-and-rswag)
 - [Output validation](#output-validation)
+- [Nil and errors](#nil-and-errors)
 - [Sharing references with verquest](#sharing-references-with-verquest)
 - [Formats and validation notes](#formats-and-validation-notes)
 - [Configuration](#configuration)
@@ -127,6 +128,7 @@ Options shared by every property:
 
   It applies to everything below the property (full and collapsed shapes, `collapse_if`, blocks and conditions), while the parent and its other properties keep theirs. The callable runs once per value: once for a whole collection, and not at all for `nil` or a property its condition leaves out. A `one_of` variant takes `context:` too, applied after the `one_of`'s, and its callable gets the matched value. `reference property:` carries the reused property's `context:` over unless it declares its own, and `with_options context:` applies it to the associations in the block. A `reference` or `collection item:` of a non-Versponse class, and the unnamed `one_of` of a collection, reject `context:`.
 - `nullable: true` allows `null`.
+- `default:` on `field`, `enum` and `array` replaces a `nil` value: a value, or `->(object)` / `->(object, context)`. A value is written to schemas as `default` and must match the property's schema. A Time default has to be a callable, and is formatted like any value. `default: nil` means no default. `reference … property:` keeps the reused property's `default:`. Other properties raise `Versponse::DefinitionError` for `default:`, and `with_options default:` skips them.
 - `type:` on `field` and `array` takes a union of two or more built-in types. `field :notice_period, type: [:integer, :string], nullable: true` writes `"type": ["integer", "string", "null"]`, and under `json_schema_version = :openapi30` an `anyOf` of single types, each with `nullable: true` (3.0's `nullable` only applies next to a `type`). `format:` and its formatter still apply.
 - A union can be narrowed with `any_of:`, as in `field :notice_period, type: [:integer, :string], nullable: true, any_of: [{"type" => "integer"}, {"enum" => ["send_immediately"]}, {"type" => "null"}]`. Under OpenAPI 3.0 the two `anyOf`s are combined with `allOf`. `nullable:` adds `"null"` to `type` but never adds a null branch to your `any_of:`, so list `{"type" => "null"}` yourself when the field is nullable. Otherwise `nil` matches no alternative.
 - A user-supplied `any_of:` is written verbatim, in documents and validation schemas alike. `{"type" => "null"}` isn't valid OpenAPI 3.0, so under `:openapi30` it ends up in the document as is, but leaving it out makes `nil` fail output validation. For a nullable union under OpenAPI 3.0, `enum:` with `nil` in its values avoids the problem.
@@ -445,6 +447,25 @@ The sample is drawn per render (a sampled collection is validated in full) and b
 
 Each validation schema is compiled once into plain Ruby checks, and each field is checked as it is rendered, so a valid render costs about 1.4x a plain one. json_schemer runs only to build the error list when a check fails, and for schemas that use keywords the compiler doesn't support (they fall back automatically). Arrays and Hashes that aren't frozen are checked again once the render has finished, so a later block that changes one in place is caught; a String changed in place later in the same render isn't.
 
+## Nil and errors
+
+`on_nil` replaces `nil` for every `field`, `enum` and `array` of a class without `default:`. Declare it before the first version. Subclasses inherit it, `on_nil nil` removes an inherited one, and nested classes use their own:
+
+```ruby
+class ContactResponse < Versponse::Base
+  on_nil ->(contact, key, context) { "" }
+  version("2025-09") { ... }
+end
+```
+
+`on_error` decides what happens when a property fails to render: `:raise` (the default), `:nullify`, `:omit`, or a handler `->(error, object, key, context)` whose value is written. Set it on a property (`on_error:`, also through `with_options`), on a class (`on_error :nullify`, before the first version, inherited), or as `config.on_error`. The property's own wins, then the class's, then the config's. Lambdas for `on_nil` and handlers are checked when declared: they must take three and four arguments.
+
+- An explicit `on_error: :nullify` needs `nullable: true`, and `:omit` needs `if:` or `unless:`, so recovered output still matches the schema. A class-level or config-level `:nullify`/`:omit` applies only to the properties it fits. The others fall through to the next level, ending at `:raise`. A handler applies to every property.
+- A handler's value isn't known ahead, so with `validate_output` the render is validated in full. So is one with a nullified value, since a declared `any_of:` may still reject `null`.
+- `config.recoverable_errors` (default `[StandardError]`) lists what a policy recovers. Versponse's own errors aren't recovered, and a `NoMethodError` or `KeyError` no policy recovers still becomes `ExtractionError`.
+- A failure inside a nested class or inline object is recovered only by an `on_error:` declared on that association (`reference :site, from: SiteResponse, nullable: true, on_error: :nullify`), and then an `ExtractionError` from it too. Class-level and config-level policies never drop a whole subtree. The child's failure is marked on the exception object, so a frozen exception can't be marked and is treated like a failure of the association itself.
+- `config.on_recovered_error = ->(error, response:, key:, object:) { ... }` is called for every recovered error, with the class whose plan recovered it, the property's key and the object being rendered. Errors it raises propagate, and no policy (not even a parent association's) recovers them.
+
 ## Sharing references with verquest
 
 Versponse classes and verquest requests speak the same reference protocol (`component_name`, `to_ref`, `to_schema`, `to_validation_schema`). A response can reuse a request schema:
@@ -507,10 +528,13 @@ end
 | `default_additional_properties` | `false` |
 | `unknown_expand` | `:raise` (or `:ignore`) |
 | `field_order` | `:declaration` (or `:alphabetical`: identifier fields first, then by key, like blueprinter's `sort_fields_by :name_asc`) |
+| `on_error` | `:raise` (or `:nullify`, `:omit`, a handler `->(error, object, key, context)`) |
+| `recoverable_errors` | `[StandardError]` |
+| `on_recovered_error` | none; called with `(error, response:, key:, object:)` |
 
 `json_schema_version` works as in verquest: output validation uses that version's meta-schema, `const` is written as a one-value `enum` under `:draft4` and `:openapi30`, and recursive classes are named with `$anchor` from 2019-09, a plain-name `$id` in drafts 6 and 7, and `id` in draft 4 and OpenAPI 3.0. `:openapi30` also writes `nullable: true` and documents declare `openapi: "3.0.3"`. A nullable enum lists `null` among its values there too. A nullable `reference`, `one_of` or other `$ref` is written as `{"allOf": [{"$ref": ...}], "nullable": true}`, the form code generators expect. Strict 3.0 validators ignore `nullable` without a `type`, so they reject `null` there; output validation always uses the 3.1 forms internally and accepts it.
 
-Plans and schemas are cached. Settings that change output (`json_schema_version`, `formatters`, `version_resolver`, `field_order`, `default_additional_properties`) reset the caches when set. Set `custom_field_types` before response classes load, because properties resolve their types when they're defined.
+Plans and schemas are cached. Settings that change output (`json_schema_version`, `formatters`, `version_resolver`, `field_order`, `default_additional_properties`, `on_error`, `recoverable_errors`) reset the caches when set. Set `custom_field_types` before response classes load, because properties resolve their types when they're defined.
 
 ### Custom field types
 

@@ -22,9 +22,10 @@ module Versponse
 
       # @param version [String] requested version name
       # @param formatters [Hash{String => #call}] formatters by JSON Schema format, for the compiling class and version
+      # @param policies [Versponse::ClassPolicies] class-level on_nil and on_error of the compiling class
       # @return [Versponse::Steps::Nested] compiled step with an inline child plan
-      def step(version:, formatters:)
-        Steps::Nested.new(key:, extractor:, condition:, plan: inline_plan(version, formatters), collection: false, context_override:)
+      def step(version:, formatters:, policies: ClassPolicies::NONE)
+        Steps::Nested.new(key:, extractor:, condition:, plan: inline_plan(version, formatters, policies), collection: false, context_override:)
       end
     end
   end

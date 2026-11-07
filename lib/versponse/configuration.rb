@@ -3,9 +3,9 @@
 module Versponse
   # Settings for Versponse, changed with {Versponse.configure}
   #
-  # Plans and schemas are cached. Setting json_schema_version, formatters, version_resolver, field_order
-  # or default_additional_properties on {Versponse.configuration} resets them; custom_field_types resolve
-  # when properties are defined, so set them before response classes load.
+  # Plans and schemas are cached. Setting json_schema_version, formatters, version_resolver, field_order,
+  # default_additional_properties, on_error or recoverable_errors on {Versponse.configuration} resets them;
+  # custom_field_types resolve when properties are defined, so set them before response classes load.
   #
   # @example
   #   Versponse.configure do |config|
@@ -58,6 +58,12 @@ module Versponse
     attr_reader :field_order
     # @return [Hash{String => Hash}] custom field types, normalized by {FieldType.normalize} (default {})
     attr_reader :custom_field_types
+    # @return [Symbol, #call] policy for failing properties without their own or their class's (default :raise)
+    attr_reader :on_error
+    # @return [Array<Class>] StandardError subclasses a policy recovers (default [StandardError])
+    attr_reader :recoverable_errors
+    # @return [#call, nil] called with (error, response:, key:, object:) for each error a policy recovers
+    attr_reader :on_recovered_error
 
     # @return [Configuration] configuration with default settings
     def initialize
@@ -71,6 +77,9 @@ module Versponse
       @json_generator = JSON.method(:generate)
       @formatters = Formatters::DEFAULTS
       @custom_field_types = {}.freeze
+      @on_error = :raise
+      @recoverable_errors = [StandardError].freeze
+      @on_recovered_error = nil
     end
 
     # @param value [Boolean, #call] validate every render, none, or those for which value.call(response_class) is
@@ -166,6 +175,31 @@ module Versponse
       @custom_field_types = value.to_h { |name, definition| [name.to_s, FieldType.normalize(name, definition)] }.freeze
     end
 
+    # @param value [Symbol, #call] :raise, :nullify, :omit, or a handler called with (error, object, key, context)
+    # @raise [ArgumentError] for anything else, or a lambda or Method that can't take those four arguments
+    def on_error=(value)
+      raise ArgumentError, "on_error must be :raise, :nullify, :omit or a callable taking (error, object, key, context)" unless ErrorPolicy.valid?(value)
+
+      @on_error = value
+      changed!
+    end
+
+    # @param value [Array<Class>] StandardError subclasses a policy recovers
+    # @raise [ArgumentError] for anything but an Array of StandardError subclasses
+    def recoverable_errors=(value)
+      valid = value.is_a?(::Array) && value.all? { |klass| klass.is_a?(Class) && klass <= StandardError }
+      raise ArgumentError, "recoverable_errors must be an Array of StandardError subclasses" unless valid
+
+      @recoverable_errors = value.dup.freeze
+      changed!
+    end
+
+    # @param value [#call, nil] called with (error, response:, key:, object:) for each recovered error, nil for none
+    # @raise [ArgumentError] when value does not respond to call
+    def on_recovered_error=(value)
+      @on_recovered_error = value.nil? ? nil : callable!(value, :on_recovered_error)
+    end
+
     # @return [Boolean] true when nullable is written as `nullable: true` (OpenAPI 3.0)
     def nullable_keyword?
       json_schema_version == :openapi30
@@ -206,13 +240,7 @@ module Versponse
     # Lambdas and Methods check their arity, so one that can't take the response class fails here, not on a render
     def class_callable!(value, name, alternatives)
       raise ArgumentError, "#{name} must be #{alternatives} or respond to call" unless value.respond_to?(:call)
-      strict = value.is_a?(Method) || (value.is_a?(Proc) && value.lambda?)
-      return value unless strict
-
-      types = value.parameters.map(&:first)
-      required = types.count(:req)
-      positional = required == 1 || (required.zero? && types.intersect?(%i[opt rest]))
-      raise ArgumentError, "#{name} must accept the response class" unless positional && !types.include?(:keyreq)
+      raise ArgumentError, "#{name} must accept the response class" unless Callable.accepts?(value, 1)
 
       value
     end

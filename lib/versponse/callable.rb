@@ -28,5 +28,23 @@ module Versponse
 
       raise DefinitionError, "callables take (object) or (object, context)"
     end
+
+    # Lambdas and Methods check their arity, so one that can't take the arguments fails when it's declared, not on a
+    # render; procs and other callables are taken as they are
+    #
+    # @param callable [Object] value to check
+    # @param count [Integer] positional arguments Versponse passes
+    # @return [Boolean] true when callable responds to call and a lambda or Method takes count positional arguments
+    #   and no required keywords
+    def self.accepts?(callable, count)
+      return false unless callable.respond_to?(:call)
+      strict = callable.is_a?(Method) || (callable.is_a?(Proc) && callable.lambda?)
+      return true unless strict
+
+      types = callable.parameters.map(&:first)
+      required = types.count(:req)
+      max = types.include?(:rest) ? Float::INFINITY : required + types.count(:opt)
+      count.between?(required, max) && !types.include?(:keyreq)
+    end
   end
 end

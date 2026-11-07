@@ -37,8 +37,10 @@ module Versponse
         @properties&.values || []
       end
 
-      def inline_plan(version, formatters)
-        Plan.new(label: key, steps: FieldOrder.call(child_properties).map { |property| property.step(version:, formatters:) })
+      def inline_plan(version, formatters, policies)
+        properties = FieldOrder.call(child_properties)
+        Plan.new(label: key, steps: properties.map { |property| property.step(version:, formatters:, policies:) },
+          recoveries: ErrorPolicy.recoveries(properties, policies, version))
       end
 
       def inline_schema(context)

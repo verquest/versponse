@@ -91,8 +91,9 @@ module Versponse
 
       # @param version [String] canonical version name
       # @param formatters [Hash{String => #call}] unused; variant classes compile with their own
+      # @param policies [Versponse::ClassPolicies] class-level on_nil and on_error of the compiling class
       # @return [Versponse::Steps::OneOf] compiled step
-      def step(version:, formatters:)
+      def step(version:, formatters:, policies: ClassPolicies::NONE)
         collapsed_dispatcher = (collapsed_dispatcher(version) if expandable?)
         Steps::OneOf.new(key:, extractor:, condition:, dispatcher: dispatcher(version), collapsed_dispatcher:, context_override:)
       end

@@ -71,4 +71,18 @@ class Versponse::CallableTest < Minitest::Test
   def test_rejects_other_arities
     assert_raises(Versponse::DefinitionError) { Versponse::Callable.normalize(->(_name, _object, _options) { true }) }
   end
+
+  def test_accepts_checks_the_arity_of_lambdas_and_methods
+    assert Versponse::Callable.accepts?(->(_object, _key, _context) {}, 3)
+    assert Versponse::Callable.accepts?(->(*) {}, 4)
+    assert Versponse::Callable.accepts?(5.method(:+), 1)
+    refute Versponse::Callable.accepts?(->(_object) {}, 3)
+    refute Versponse::Callable.accepts?(->(_object, key:) {}, 1)
+    refute Versponse::Callable.accepts?(:fill, 3)
+  end
+
+  def test_accepts_takes_procs_and_callable_objects_as_they_are
+    assert Versponse::Callable.accepts?(proc { |object| object }, 4)
+    assert Versponse::Callable.accepts?(Class.new { def call(_object) = nil }.new, 3)
+  end
 end

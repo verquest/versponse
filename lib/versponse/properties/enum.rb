@@ -9,6 +9,9 @@ module Versponse
       # @return [Array<String>] keywords this property type writes itself
       def self.written_keywords = %w[enum].freeze
 
+      # @return [Boolean] true: nil values can be replaced
+      def self.default_option? = true
+
       # Ruby classes a value of each built-in type must be
       VALUE_CLASSES = {
         "string" => [::String],
@@ -30,6 +33,7 @@ module Versponse
         @values = values.dup.freeze
         @type = type.nil? ? inferred_type : FieldType.resolve(type, key).first
         check_values!
+        check_default!
       end
 
       # @param context [Versponse::SchemaContext, nil] schema generation context
@@ -44,9 +48,10 @@ module Versponse
 
       # @param version [String] unused by scalars
       # @param formatters [Hash{String => #call}] unused by enums
+      # @param policies [Versponse::ClassPolicies] class-level on_nil and on_error of the compiling class
       # @return [Versponse::Steps::Value] compiled step
-      def step(version:, formatters:)
-        value_step
+      def step(version:, formatters:, policies: ClassPolicies::NONE)
+        value_step(policies:)
       end
 
       private

@@ -72,10 +72,16 @@ module Versponse
           nil
         else
           context = @context_override.call(object, context) if @context_override
-          collapse = @collapsed_plan && !expansion.expand?(@key) && (@collapse_if.nil? || collapse?(value, context))
-          plan = collapse ? @collapsed_plan : @plan
-          node = expansion.child(@key)
-          @collection ? Collections.map(Collections.items(value)) { |item| plan.call(item, context, node) } : plan.call(value, context, node)
+          # Errors from the child plans are marked, so only an explicit association policy recovers them
+          begin
+            collapse = @collapsed_plan && !expansion.expand?(@key) && (@collapse_if.nil? || collapse?(value, context))
+            plan = collapse ? @collapsed_plan : @plan
+            node = expansion.child(@key)
+            @collection ? Collections.map(Collections.items(value)) { |item| plan.call(item, context, node) } : plan.call(value, context, node)
+          rescue => e
+            ErrorPolicy.mark_nested!(e)
+            raise
+          end
         end
       end
 

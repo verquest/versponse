@@ -28,8 +28,11 @@ module Versponse
       # @return [Boolean] true for properties whose subtree can render with its own context (context: option)
       def self.context_option? = false
 
+      # @return [Boolean] true for properties whose nil values a default: or the class's on_nil replaces
+      def self.default_option? = false
+
       # Options the DSL reads itself, suggested for typos
-      DSL_OPTIONS = %w[map nullable if unless context].freeze
+      DSL_OPTIONS = %w[map nullable if unless context default on_error].freeze
 
       # @return [Symbol] property name, used to read the value
       attr_reader :name
@@ -45,6 +48,8 @@ module Versponse
       attr_reader :schema_options
       # @return [Versponse::ContextOverride::Merge, Versponse::ContextOverride::Call, nil] context of the subtree
       attr_reader :context_override
+      # @return [Symbol, #call, nil] the property's own on_error: policy
+      attr_reader :on_error
 
       # @param name [Symbol, String] property name and output key
       # @param block [Proc, nil] value block
@@ -61,6 +66,9 @@ module Versponse
         raise DefinitionError, "#{key}: context: only works on reference, collection, object and one_of" unless context.nil? || self.class.context_option?
 
         @context_override = ContextOverride.build(context, key: @key)
+        @on_error = options.delete(:on_error)
+        check_on_error! unless @on_error.nil?
+        parse_default!(options)
         check_options!(options)
         @schema_options = Naming.camelize_keys(options)
         check_keywords!(options)
@@ -109,8 +117,9 @@ module Versponse
 
       # @param version [String] requested version name, used by nested classes
       # @param formatters [Hash{String => #call}] formatters by JSON Schema format, for the compiling class and version
+      # @param policies [Versponse::ClassPolicies] class-level on_nil and on_error of the compiling class
       # @return [#call] compiled plan step
-      def step(version:, formatters:)
+      def step(version:, formatters:, policies: ClassPolicies::NONE)
         raise NotImplementedError
       end
 
@@ -212,11 +221,57 @@ module Versponse
         Extractors.for(name:, map:, block:)
       end
 
-      # A plain field (no block, condition or path map:) compiles to the specialized Steps::Read
-      def value_step(formatter: nil)
-        return (formatter ? Steps::ReadFormatted : Steps::Read).new(key:, name: map || name, formatter:) if plain_read?
+      def check_on_error!
+        raise DefinitionError, "#{key}: on_error: must be :raise, :nullify, :omit or a callable taking (error, object, key, context)" unless ErrorPolicy.valid?(@on_error)
+        raise DefinitionError, "#{key}: on_error: :nullify needs nullable: true" if @on_error == :nullify && !nullable?
+        raise DefinitionError, "#{key}: on_error: :omit needs if: or unless:" if @on_error == :omit && !conditional?
+      end
 
-        Steps::Value.new(key:, extractor:, condition:, formatter:)
+      # A static default stays in the options, so the schema writes it; a callable one only renders. default: nil
+      # means no default.
+      def parse_default!(options)
+        return unless options.key?(:default)
+        raise DefinitionError, "#{key}: default: only works on field, enum and array" unless self.class.default_option?
+
+        default = options.delete(:default)
+        return if default.nil?
+
+        @default = default.respond_to?(:call) ? Callable.normalize(default) : DeepFreeze.call(default)
+        options[:default] = @default unless default.respond_to?(:call)
+      end
+
+      # Called by the subclasses once their schema is complete. Scalar schemas never read SchemaContext#version.
+      def check_default!
+        return if @default.nil? || @default.respond_to?(:call)
+
+        require "json_schemer"
+        schema = schema(SchemaContext.new(version: nil, validation: true))
+        return if JSONSchemer.schema(schema, meta_schema: Versponse.configuration.json_schema_uri).valid?(@default)
+
+        raise DefinitionError, "#{key}: default: #{@default.inspect} doesn't match the property's schema"
+      end
+
+      # @return [#call, nil] (object, context) callable for nil values: default:, else the class's on_nil
+      def nil_fallback(policies)
+        return unless self.class.default_option?
+        return @default if @default.respond_to?(:call)
+
+        unless @default.nil?
+          value = @default
+          return ->(_object, _context) { value }
+        end
+        on_nil = policies.on_nil
+        key = @key
+        ->(object, context) { on_nil.call(object, key, context) } if on_nil
+      end
+
+      # A plain field (no block, condition, path map:, default: or on_nil) compiles to the specialized Steps::Read
+      def value_step(formatter: nil, policies: ClassPolicies::NONE)
+        fallback = nil_fallback(policies)
+        return (formatter ? Steps::ReadFormatted : Steps::Read).new(key:, name: map || name, formatter:) if fallback.nil? && plain_read?
+
+        reader = fallback ? Extractors::Fallback.new(extractor, fallback) : extractor
+        Steps::Value.new(key:, extractor: reader, condition:, formatter:)
       end
 
       def plain_read?

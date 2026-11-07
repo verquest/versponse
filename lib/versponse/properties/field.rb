@@ -6,6 +6,9 @@ module Versponse
     #
     # @api private
     class Field < Base
+      # @return [Boolean] true: nil values can be replaced
+      def self.default_option? = true
+
       # @param type [Symbol, String, Array<Symbol, String>] a built-in type ({FieldType::BUILT_IN}; "object" is a free-form map whose
       #   value passes through), a custom one from config.custom_field_types, or a union of two or more built-in types
       # @param options [Hash] see {Base#initialize}; they win over the custom type's schema options
@@ -14,6 +17,7 @@ module Versponse
         super(**options)
         @type, type_options = FieldType.resolve(type, key)
         @schema_options = type_options.merge(schema_options)
+        check_default!
       end
 
       # @param context [Versponse::SchemaContext, nil] schema generation context
@@ -29,9 +33,10 @@ module Versponse
 
       # @param version [String] unused by scalars
       # @param formatters [Hash{String => #call}] formatters by JSON Schema format, for the compiling class and version
+      # @param policies [Versponse::ClassPolicies] class-level on_nil and on_error of the compiling class
       # @return [Versponse::Steps::Value] compiled step with the formatter of its format
-      def step(version:, formatters:)
-        value_step(formatter: formatters[schema_options["format"]])
+      def step(version:, formatters:, policies: ClassPolicies::NONE)
+        value_step(formatter: formatters[schema_options["format"]], policies:)
       end
     end
   end

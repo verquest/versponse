@@ -51,10 +51,11 @@ module Versponse
       # @param version [String] canonical version name
       # @param formatters [Hash{String => #call}] formatters of the compiling class, used by a property: reference;
       #   a nested class compiles with its own
+      # @param policies [Versponse::ClassPolicies] class-level on_nil and on_error of the compiling class
       # @return [Versponse::Steps::Nested, Versponse::Steps::Value, #call] compiled step
       # @raise [Versponse::DefinitionError] when a versponse property: does not exist
-      def step(version:, formatters:)
-        return referenced_property(version).step(version:, formatters:) if versponse_property?
+      def step(version:, formatters:, policies: ClassPolicies::NONE)
+        return referenced_property(version).step(version:, formatters:, policies:) if versponse_property?
         return value_step unless References.versponse?(@from)
 
         collapsed_plan = (References.collapsed_plan(@from, version) if expandable?)

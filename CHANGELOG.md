@@ -3,6 +3,12 @@
 ### Added
 
 - `context:` on `reference`, `collection`, `object`, `one_of` and `one_of` variants renders the subtree with its own context: a Hash merged over the parent context, or a callable returning it.
+- `default:` on `field`, `enum` and `array`, and class-level `on_nil`, replace nil values.
+- `on_error` on properties, classes and `config` recovers failed properties (`:nullify`, `:omit` or a handler), with `config.recoverable_errors` and the `config.on_recovered_error` hook.
+
+### Changed
+
+- `default:` on `reference`, `collection`, `object`, `one_of` and `const` raises `DefinitionError`. On `field`, `enum` and `array` a static value must match the property's schema, and `default: nil` means no default (it no longer writes `"default": null`).
 
 ## [0.1.0] - 2026-11-06
 

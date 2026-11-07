@@ -69,6 +69,33 @@ module Versponse
       Versponse.reset_caches!
     end
 
+    # Replaces nil values of the class's field, enum and array properties without default:
+    #
+    # @param callable [#call, nil] called with (object, key, context); nil removes an inherited one
+    # @return [void]
+    # @raise [Versponse::DefinitionError] inside a version, after the first version, or for a value that can't take
+    #   (object, key, context)
+    def on_nil(callable)
+      class_setting!(:on_nil)
+      raise DefinitionError, "on_nil must be a callable taking (object, key, context), or nil to remove an inherited one" unless callable.nil? || Callable.accepts?(callable, 3)
+
+      @klass.versponse.on_nil = callable
+      Versponse.reset_caches!
+    end
+
+    # Policy for the class's failing properties without their own on_error:
+    #
+    # @param policy [Symbol, #call, nil] :raise, :nullify, :omit, a handler, or nil to remove an inherited one
+    # @return [void]
+    # @raise [Versponse::DefinitionError] inside a version, after the first version, or for an unknown policy
+    def on_error(policy)
+      class_setting!(:on_error)
+      raise DefinitionError, "on_error must be :raise, :nullify, :omit or a callable taking (error, object, key, context)" unless policy.nil? || ErrorPolicy.valid?(policy)
+
+      @klass.versponse.on_error = policy
+      Versponse.reset_caches!
+    end
+
     # Declares a version
     #
     # @param name [String] version name, compared as a String
@@ -301,6 +328,11 @@ module Versponse
 
     private
 
+    def class_setting!(name)
+      raise DefinitionError, "#{name} can only be set on the class" if @current_scope
+      raise DefinitionError, "#{name} must come before the first version" unless @klass.versponse.versions.empty?
+    end
+
     def default_options
       @default_options || {}
     end
@@ -361,6 +393,7 @@ module Versponse
       target = options[:from] || options[:item]
       takes_context = klass.context_option? && (target.nil? || References.versponse?(target))
       defaults = defaults.except(:context) unless takes_context
+      defaults = defaults.except(:default) unless klass.default_option?
       property = klass.new(**defaults, **options)
       if scope.is_a?(View) && @view_version&.identifiers&.key?(property.key)
         raise DefinitionError, "#{@view_version.label}: #{property.key} is declared by identifier"

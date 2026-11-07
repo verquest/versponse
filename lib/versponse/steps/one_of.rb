@@ -45,7 +45,17 @@ module Versponse
 
         context = @context_override.call(object, context) if @context_override
         dispatcher = (@collapsed_dispatcher && !expansion.expand?(@key)) ? @collapsed_dispatcher : @dispatcher
-        output[@key] = dispatcher.call(value, context, expansion.child(@key))
+        output[@key] = dispatch(dispatcher, value, context, expansion.child(@key))
+      end
+
+      private
+
+      # Errors from the variant plans (and a value matching no variant) are marked like a nested step's
+      def dispatch(dispatcher, value, context, node)
+        dispatcher.call(value, context, node)
+      rescue => e
+        ErrorPolicy.mark_nested!(e)
+        raise
       end
     end
   end

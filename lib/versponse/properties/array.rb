@@ -9,6 +9,9 @@ module Versponse
       # @return [Array<String>] keywords this property type writes itself
       def self.written_keywords = %w[items].freeze
 
+      # @return [Boolean] true: nil values can be replaced
+      def self.default_option? = true
+
       # @param type [Symbol, String, Array<Symbol, String>] item type: built-in ({FieldType::BUILT_IN}), custom, or a union of built-in types
       # @param item_schema_options [Hash] JSON Schema keywords of each item; they win over the custom type's
       # @param options [Hash] see {Base#initialize}
@@ -18,6 +21,7 @@ module Versponse
         check_keywords!(item_schema_options, label: "#{key} item_schema_options", written_keywords: [])
         @item_type, type_options = FieldType.resolve(type, key)
         @item_schema_options = type_options.merge(Naming.camelize_keys(item_schema_options))
+        check_default!
       end
 
       # @param context [Versponse::SchemaContext, nil] schema generation context
@@ -29,13 +33,14 @@ module Versponse
 
       # @param version [String] unused by scalars
       # @param formatters [Hash{String => #call}] formatters by JSON Schema format, for the compiling class and version
+      # @param policies [Versponse::ClassPolicies] class-level on_nil and on_error of the compiling class
       # @return [Versponse::Steps::Value] compiled step; like a collection, the value is read with {Collections.items}
       #   (to_ary values and Sets; anything else raises), and items are formatted by their format
-      def step(version:, formatters:)
+      def step(version:, formatters:, policies: ClassPolicies::NONE)
         formatter = formatters[@item_schema_options["format"]]
-        return value_step(formatter: ->(items) { Collections.items(items) }) unless formatter
+        return value_step(formatter: ->(items) { Collections.items(items) }, policies:) unless formatter
 
-        value_step(formatter: ->(items) { Collections.items(items).map { |item| item.nil? ? nil : formatter.call(item) } })
+        value_step(formatter: ->(items) { Collections.items(items).map { |item| item.nil? ? nil : formatter.call(item) } }, policies:)
       end
 
       private
