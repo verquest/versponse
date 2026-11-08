@@ -12,8 +12,18 @@ module Versponse
       # Object keywords a plan guarantees by construction (type object, additionalProperties false)
       OBJECT_KEYWORDS = %w[type properties required additionalProperties].freeze
 
-      # Types whose values can't be changed in place later in the render (Strings aside, see the README)
-      SCALAR_TYPES = %w[string number integer boolean null].freeze
+      # Types a change in place can't turn into another type (not integer: json_schemer accepts any Numeric whose
+      # floor equals it, so a mutable Numeric can stop passing)
+      SCALAR_TYPES = %w[string number boolean null].freeze
+
+      # Types whose values can't be changed in place at all
+      IMMUTABLE_TYPES = %w[boolean null].freeze
+
+      # Keywords that only constrain the type (nullable: openapi30)
+      TYPE_KEYWORDS = %w[type nullable].freeze
+
+      # Leaf steps that have a checking variant
+      LEAVES = [Steps::Read, Steps::ReadFormatted, Steps::Value].freeze
 
       # Keywords that never change validity, besides x- extensions
       INERT = (Validator::Compiler::ANNOTATIONS + Validator::Compiler::ANCHORS).freeze
@@ -56,18 +66,26 @@ module Versponse
         schema.is_a?(Hash) && schema.each_key.all? { |key| keys.include?(key) || inert?(key) }
       end
 
+      # Exact classes only (a subclass may write other keys, so it stays unproven until it is listed here)
       def checked(step, schema)
-        case step
-        when Steps::Read, Steps::Value then step.checked(@compiler.checker_for(schema), recheck: !scalar?(schema))
-        when Steps::Const then step if root(schema).valid?(step.value)
-        when Steps::Nested then nested(step, schema)
-        when Steps::OneOf then Steps::Checked.new(step, root(schema))
+        klass = step.class
+        if LEAVES.include?(klass) then step.checked(@compiler.checker_for(schema), recheck: recheck?(schema))
+        elsif klass == Steps::Const then step if root(schema).valid?(step.value)
+        elsif klass == Steps::Nested then nested(step, schema)
+        elsif klass == Steps::OneOf then Steps::Checked.new(step, root(schema))
         end
       end
 
-      # A schema whose accepted values are never an Array or Hash needs no recheck after the render
-      def scalar?(schema)
-        schema.is_a?(Hash) && schema.key?("type") && Array(schema["type"]).all? { |type| SCALAR_TYPES.include?(type) }
+      # Whether a value the schema accepts can stop passing when it is changed in place later in the render: not
+      # when only its type is constrained and every type is scalar (a change in place keeps the value's class), nor
+      # for booleans and nulls
+      def recheck?(schema)
+        return true unless schema.is_a?(Hash) && schema.key?("type")
+
+        types = Array(schema["type"])
+        return false if types.all? { |type| IMMUTABLE_TYPES.include?(type) }
+
+        !(types.all? { |type| SCALAR_TYPES.include?(type) } && only?(schema, TYPE_KEYWORDS))
       end
 
       def root(schema)

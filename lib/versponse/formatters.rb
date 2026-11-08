@@ -4,7 +4,8 @@ module Versponse
   # Default formatters, keyed by JSON Schema format, applied to non-nil field values
   module Formatters
     # Formats times, datetimes and dates (as midnight) as ISO 8601 in UTC with the given fraction digits,
-    # always with a Z suffix, without changing the original object
+    # always with a Z suffix, without changing the original object. The Strings it builds are frozen, so inline
+    # validation checks them once (see InlineValidation::Builder); any other value is returned as it is.
     #
     # @param precision [Integer] fraction digits, 0 for whole seconds
     # @return [Proc] date-time formatter
@@ -12,13 +13,13 @@ module Versponse
       lambda do |value|
         # A UTC Time needs no getutc copy
         if value.instance_of?(Time) && value.utc?
-          value.iso8601(precision)
+          value.iso8601(precision).freeze
         elsif value.respond_to?(:getutc)
-          value.getutc.iso8601(precision)
+          value.getutc.iso8601(precision).freeze
         elsif value.respond_to?(:new_offset)
-          value.new_offset(0).to_time.utc.iso8601(precision)
+          value.new_offset(0).to_time.utc.iso8601(precision).freeze
         elsif value.is_a?(Date)
-          Time.utc(value.year, value.month, value.day).iso8601(precision)
+          Time.utc(value.year, value.month, value.day).iso8601(precision).freeze
         else
           value
         end
@@ -28,8 +29,8 @@ module Versponse
     # Formats date-times with milliseconds, like Rails' JSON
     DATE_TIME = date_time(3)
 
-    # Formats dates, and times or datetimes (converted to their date), as ISO 8601
-    DATE = ->(value) { (value.is_a?(Date) || value.is_a?(Time)) ? value.to_date.iso8601 : value }
+    # Formats dates, and times or datetimes (converted to their date), as frozen ISO 8601 Strings
+    DATE = ->(value) { (value.is_a?(Date) || value.is_a?(Time)) ? value.to_date.iso8601.freeze : value }
 
     # Formatters used when none are configured
     DEFAULTS = {"date-time" => DATE_TIME, "date" => DATE}.freeze

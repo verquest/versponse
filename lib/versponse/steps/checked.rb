@@ -34,19 +34,9 @@ module Versponse
         @step.call(object, hash, context, output, expansion)
         return unless output.key?(@key)
 
-        value = output[@key]
-        # The rescue covers the check only: a check that raises, or defers (UncaughtThrowError outside Root), fails
-        ok = begin
-          @check.valid?(value)
-        rescue
-          false
-        end
-        if !ok
-          InlineValidation.failed!
-        elsif !value.frozen?
-          # The rendered value holds the source's own values, so it is checked again after the render
-          InlineValidation.recheck_later(@check, value)
-        end
+        # The written subtree holds the source's values (a one_of can even write a source String), so it is checked
+        # once the render has finished
+        InlineValidation.check(@check, output[@key], true)
       end
     end
   end

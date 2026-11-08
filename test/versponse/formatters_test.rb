@@ -50,4 +50,15 @@ class Versponse::FormattersTest < Minitest::Test
 
     assert_equal "2025-09-01T10:00:00.123Z", Versponse::Formatters::DATE_TIME.call(utc)
   end
+
+  # Built Strings are frozen, so inline validation checks them once; a String input comes back as it is
+  def test_built_strings_are_frozen
+    time = Time.utc(2025, 9, 1, 10)
+    input = +"2025"
+
+    assert_predicate Versponse::Formatters::DATE_TIME.call(time), :frozen?
+    assert_predicate Versponse::Formatters::DATE_TIME.call(Date.new(2025, 9, 1)), :frozen?
+    assert_predicate Versponse::Formatters::DATE.call(time), :frozen?
+    assert_same input, Versponse::Formatters::DATE.call(input)
+  end
 end

@@ -81,8 +81,35 @@ class Versponse::CallableTest < Minitest::Test
     refute Versponse::Callable.accepts?(:fill, 3)
   end
 
-  def test_accepts_takes_procs_and_callable_objects_as_they_are
+  def test_accepts_takes_procs_as_they_are
     assert Versponse::Callable.accepts?(proc { |object| object }, 4)
-    assert Versponse::Callable.accepts?(Class.new { def call(_object) = nil }.new, 3)
+  end
+
+  # Objects are checked by their call method, like lambdas; one answered by method_missing takes anything
+  def test_accepts_checks_the_arity_of_callable_objects
+    assert Versponse::Callable.accepts?(Class.new { def call(_object) = nil }.new, 1)
+    assert Versponse::Callable.accepts?(Class.new { def call(*) = nil }.new, 3)
+    refute Versponse::Callable.accepts?(Class.new { def call = nil }.new, 1)
+    refute Versponse::Callable.accepts?(Class.new { def call(_object) = nil }.new, 3)
+
+    dynamic = Class.new do
+      def respond_to_missing?(name, include_private = false) = name == :call || super
+      def method_missing(name, *args) = (name == :call) ? args : super
+    end
+
+    assert Versponse::Callable.accepts?(dynamic.new, 4)
+
+    claimed = Class.new { def respond_to?(name, include_all = false) = name == :call || super }
+
+    assert Versponse::Callable.accepts?(claimed.new, 4)
+  end
+
+  # An object with its own #method (a Struct member, a request) is still read through Kernel#method
+  def test_callable_objects_with_their_own_method
+    with_method = Struct.new(:method) { def call(_object) = nil }.new("GET")
+
+    assert Versponse::Callable.accepts?(with_method, 1)
+    refute Versponse::Callable.accepts?(with_method, 3)
+    assert_respond_to Versponse::Callable.normalize(with_method), :call
   end
 end

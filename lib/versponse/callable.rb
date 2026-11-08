@@ -17,7 +17,7 @@ module Versponse
       raise DefinitionError, "expected a callable (a Proc, lambda or Method), got #{callable.inspect}" unless callable.respond_to?(:call)
       return callable if callable.is_a?(Proc) && !callable.lambda?
 
-      params = (callable.respond_to?(:parameters) ? callable : callable.method(:call)).parameters
+      params = (callable.respond_to?(:parameters) ? callable : call_method(callable)).parameters
       raise DefinitionError, "callables cannot take required keyword arguments" if params.any? { |type, _| type == :keyreq }
 
       required = params.count { |type, _| type == :req }
@@ -29,22 +29,46 @@ module Versponse
       raise DefinitionError, "callables take (object) or (object, context)"
     end
 
-    # Lambdas and Methods check their arity, so one that can't take the arguments fails when it's declared, not on a
-    # render; procs and other callables are taken as they are
+    # Lambdas, Methods and other objects' call methods check their arity, so one that can't take the arguments fails
+    # when it's declared, not on a render; procs are taken as they are
     #
     # @param callable [Object] value to check
     # @param count [Integer] positional arguments Versponse passes
-    # @return [Boolean] true when callable responds to call and a lambda or Method takes count positional arguments
-    #   and no required keywords
+    # @return [Boolean] true when callable responds to call and, unless it is a proc, takes count positional
+    #   arguments and no required keywords
     def self.accepts?(callable, count)
       return false unless callable.respond_to?(:call)
-      strict = callable.is_a?(Method) || (callable.is_a?(Proc) && callable.lambda?)
-      return true unless strict
+      return true if callable.is_a?(Proc) && !callable.lambda?
 
-      types = callable.parameters.map(&:first)
+      types = parameters(callable)&.map(&:first)
+      return true if types.nil?
+
       required = types.count(:req)
       max = types.include?(:rest) ? Float::INFINITY : required + types.count(:opt)
       count.between?(required, max) && !types.include?(:keyreq)
     end
+
+    # @param callable [#call] lambda, Method or object
+    # @return [Array<Array(Symbol, Symbol)>, nil] its call's parameters, nil when respond_to? answers for a call
+    #   method Ruby can't find
+    def self.parameters(callable)
+      (callable.is_a?(Proc) || callable.is_a?(Method)) ? callable.parameters : call_method(callable).parameters
+    rescue NameError
+      nil
+    end
+    private_class_method :parameters
+
+    # Kernel#method, so an object with its own #method (a Struct member, a request) still answers
+    #
+    # @param callable [#call] object
+    # @return [Method] its call method
+    def self.call_method(callable)
+      KERNEL_METHOD.bind_call(callable, :call)
+    end
+    private_class_method :call_method
+
+    # Kernel#method, unbound
+    KERNEL_METHOD = Kernel.instance_method(:method)
+    private_constant :KERNEL_METHOD
   end
 end

@@ -34,8 +34,7 @@ module Versponse
     # @return [Boolean, #call] validate every rendered response against its schema, none (default false), or those
     #   for which the callable, called with the response class, returns a truthy value
     attr_reader :validate_output
-    # @return [Numeric, #call] share of renders validated when validate_output allows it, from 0 to 1 (default 1.0),
-    #   or a callable returning it for the response class
+    # @return [Numeric] share of renders validated when validate_output allows it, from 0 to 1 (default 1.0)
     attr_reader :validate_output_sample_rate
     # @return [Boolean] additionalProperties of generated object schemas (default false)
     attr_reader :default_additional_properties
@@ -92,18 +91,14 @@ module Versponse
       @validate_output = (value == true || value == false) ? value : class_callable!(value, :validate_output, "true, false")
     end
 
-    # @param value [Numeric, #call] share of renders validated when validate_output allows it, from 0 to 1, or a
-    #   callable called with the response class per render that returns it
-    # @raise [ArgumentError] for anything but a real number from 0 to 1 or a callable, or a lambda or Method that
-    #   can't take the response class
+    # @param value [Numeric] share of renders validated when validate_output allows it, from 0 to 1
+    # @raise [ArgumentError] for anything but a real number from 0 to 1
     def validate_output_sample_rate=(value)
-      @validate_output_sample_rate = self.class.sample_rate?(value) ? value : class_callable!(value, :validate_output_sample_rate, "a number from 0 to 1")
-    end
+      unless value.is_a?(Numeric) && value.real? && (0..1).cover?(value)
+        raise ArgumentError, "validate_output_sample_rate must be a number from 0 to 1"
+      end
 
-    # @param value [Object] a sample rate, as set or as returned by a callable one
-    # @return [Boolean] true for a real number from 0 to 1
-    def self.sample_rate?(value)
-      value.is_a?(Numeric) && value.real? && (0..1).cover?(value)
+      @validate_output_sample_rate = value
     end
 
     # @param value [Boolean] additionalProperties of generated object schemas

@@ -38,14 +38,13 @@ module Versponse
 
       internals = versponse
       internals.requesting(version) do |canonical|
-        plan = internals.plan(version: canonical, view:)
         expansion = internals.expansion(expand, version: canonical, view:)
         selection = internals.selection(fields, version: canonical, view:, expansion:) unless fields.nil?
         context = context.frozen? ? context : context.dup.freeze
         validate = Versponse.configuration.validate_output && OutputValidator.enabled?(self)
         if selection && !selection.all?
           # Validating plans prove the full shape, so a selection renders with the plain plan
-          data = render(object, plan, context, Selection::Scope.new(expansion, selection))
+          data = render(object, internals.plan(version: canonical, view:), context, Selection::Scope.new(expansion, selection))
           OutputValidator.call(self, data, version: canonical, view:, selection:) if validate
         # A validating plan checks while rendering; the output goes through OutputValidator only when a check failed
         elsif validate && (inline = internals.validating_plan(version: canonical, view:))
@@ -53,6 +52,9 @@ module Versponse
           failed = InlineValidation.run { data = render(object, inline, context, expansion) }
           OutputValidator.call(self, data, version: canonical, view:) if failed
         else
+          # The plain plan is looked up only here and for a selection, so a validated render skips it; render is
+          # written out: the extra call costs about 2% of a small render in the interpreter
+          plan = internals.plan(version: canonical, view:)
           data = Collections.collection?(object) ? Collections.map(Collections.items(object)) { |item| plan.call(item, context, expansion) } : plan.call(object, context, expansion)
           OutputValidator.call(self, data, version: canonical, view:) if validate
         end

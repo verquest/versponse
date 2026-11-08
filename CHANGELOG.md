@@ -4,7 +4,7 @@
 
 - `context:` on `reference`, `collection`, `object`, `one_of` and `one_of` variants renders the subtree with its own context: a Hash merged over the parent context, or a callable returning it.
 - `default:` on `field`, `enum` and `array`, and class-level `on_nil`, replace nil values.
-- `on_error` on properties, classes and `config` recovers failed properties (`:nullify`, `:omit` or a handler), with `config.recoverable_errors` and the `config.on_recovered_error` hook.
+- `on_error` on properties, classes and `config` recovers failed properties (`:nullify`, `:omit` or a handler), with `config.recoverable_errors` and the `config.on_recovered_error` hook. `reference property:` reuses the property's policy only where it fits the copy (an `:omit` only when the copy has `if:`/`unless:`).
 - `fields:` on `serialize` renders a selection of fields, `selectable_paths` lists the paths, and `config.unknown_fields` sets what happens to invalid ones.
 - `expandable_targets` maps each expandable path to the response classes it renders.
 
@@ -15,6 +15,9 @@
 ### Fixed
 
 - Validation reads Symbol keys of rendered Hashes as their Strings, like json_schemer, instead of deferring the whole output to json_schemer. Inline validation no longer reports a failure for such values (for example image URL Hashes built with Symbol keys), which made every such render validate twice.
+- Inline validation checks a value once the render has finished whenever a later block could still change it in place and break its schema: frozen Hashes and Arrays with unfrozen contents, Strings whose schema limits more than their type (length, pattern, format, enum), and integers (a mutable Numeric can stop being whole). Such changes were accepted before.
+- The built-in date and date-time formatters return frozen Strings.
+- Callable objects (anything with `#call` that isn't a proc) passed to `on_nil`, `on_error` or `validate_output` are checked for their arity when they are set, like lambdas, instead of failing on a render.
 
 ## [0.1.0] - 2026-11-06
 
@@ -28,7 +31,7 @@
 - `serialize` and `serialize_json` with root keys and meta.
 - OpenAPI schemas per version and view, validation schemas, component names and `$ref`s.
 - `Versponse.components` and `Versponse.eager_load!`.
-- Opt-in output validation (`validate_output`): `true`, or a callable called with the response class per render (e.g. reading Rails' `Current`), and `validate_output_sample_rate` to validate a share of renders (a number, or a callable returning one for the response class). Fields are checked while rendering where the schema proves it equivalent (most classes), so validation costs about 0.4x of a render; a callable `validate_output` is called before the render.
+- Opt-in output validation (`validate_output`): `true`, or a callable called with the response class per render (e.g. reading Rails' `Current`), and `validate_output_sample_rate` to validate a share of renders. Fields are checked while rendering where the schema proves it equivalent (most classes), so validation costs about 0.5x of a render; a callable `validate_output` is called before the render.
 - References to verquest request schemas.
 - Polymorphic collections: an unnamed `one_of` inside a `collection` block types each item.
 - `reference property:` reuses a property of another response class.

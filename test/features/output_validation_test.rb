@@ -87,38 +87,6 @@ class OutputValidationTest < Minitest::Test
     end
   end
 
-  def test_sample_rate_callable_decides_per_class
-    received = []
-    rate = ->(klass) { received << klass and (klass == StrictResponse) ? 1 : 0 }
-
-    with_configuration(validate_output: true, validate_output_sample_rate: rate) do
-      assert_raises(Versponse::InvalidOutputError) { StrictResponse.serialize(INVALID, version: "2025-09") }
-      other = Class.new(Versponse::Base) { version("2025-09") { field :count, type: :integer } }
-
-      assert_equal "many", other.serialize({count: "many"}, version: "2025-09")["count"]
-      assert_equal [StrictResponse, other], received
-    end
-  end
-
-  def test_sample_rate_callable_returning_anything_else_raises
-    with_configuration(validate_output: true, validate_output_sample_rate: ->(_klass) { "all" }) do
-      error = assert_raises(ArgumentError) { StrictResponse.serialize({id: "a", count: 1}, version: "2025-09") }
-
-      assert_match(/validate_output_sample_rate returned "all" for OutputValidationTest::StrictResponse/, error.message)
-    end
-  end
-
-  def test_sample_rate_callable_is_not_called_when_validate_output_is_false
-    called = false
-    rate = ->(_klass) { called = true }
-
-    with_configuration(validate_output: false, validate_output_sample_rate: rate) do
-      StrictResponse.serialize(INVALID, version: "2025-09")
-    end
-
-    refute called
-  end
-
   def test_sampling_draws_per_render
     with_configuration(validate_output: true, validate_output_sample_rate: 0.5) do
       outcomes = Array.new(40) do
@@ -169,12 +137,57 @@ class OutputValidationTest < Minitest::Test
     end
   end
 
-  def test_frozen_values_are_not_rechecked
-    with_configuration(validate_output: true) do
-      tags = ["a", "b"].freeze
-      klass = Class.new(Versponse::Base) { version("2025-09") { array :tags, type: :string } }
+  class FrozenMetaResponse < Versponse::Base
+    version "2025-09" do
+      field :meta, type: :object, additional_properties: {type: "array", items: {type: "string"}}
+      field(:later, type: :boolean) { |object| object[:meta]["k"] << 1 && true }
+    end
+  end
 
-      assert_equal({"tags" => %w[a b]}, klass.serialize({tags:}, version: "2025-09"))
+  # frozen? is shallow: a frozen Hash whose Array is changed later is still caught
+  def test_frozen_containers_changed_later_are_caught
+    with_configuration(validate_output: true) do
+      error = assert_raises(Versponse::InvalidOutputError) { FrozenMetaResponse.serialize({meta: {"k" => ["a"]}.freeze}, version: "2025-09") }
+
+      assert_equal ["/meta/k/1"], error.errors.map { |item| item[:pointer] }
+    end
+  end
+
+  class ShortNameResponse < Versponse::Base
+    version "2025-09" do
+      field :name, type: :string, max_length: 3
+      field(:later, type: :boolean) { |object| object[:name] << "toolong" && true }
+    end
+  end
+
+  # A String whose schema limits more than its type is checked after the render, so growing it in place is caught
+  def test_constrained_strings_changed_later_are_caught
+    with_configuration(validate_output: true) do
+      error = assert_raises(Versponse::InvalidOutputError) { ShortNameResponse.serialize({name: +"abc"}, version: "2025-09") }
+
+      assert_equal ["/name"], error.errors.map { |item| item[:pointer] }
+    end
+  end
+
+  # A Numeric whose value can change in place; json_schemer's integer check reads the value (floor == self)
+  class Amount < Numeric
+    attr_accessor :value
+
+    def initialize(value) = (@value = value)
+    def floor = value.floor
+    def ==(other) = value == (other.is_a?(Amount) ? other.value : other)
+  end
+
+  class AmountResponse < Versponse::Base
+    version "2025-09" do
+      field :amount, type: :integer
+      field(:later, type: :boolean) { |object| (object[:amount].value = 1.5) && true }
+    end
+  end
+
+  def test_integers_changed_later_are_caught
+    with_configuration(validate_output: true) do
+      assert_raises(Versponse::InvalidOutputError) { AmountResponse.serialize({amount: Amount.new(1)}, version: "2025-09") }
     end
   end
 

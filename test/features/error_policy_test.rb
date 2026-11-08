@@ -58,6 +58,33 @@ class ErrorPolicyTest < Minitest::Test
     end
   end
 
+  class OmittedSourceResponse < Versponse::Base
+    version "2025-09" do
+      field :name, type: :string, if: ->(_item) { true }, on_error: :omit, &FAIL
+    end
+  end
+
+  # The copy is required (no if:), so the reused :omit doesn't fit it
+  class RequiredReuseResponse < Versponse::Base
+    version "2025-09" do
+      reference :title, from: OmittedSourceResponse, property: :name
+    end
+  end
+
+  class ConditionalReuseResponse < Versponse::Base
+    version "2025-09" do
+      reference :title, from: OmittedSourceResponse, property: :name, if: ->(_item) { true }
+    end
+  end
+
+  class HandledReuseResponse < Versponse::Base
+    on_error ->(_error, _item, key, _context) { "no #{key}" }
+
+    version "2025-09" do
+      reference :title, from: OmittedSourceResponse, property: :name
+    end
+  end
+
   class FailingChildResponse < Versponse::Base
     version "2025-09" do
       field :name, type: :string, &FAIL
@@ -238,6 +265,13 @@ class ErrorPolicyTest < Minitest::Test
     assert_equal({"title" => nil, "remark" => "no remark"}, render(ReusingResponse))
   end
 
+  # A reused policy applies only where it keeps the copy within its schema; otherwise the class and config decide
+  def test_a_reused_policy_applies_only_where_it_fits
+    assert_raises(Boom) { render(RequiredReuseResponse) }
+    assert_equal({}, render(ConditionalReuseResponse))
+    assert_equal({"title" => "no title"}, render(HandledReuseResponse))
+  end
+
   def test_recoverable_errors_narrow_what_is_recovered
     with_configuration(recoverable_errors: [Boom]) { assert_equal({"name" => nil}, render(LenientResponse)) }
     with_configuration(recoverable_errors: [ArgumentError]) { assert_raises(Boom) { render(LenientResponse) } }
@@ -279,6 +313,14 @@ class ErrorPolicyTest < Minitest::Test
 
     refute_nil klass.versponse.validating_plan(version: "2025-09")
     assert_equal({"id" => "i1", "name" => nil}, render(klass))
+  end
+
+  # Every recovery skips the step's check, so it hands the output to the full validation, :omit included
+  def test_recoveries_flag_inline_validation
+    plan = OmittedSourceResponse.versponse.validating_plan(version: "2025-09")
+
+    refute_nil plan
+    assert(Versponse::InlineValidation.run { plan.call(Item.new("i1"), {}) })
   end
 
   def test_only_an_explicit_association_policy_recovers_a_child_failure

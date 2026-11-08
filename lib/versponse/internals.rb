@@ -436,15 +436,19 @@ module Versponse
     UNPROVEN = Object.new.freeze
     private_constant :UNPROVEN
 
+    # Compiles the validation schema once for both: the root checker goes into the checker cache read before the
+    # build (a reset meanwhile discards it), and the compiler's subschema checkers prove the plan
     def build_validating_plan(version:, view:)
-      return unless checker(version:, view:)
-
+      checkers = @checkers
       schema = validation_schema(version:, view:)
       compiler = Validator::Compiler.new(schemer(version:, view:))
-      compiler.root(schema)
-      InlineValidation::Builder.new(compiler).prove(plan(version:, view:), schema)
-    rescue Validator::Compiler::Unsupported
-      nil
+      root = begin
+        compiler.root(schema)
+      rescue Validator::Compiler::Unsupported
+        nil
+      end
+      checkers.fetch(version) { resolve(version) && Cache.new }.fetch(view) { root }
+      InlineValidation::Builder.new(compiler).prove(plan(version:, view:), schema) if root
     end
 
     def current_version_name

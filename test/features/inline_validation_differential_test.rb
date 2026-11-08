@@ -64,6 +64,39 @@ class InlineValidationDifferentialTest < Minitest::Test
     end
   end
 
+  Boom = Class.new(StandardError)
+
+  class PolicySourceResponse < Versponse::Base
+    version "2025-09" do
+      field(:handled, type: :string, on_error: ->(_error, object, _key, _context) { object[:fallback] }) { |object| object[:boom] ? raise(Boom) : object[:handled] }
+      field(:hidden, type: :string, if: ->(object) { object[:show] }, on_error: :omit) { |object| object[:boom] ? raise(Boom) : object[:hidden] }
+    end
+  end
+
+  # Recovered values, defaults and reused properties skip or change the steps' checks
+  class PolicyResponse < Versponse::Base
+    on_nil ->(object, _key, _context) { object[:filler] }
+
+    version "2025-09" do
+      field(:nullified, type: :integer, nullable: true, on_error: :nullify) { |object| object[:boom] ? raise(Boom) : object[:count] }
+      field(:omitted, type: :string, if: ->(object) { object[:show] }, on_error: :omit) { |object| object[:boom] ? raise(Boom) : object[:text] }
+      field(:handled, type: :string, on_error: ->(_error, object, _key, _context) { object[:fallback] }) { |object| object[:boom] ? raise(Boom) : object[:text] }
+      field :defaulted, type: :string, default: "d"
+      field :computed_default, type: :integer, default: ->(object) { object[:count] }
+      field :filled, type: :string
+      reference :reused, from: PolicySourceResponse, property: :handled
+      reference :reused_hidden, from: PolicySourceResponse, property: :hidden, if: ->(object) { object[:show] }
+      array :days, type: :string, item_schema_options: {format: "date"}
+      field :short, type: :string, max_length: 3, format: "passthrough"
+      # Changes earlier values in place, after their checks
+      field(:grow, type: :boolean) do |object|
+        object[:short] << "long" if object[:grow] && object[:short].is_a?(String)
+        object[:days] << 1 if object[:grow] && object[:days].is_a?(Array)
+        true
+      end
+    end
+  end
+
   def child = {id: "c1", rank: 1}
 
   def input
@@ -103,13 +136,15 @@ class InlineValidationDifferentialTest < Minitest::Test
     return [[:no_validating_plan]] unless inline
 
     inputs.filter_map do |source|
+      # Each render gets its own copy, since a block may change the input in place
       expected = begin
-        plan.call(source, {}.freeze, expansion)
+        plan.call(Marshal.load(Marshal.dump(source)), {}.freeze, expansion)
       rescue Versponse::ExtractionError
         next
       end
       output = nil
-      failed = Versponse::InlineValidation.run { output = inline.call(source, {}.freeze, expansion) }
+      copy = Marshal.load(Marshal.dump(source))
+      failed = Versponse::InlineValidation.run { output = inline.call(copy, {}.freeze, expansion) }
       @compared += 1
       valid = begin
         schemer.valid?(expected)
@@ -136,6 +171,27 @@ class InlineValidationDifferentialTest < Minitest::Test
 
     assert_empty found.first(5)
     assert_operator @compared, :>, 6000, "most mutated inputs must render, or the comparison is empty"
+  end
+
+  def policy_input
+    {boom: false, count: 1, text: "t", fallback: "f", show: true, filler: "x", defaulted: nil, computed_default: nil,
+     filled: nil, handled: "h", hidden: "s", days: [+"2025-09-01", Date.new(2025, 9, 2)], short: +"abc", grow: false}
+  end
+
+  def test_policies_defaults_and_formatters_agree_with_json_schemer
+    @compared = 0
+    passthrough = Versponse::Configuration.new.formatters.merge("passthrough" => ->(value) { value })
+    found = VERSIONS.flat_map do |json_schema_version|
+      with_configuration(json_schema_version:, formatters: passthrough) do
+        inputs = [policy_input, policy_input.merge(boom: true), policy_input.merge(boom: true, show: false), policy_input.merge(grow: true)]
+        inputs += inputs.flat_map { |source| mutations(source) }
+        # A recovery always hands the output to the full validation, so only false accepts and output changes count
+        disagreements(PolicyResponse, inputs).reject { |_source, problem| problem == :false_reject }.map { |found| [json_schema_version, *found] }
+      end
+    end
+
+    assert_empty found.first(5)
+    assert_operator @compared, :>, 2000, "most mutated inputs must render, or the comparison is empty"
   end
 
   def test_validating_plans_prove_the_example_classes

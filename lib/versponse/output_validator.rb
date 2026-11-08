@@ -29,9 +29,7 @@ module Versponse
     end
 
     # Whether this render is validated: validate_output must allow it (true, or a callable returning truthy for
-    # the class), and the render must be sampled (at a fixed rate, or the rate a callable returns for the class).
-    # A false validate_output stops first; then the rate is drawn, so a validate_output callable runs only on
-    # sampled renders
+    # the class), and the render must be sampled; the cheap checks run first, so a callable runs only on sampled renders
     #
     # @param klass [Class] response class serialize was called on
     # @return [Boolean] true when the render is validated
@@ -41,21 +39,9 @@ module Versponse
       return false unless setting
 
       rate = config.validate_output_sample_rate
-      rate = sample_rate(rate, klass) unless rate.is_a?(Numeric)
       return false if rate < 1 && Random.rand >= rate
 
       setting == true || !!setting.call(klass)
-    end
-
-    # @param callable [#call] validate_output_sample_rate
-    # @param klass [Class] response class
-    # @return [Numeric] the rate it returns for the class
-    # @raise [ArgumentError] when it returns anything but a number from 0 to 1
-    def self.sample_rate(callable, klass)
-      rate = callable.call(klass)
-      return rate if Configuration.sample_rate?(rate)
-
-      raise ArgumentError, "validate_output_sample_rate returned #{rate.inspect} for #{klass.name || "AnonymousResponse"}; it must return a number from 0 to 1"
     end
 
     # The compiled checker is the fast path; json_schemer runs only when it fails or is missing

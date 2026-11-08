@@ -11,8 +11,8 @@ module Versponse
       # @param condition [Versponse::Condition, nil] if:/unless:
       # @param formatter [#call, nil] applied to non-nil values
       # @param check [#valid?] checker of the property's schema
-      # @param recheck [Boolean] the schema may accept an Array or Hash, so an unfrozen value is checked again after
-      #   the render (see InlineValidation.recheck_later)
+      # @param recheck [Boolean] a change in place can break the schema, so a value not frozen all the way down is
+      #   checked after the render (see InlineValidation.check)
       def initialize(key:, extractor:, condition:, formatter:, check:, recheck:)
         @check = check
         @recheck = recheck
@@ -31,16 +31,16 @@ module Versponse
         value = @extractor.call(object, hash, context)
         value = @formatter.call(value) if @formatter && !value.nil?
         output[@key] = value
-        # The rescue covers the check only: a check that raises, or defers (UncaughtThrowError outside Root), fails
-        ok = begin
-          @check.valid?(value)
-        rescue
-          false
-        end
-        if !ok
-          InlineValidation.failed!
-        elsif @recheck && !value.frozen?
+        if @recheck && !Ractor.shareable?(value)
           InlineValidation.recheck_later(@check, value)
+        else
+          # The rescue covers the check only: a check that raises, or defers (UncaughtThrowError outside Root), fails
+          ok = begin
+            @check.valid?(value)
+          rescue
+            false
+          end
+          InlineValidation.failed! unless ok
         end
       end
     end

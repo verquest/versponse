@@ -77,9 +77,8 @@ module Versponse
       end
 
       # @param data [Hash] value with a non-String key
-      # @return [Boolean] the answer for the Hash with String keys
-      # @throw [Symbol] {Root::DEFER} when the keys can't all be read as Strings (inside oneOf or not, a false would
-      #   be read as a real answer)
+      # @return [Boolean] the answer for the Hash with String keys; throws {Root::DEFER} when the keys can't all be
+      #   read as Strings (inside oneOf or not, a false would be read as a real answer)
       def with_string_keys(data)
         strings = StringKeys.call(data)
         throw Root::DEFER unless strings

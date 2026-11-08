@@ -33,6 +33,42 @@ class Versponse::InlineValidation::BuilderTest < Minitest::Test
       validating_plan(klass).steps.map(&:class)
   end
 
+  # A change in place can't change a value's class, so scalar fields limited only by their type, booleans and nulls
+  # skip the recheck after the render; anything a change in place can break gets it (integers too: a Numeric's
+  # value decides it)
+  def test_rechecks_follow_what_a_change_in_place_can_break
+    klass = define do
+      field :name, type: :string
+      field :count, type: :integer, nullable: true
+      field :ratio, type: :number
+      field :flag, type: :boolean, enum: [true]
+      field :short, type: :string, max_length: 3
+      field :at, type: :string, format: "date-time"
+      field :choice, type: :string, enum: %w[a b]
+      field :positive, type: :integer, minimum: 1
+      field :map, type: :object
+      array :tags, type: :string
+    end
+    rechecked = validating_plan(klass).steps.to_h { |step| [step.key, step.instance_variable_get(:@recheck)] }
+
+    assert_equal({"name" => false, "count" => true, "ratio" => false, "flag" => false, "short" => true, "at" => true,
+                  "choice" => true, "positive" => true, "map" => true, "tags" => true}, rechecked)
+  end
+
+  # A subclass of a known step may write other keys, so a plan with one isn't proven
+  def test_unknown_step_subclasses_are_unproven
+    internals = define { field :name, type: :string }.versponse
+    plan = internals.plan(version: "2025-09")
+    schema = internals.validation_schema(version: "2025-09", view: :default)
+    compiler = Versponse::Validator::Compiler.new(internals.schemer(version: "2025-09"))
+    compiler.root(schema)
+    builder = Versponse::InlineValidation::Builder.new(compiler)
+    subclassed = Versponse::Plan.new(label: plan.label, steps: [Class.new(Versponse::Steps::Read).new(key: "name", name: :name)])
+
+    assert_nil builder.prove(subclassed, schema)
+    refute_nil builder.prove(plan, schema)
+  end
+
   def test_unproven_object_schemas_have_no_validating_plan
     extra_keyword = Class.new(Versponse::Base) do
       schema_options min_properties: 1

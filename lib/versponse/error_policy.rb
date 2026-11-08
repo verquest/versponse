@@ -60,16 +60,17 @@ module Versponse
       list.any? ? list.freeze : nil
     end
 
-    # The property's own policy (or the reused property's), else the first of the class's and config.on_error that
-    # fits what it renders (a :nullify only fits nullable properties, an :omit only conditional ones); :raise stops
-    # the search
+    # The property's own policy, or the reused property's when it fits the copy (which has the reusing property's
+    # condition), else the first of the class's and config.on_error that fits what it renders (a :nullify only fits
+    # nullable properties, an :omit only conditional ones); :raise stops the search
     #
     # @param property [Versponse::Properties::Base] property as declared in the plan
     # @param target [Versponse::Properties::Base] what it renders: itself, or the copy a reference property: reuses
     # @param policies [Versponse::ClassPolicies] the compiling class's settings
     # @return [Recovery, nil] nil when the property raises
     def self.resolve(property, target, policies)
-      own = property.on_error || target.on_error
+      reused = target.on_error unless target.equal?(property)
+      own = property.on_error || (reused if reused && fits?(reused, target))
       if own
         return (own == :raise) ? nil : Recovery.new(own, key: property.key, response: policies.response, explicit: true)
       end

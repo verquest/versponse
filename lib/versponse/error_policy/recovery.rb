@@ -31,8 +31,9 @@ module Versponse
         !error.is_a?(Error) && recoverable?(error)
       end
 
-      # Writes nil, leaves the key out, or writes the handler's value. A written value skips the step's inline check,
-      # so it forces full output validation (a nullable property's declared any_of may still reject nil).
+      # Writes nil, leaves the key out, or writes the handler's value. Each skips the step's inline check, so it
+      # forces full output validation (a nullable property's declared any_of may still reject nil, a left-out key may
+      # be required).
       #
       # @param error [StandardError] what the step raised
       # @param object [Object] the object being rendered
@@ -44,8 +45,8 @@ module Versponse
           output.delete(@key)
         else
           output[@key] = (@policy == :nullify) ? nil : @policy.call(error, object, @key, context)
-          InlineValidation.failed!
         end
+        InlineValidation.failed!
         report(error, object)
       end
 
