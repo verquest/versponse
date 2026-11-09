@@ -42,4 +42,9 @@ class Versponse::RegistryTest < Minitest::Test
 
     assert_nil Versponse::Registry.instance_variable_get(:@canonical)["0000-early"]
   end
+
+  # Undeclared names resolve to the same declared version, so caches keyed by it don't grow with client strings
+  def test_undeclared_names_share_a_canonical_version
+    assert_equal Versponse::Registry.canonical("2099-01-01-a"), Versponse::Registry.canonical("2099-01-01-b")
+  end
 end

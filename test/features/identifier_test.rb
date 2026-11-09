@@ -76,8 +76,11 @@ class IdentifierTest < Minitest::Test
     assert_equal %i[default], PlainResponse.versponse.resolve("2025-09").view_names
   end
 
+  # Rendering asks for a view the class doesn't have, so it's the same error as any unknown view
   def test_collapsed_without_an_identifier_raises
-    assert_raises(Versponse::DefinitionError) { PlainResponse.serialize({id: "x"}, version: "2025-09", view: :collapsed) }
+    error = assert_raises(Versponse::ViewNotFoundError) { PlainResponse.serialize({id: "x"}, version: "2025-09", view: :collapsed) }
+
+    assert_equal "IdentifierTest::PlainResponse 2025-09 has no identifier, so it has no collapsed view. Available views: default", error.message
   end
 
   def test_full_shape_renders_the_identifier

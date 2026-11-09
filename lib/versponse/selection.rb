@@ -19,6 +19,11 @@ module Versponse
       from_hash(tree, signature: paths.join("\n").freeze)
     end
 
+    # @return [Selection] a selection of no keys: plans render only what always renders (identifiers and consts)
+    def self.none
+      new({}.freeze, signature: "")
+    end
+
     # @param tree [Hash{String => Hash, Symbol}] node being built (:all for a key selected whole)
     # @param segments [Array<String>] path segments
     # @return [void]

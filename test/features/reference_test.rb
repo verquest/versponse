@@ -103,7 +103,7 @@ class ReferenceTest < Minitest::Test
 
   def test_openapi30_nullable_reference
     with_configuration(json_schema_version: :openapi30) do
-      expected = {"allOf" => [{"$ref" => "#/components/schemas/MoneyResponse"}], "nullable" => true}
+      expected = {"anyOf" => [{"$ref" => "#/components/schemas/MoneyResponse"}, {"nullable" => true, "enum" => [nil]}]}
 
       assert_equal expected, UnitTypeResponse.to_schema(version: "2025-09")["properties"]["deposit"]
     end

@@ -42,6 +42,8 @@ Sponsored by [Stora](https://stora.co)
 gem "versponse"
 ```
 
+Versponse needs Ruby 3.2 or later. [verquest](https://github.com/verquest/verquest) is optional: install it to reference request classes and to list them with `requests namespace:`.
+
 ## Quick start
 
 ```ruby
@@ -89,6 +91,8 @@ UnitTypeResponse.serialize(unit_type, version: "2025-09")
 ```
 
 `serialize` takes an object, a Hash with Symbol or String keys, a Set, or anything that responds to `to_ary`, such as an Array or an ActiveRecord relation. It returns a Hash with String keys. `serialize_json` takes the same arguments and returns a String.
+
+Output is yours to change: arrays are new Arrays, and Hash or Array `default:` and `const` values are copies. A `field type: :object` value is the source's own object.
 
 The value of a `collection` or `array` property must be a Set or respond to `to_ary`. Any other value raises `Versponse::ExtractionError`.
 
@@ -211,6 +215,8 @@ end
 ```
 
 A request for any version resolves to the closest declared version at or before it, so `"2025-12"` uses `"2025-09"`. A request older than every version raises `Versponse::VersionNotFoundError`. Each referenced class resolves the requested version on its own, so a `MoneyResponse` with only `2025-01` serves every later request.
+
+A class with versions can't be subclassed, which raises `Versponse::DefinitionError`. Share code through a base class without versions.
 
 `supported_versions` limits the versions a class serves. Both bounds are inclusive and optional:
 
@@ -348,6 +354,7 @@ OrderResponse.serialize(order, fields: ["status", "total", "line_items.price"], 
 - Identifiers and `const` properties, including `one_of` discriminators, always render.
 - Unselected properties never run their blocks, so their queries are skipped too.
 - A path below an expandable association needs that association expanded. Otherwise, like an unknown path, it raises `Versponse::InvalidFieldsError` (`paths` lists them), unless `config.unknown_fields = :ignore`.
+- Under `:ignore`, a `fields:` list with no valid path renders only identifiers and consts.
 - `UnitResponse.selectable_paths(version: "2025-09")` lists every path.
 - Schemas describe the full shape. With `validate_output`, a selected render is validated against a copy of its schema that requires only the selected keys.
 
@@ -381,7 +388,7 @@ PriceListResponse.to_schema(version: "2025-09")
 - `component_name(view:)` drops the class name's first namespace, joins the rest, and appends the view: `PriceListResponse`, `PriceListResponseEmbedded`. `Api::V1::UserResponse` becomes `V1UserResponse`. To rename, override `self.base_component_name`, for example `def self.base_component_name = super.delete_suffix("Response")`.
 - `to_ref(view:, property: nil)` returns `"#/components/schemas/<name>"`. An anonymous class has no component name, so it raises `Versponse::DefinitionError`.
 - With `discriminator:`, `one_of` emits an OpenAPI `mapping` built from each variant's `const`, such as `{"order" => "#/components/schemas/OrderResponse"}`. A variant without that `const`, or two variants with the same value, raise `DefinitionError` when the schema is built.
-- A `one_of` is a `oneOf`, in documents and validation schemas alike. Without `discriminator:`, its variants need shapes a client can tell apart: if one payload fits two variants, `oneOf` rejects it, so `validate_output` raises and strict consumers such as rswag's response validation fail. For polymorphic responses, prefer `discriminator:`.
+- A `one_of` is a `oneOf`, in documents and validation schemas alike, except an expandable `one_of`, which is an `anyOf` of each variant's full shape and its inline collapsed shape. Without `discriminator:`, its variants need shapes a client can tell apart: if one payload fits two variants, `oneOf` rejects it, so `validate_output` raises and strict consumers such as rswag's response validation fail. For polymorphic responses, prefer `discriminator:`.
 - `to_schema(root: "unit_types", meta: MetaResponse, collection: true)` returns a wrapper schema for the whole response body. The envelope is strict (`additionalProperties: false`) whatever `default_additional_properties` says.
 - `description` and `schema_options` on a class reach its subclasses, so an abstract `ApplicationResponse` can carry them. Versponse looks them up when it builds schemas, so a later change to the parent still applies. A subclass's `schema_options` merge with its ancestors', and the subclass wins per key. A version's own `description` and `schema_options` win over both.
 - Collapsed shapes are strict (`additionalProperties: false`) whatever `default_additional_properties` says, so only a real collapsed payload matches them.
@@ -412,17 +419,18 @@ class PublicApiDocument < Versponse::OpenAPI::Document
   finalize { |document, version| document["info"]["x-build-date"] = Date.current.iso8601 }
 end
 
-PublicApiDocument.build(version: "2025-09")      # => String-keyed Hash
+PublicApiDocument.build(version: "2025-09")      # => Hash, a copy you can change; schema keys are Strings
 PublicApiDocument.validate(version: "2025-09")   # => [] when valid OpenAPI and every "#/..." $ref resolves
 ```
 
 - Values use OpenAPI's own key names, which are never camelized. The exception is `schema`: a hand-written component is a schema, so its keys are camelized like every other schema (`additional_properties:` becomes `additionalProperties`). Keys inside `properties` and a discriminator's `mapping`, values of `enum`, `example`, and `default`, and `x-` extensions keep their spelling.
 - A block that takes an argument receives the version. A `finalize` block that takes one argument receives only the document.
 - `responses` and `requests` take one or more classes, or `namespace:` with a Module or a String. At build, Versponse eager-loads the namespace through Zeitwerk, so its classes don't have to be loaded first. An undefined namespace, or one with no response classes or body requests, raises `Versponse::DefinitionError`. So does a listed class of the wrong kind, or a listed request whose `location` isn't `:body`.
-- `wrapper` turns a Symbol name into PascalCase (`:contact_list` declares `ContactList`) and uses a String as given. Its `meta:` takes a response class, whose `$ref` describes `"meta"`. `serialize(meta:)` takes the Hash instead.
+- `wrapper` turns a Symbol name into PascalCase (`:contact_list` declares `ContactList`) and uses a String as given. Its `meta:` takes a response class, whose `$ref` describes `"meta"`, and anything else raises `Versponse::DefinitionError`. `serialize(meta:)` takes the Hash instead.
 - `server` and `tag` write keywords that start with `x_` as extensions, with every underscore turned into a hyphen: `x_internal: true` becomes `"x-internal" => true`, and `x_display_name:` becomes `"x-display-name"`.
 - `security` sets the top-level security requirement. `versions` and `document_name` called without arguments return what the class declares.
 - `openapi` defaults to `"3.1.1"`, or `"3.0.3"` under `config.json_schema_version = :openapi30`, to match how schemas are written. Declaring `openapi "3.0.3"` while schemas are written for 3.1 (or the other way round) raises `Versponse::DefinitionError` on `build`.
+- `build` raises `ArgumentError` for a version the document doesn't declare, and `webhooks` raise `Versponse::DefinitionError` under `:openapi30`, which has no webhooks section.
 - `finalize` hooks run last, on a copy of the document they can change freely, components included.
 - Two components with the same name raise `Versponse::DefinitionError`.
 
@@ -505,9 +513,21 @@ The property's policy wins, then the class's, then the config's. Versponse check
 
 - An explicit `on_error: :nullify` needs `nullable: true`, and `:omit` needs `if:` or `unless:`, so recovered output still matches the schema. A class-level or config-level `:nullify` or `:omit` applies only to the properties it fits. The others fall through to the next level, ending at `:raise`. A handler applies to every property.
 - A handler's return value isn't known in advance, so with `validate_output` a render that used a handler is validated in full. So is a render with a nullified value, because a declared `any_of:` may still reject `null`.
-- `config.recoverable_errors` (default `[StandardError]`) lists what a policy recovers. Versponse's own errors aren't recovered, and a `NoMethodError` or `KeyError` no policy recovers still becomes `ExtractionError`.
+- `config.recoverable_errors` (default `[StandardError]`) lists what a policy recovers. Versponse's own errors aren't recovered, and a `NoMethodError` or `KeyError` no policy recovers still becomes `ExtractionError`, unless the `on_recovered_error` hook raised it.
 - A failure inside a nested class or inline object is recovered only by an `on_error:` declared on that association (`reference :site, from: SiteResponse, nullable: true, on_error: :nullify`), and then an `ExtractionError` from it too. Class-level and config-level policies never drop a whole subtree. The child's failure is marked on the exception object, so a frozen exception can't be marked and is treated like a failure of the association itself.
 - Versponse calls `config.on_recovered_error = ->(error, response:, key:, object:) { ... }` for every recovered error. It passes the class that recovered the error, the property's key, and the object being rendered. An error raised inside the hook propagates, and no policy recovers it, not even a parent association's.
+
+### Errors
+
+Every error Versponse raises inherits from `Versponse::Error`:
+
+- `DefinitionError`: a class or document declares something invalid.
+- `VersionNotFoundError`, `ViewNotFoundError`, `PropertyNotFoundError`: a render or schema asks for something the class doesn't have. A `nil` view, or `:collapsed` on a class without an identifier, raises `ViewNotFoundError` too.
+- `ExtractionError`: reading a value failed. `label` names the class, version and view, `keys` the path to the property, and `detail` the cause.
+- `InvalidOutputError`: output doesn't match its schema. The message names the first two errors. `errors` lists them all with `:pointer`, `:type`, `:message` and `:details`, and for a rendered collection they point into it (`/1/count`).
+- `InvalidExpandError`, `InvalidFieldsError`: `expand:` or `fields:` names unknown paths.
+
+`Versponse.reset_caches!` drops compiled plans and schemas, for example after changing configuration in tests.
 
 ## Sharing references with verquest
 
@@ -590,7 +610,7 @@ end
 - `const` is written as a one-value `enum` under `:draft4` and `:openapi30`.
 - Recursive classes are named with `$anchor` from 2019-09, a plain-name `$id` in drafts 6 and 7, and `id` in draft 4 and OpenAPI 3.0.
 
-`:openapi30` writes `nullable: true` instead of a `"null"` type, and documents declare `openapi: "3.0.3"`. A nullable enum also lists `null` among its values. A nullable `reference`, `one_of`, or other `$ref` is written as `{"allOf": [{"$ref": ...}], "nullable": true}`, the form that code generators expect. Strict 3.0 validators ignore `nullable` without a `type`, so they reject `null` in that form. Output validation always uses the 3.1 forms internally and accepts it.
+`:openapi30` writes `nullable: true` instead of a `"null"` type, and documents declare `openapi: "3.0.3"`. A nullable enum also lists `null` among its values. A nullable `reference`, `one_of`, or expandable property gets a null branch, `{"nullable": true, "enum": [null]}`: a reference is written as `{"anyOf": [{"$ref": ...}, {"nullable": true, "enum": [null]}]}`, and a `one_of` or expandable `anyOf` lists the branch among its own. Strict 3.0 validators read `nullable` only beside a `type` or `enum`, so this is the form in which they accept `null`. Output validation uses the 3.1 forms internally.
 
 Versponse caches plans and schemas. Setting any of these clears the caches, because they change output: `json_schema_version`, `formatters`, `version_resolver`, `field_order`, `default_additional_properties`, `on_error`, and `recoverable_errors`. Set `custom_field_types` before response classes load, because properties resolve their types when they're defined.
 
@@ -612,6 +632,8 @@ field :id, type: :site_id                 # {"type" => "string", "pattern" => "^
 array :site_ids, type: :site_id           # items use the custom schema
 field :email, type: :email, description: "Contact email"   # field options win on conflict
 ```
+
+Patterns are ECMA-262, in documents and output validation alike, so `^` and `$` anchor the whole string. A Regexp `pattern:`, in `schema_options` or a property's options, is written as one: `\A` and `\z` become `^` and `$`. A Regexp with options (`/i`, `/m`, `/x`, or an inline group such as `(?i)`) or `\Z` raises `Versponse::DefinitionError`.
 
 - `type` must be a built-in type, and a custom name can't replace a built-in one.
 - `required:` is ignored, because it only means something for requests.

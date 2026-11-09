@@ -10,6 +10,9 @@ module Versponse
       # Schema allowing null next to a referenced schema
       NULL_SCHEMA = {"type" => "null"}.freeze
 
+      # Null in OpenAPI 3.0, which has no null type: validators read nullable only beside a type or enum
+      NULL_SCHEMA_30 = {"nullable" => true, "enum" => [nil].freeze}.freeze
+
       # JSON Schema and OpenAPI keywords a property takes as options (camelized), besides x- extensions.
       # type, required, nullable, discriminator and $ref come from the DSL itself.
       SCHEMA_KEYWORDS = %w[
@@ -247,7 +250,7 @@ module Versponse
 
         require "json_schemer"
         schema = schema(SchemaContext.new(version: nil, validation: true))
-        return if JSONSchemer.schema(schema, meta_schema: Versponse.configuration.json_schema_uri).valid?(@default)
+        return if JSONSchemer.schema(schema, meta_schema: Versponse.configuration.json_schema_uri, regexp_resolver: "ecma").valid?(@default)
 
         raise DefinitionError, "#{key}: default: #{@default.inspect} doesn't match the property's schema"
       end
@@ -259,6 +262,9 @@ module Versponse
 
         unless @default.nil?
           value = @default
+          # A Hash or Array default is the caller's to change, so each render gets its own copy
+          return ->(_object, _context) { DeepCopy.call(value) } if DeepCopy.container?(value)
+
           return ->(_object, _context) { value }
         end
         on_nil = policies.on_nil
@@ -289,8 +295,7 @@ module Versponse
         schema.merge("type" => [*schema["type"], "null"])
       end
 
-      # OpenAPI 3.0's `nullable` is not honoured next to allOf/enum/oneOf by validators,
-      # so validation schemas always use the 3.1 forms
+      # OpenAPI 3.0 documents write null with the nullable keyword; validation schemas always use the 3.1 forms
       def nullable_keyword?(context)
         Versponse.configuration.nullable_keyword? && !context&.validation?
       end
@@ -302,16 +307,18 @@ module Versponse
 
       def nullable_ref(schema, context)
         return schema unless nullable?
-        return {"allOf" => [schema], "nullable" => true} if nullable_keyword?(context)
 
-        {"anyOf" => [schema, NULL_SCHEMA]}
+        {"anyOf" => [schema, null_schema(context)]}
       end
 
       def nullable_choice(keyword, schemas, context)
         return {keyword => schemas} unless nullable?
-        return {keyword => schemas, "nullable" => true} if nullable_keyword?(context)
 
-        {keyword => [*schemas, NULL_SCHEMA]}
+        {keyword => [*schemas, null_schema(context)]}
+      end
+
+      def null_schema(context)
+        nullable_keyword?(context) ? NULL_SCHEMA_30 : NULL_SCHEMA
       end
     end
   end

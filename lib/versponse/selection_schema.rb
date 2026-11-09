@@ -51,7 +51,10 @@ module Versponse
       pruned["properties"] = schema["properties"].to_h do |key, property|
         [key, selection.selected?(key) ? prune(property, selection.child(key), anchors) : property]
       end
-      pruned["required"] = schema["required"].select { |key| selection.selected?(key) } if schema["required"].is_a?(::Array)
+      required = schema["required"].select { |key| selection.selected?(key) } if schema["required"].is_a?(::Array)
+      # OpenAPI 3.0 and draft 4 need at least one item in required
+      pruned.delete("required")
+      pruned["required"] = required if required&.any?
       pruned
     end
 

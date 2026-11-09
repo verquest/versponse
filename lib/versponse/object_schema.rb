@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Versponse
-  # Builds an object schema from properties; every unconditional property is required
+  # Builds an object schema from properties; every unconditional property is required (no required keyword when none is)
   #
   # @api private
   module ObjectSchema
@@ -14,7 +14,9 @@ module Versponse
     def self.build(properties, context, description: nil, schema_options: {}, additional_properties: Versponse.configuration.default_additional_properties)
       schema = {"type" => "object"}
       schema["description"] = description if description
-      schema["required"] = properties.reject(&:conditional?).map(&:key)
+      required = properties.reject(&:conditional?).map(&:key)
+      # OpenAPI 3.0 and draft 4 need at least one item in required
+      schema["required"] = required unless required.empty?
       schema["properties"] = properties.to_h { |property| [property.key, property.schema(context)] }
       schema["additionalProperties"] = additional_properties
       schema.merge(schema_options)

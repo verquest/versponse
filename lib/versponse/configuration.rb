@@ -175,6 +175,7 @@ module Versponse
     #
     # @param value [Hash{Symbol, String => Hash}] verquest-shaped types, e.g. {site_id: {type: "string", schema_options: {pattern: "^site_"}}}
     # @raise [ArgumentError] when value is not a Hash or a type is invalid
+    # @raise [Versponse::DefinitionError] for a Regexp pattern ECMA-262 can't express
     def custom_field_types=(value)
       raise ArgumentError, "custom_field_types must be a Hash" unless value.is_a?(Hash)
 

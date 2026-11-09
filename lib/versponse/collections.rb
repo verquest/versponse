@@ -25,7 +25,8 @@ module Versponse
     # @param items [Array] items to render
     # @yieldparam item [Object] one item
     # @return [Array] the rendered items
-    # @raise [Versponse::ExtractionError] with the item's index in its keys when an item fails
+    # @raise [Versponse::ExtractionError] with the item's index in its keys when an item fails; an on_recovered_error
+    #   hook's error propagates as raised
     def self.map(items)
       index = 0
       items.map do |item|
@@ -34,8 +35,14 @@ module Versponse
         rendered
       end
     rescue ExtractionError => e
+      raise if ErrorPolicy.unrecoverable?(e)
+
       raise ExtractionError.new(label: e.label, keys: [index.to_s, *e.keys], detail: e.detail)
     rescue NoMethodError, KeyError => e
+      # An on_recovered_error hook's error propagates as raised; otherwise this is a one_of item matching no
+      # variant, which no plan wrapped (the parent plan adds its label)
+      raise if ErrorPolicy.unrecoverable?(e)
+
       raise ExtractionError.new(label: "", keys: [index.to_s], detail: e.message)
     end
   end

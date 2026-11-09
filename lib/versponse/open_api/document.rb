@@ -70,6 +70,8 @@ module Versponse
           declarations.versions = names.map(&:to_s)
         end
 
+        # Alias of {versions} without arguments, kept for callers that read it under this name
+        #
         # @return [Array<String>] declared versions
         def document_versions = versions
 

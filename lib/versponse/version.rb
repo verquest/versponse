@@ -137,8 +137,7 @@ module Versponse
 
     # @param view_name [Symbol, String] view name
     # @return [Array<Versponse::Properties::Base>] properties of the view in output order
-    # @raise [Versponse::ViewNotFoundError] for an unknown view
-    # @raise [Versponse::DefinitionError] for :collapsed without an identifier
+    # @raise [Versponse::ViewNotFoundError] for an unknown view, or :collapsed without an identifier
     def properties_for(view_name)
       FieldOrder.call(declared_properties_for(view_name.to_sym), identifiers: identifiers.keys)
     end
@@ -176,7 +175,7 @@ module Versponse
     end
 
     def collapsed_properties
-      raise DefinitionError, "#{label} has no identifier, so it has no collapsed view" unless identifiers?
+      raise ViewNotFoundError, "#{label} has no identifier, so it has no collapsed view. Available views: #{view_names.join(", ")}" unless identifiers?
 
       identifiers.values
     end

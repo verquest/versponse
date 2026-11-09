@@ -15,10 +15,10 @@ module Versponse
     # @param definition [Hash] type: and schema_options: (required: is ignored)
     # @return [Hash{String => Object}] frozen {"type" => base type, "schema_options" => camelized keywords}
     # @raise [ArgumentError] for a built-in name, unknown keys or an unsupported type:
+    # @raise [Versponse::DefinitionError] for a Regexp pattern ECMA-262 can't express
     def self.normalize(name, definition)
       definition = check!(name.to_s, definition)
-      options = (definition[:schema_options] || {}).transform_values { |value| value.is_a?(Regexp) ? value.source : value }
-      DeepFreeze.call({"type" => definition[:type].to_s, "schema_options" => Naming.camelize_keys(options)})
+      DeepFreeze.call({"type" => definition[:type].to_s, "schema_options" => Naming.camelize_keys(definition[:schema_options] || {})})
     end
 
     # @param type [Symbol, String, Array<Symbol, String>] built-in or custom type name, or a union of built-in types

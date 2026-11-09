@@ -18,7 +18,7 @@ class OutputValidationTest < Minitest::Test
 
       assert_equal "/count", error.errors.first[:pointer]
       assert_equal "integer", error.errors.first[:type]
-      assert_match(%r{OutputValidationTest::StrictResponse output does not match its 2025-09/default schema}, error.message)
+      assert_equal "OutputValidationTest::StrictResponse output does not match its 2025-09/default schema: value at `/count` is not an integer", error.message
     end
   end
 
@@ -127,13 +127,13 @@ class OutputValidationTest < Minitest::Test
     end
   end
 
-  # Unfrozen Arrays and Hashes are checked again after the render, so changing them in place later is caught
+  # Unfrozen Hashes passed through from the source are checked again after the render, so changing them in place later is caught
   def test_values_changed_later_in_the_render_are_caught
     with_configuration(validate_output: true) do
       refute_nil MutatingResponse.versponse.validating_plan(version: "2025-09")
       error = assert_raises(Versponse::InvalidOutputError) { MutatingResponse.serialize({tags: ["a"], meta: {}}, version: "2025-09") }
 
-      assert_equal %w[/meta/count /tags], error.errors.map { |item| item[:pointer] }.sort
+      assert_equal %w[/meta/count], error.errors.map { |item| item[:pointer] }.sort
     end
   end
 
@@ -192,20 +192,20 @@ class OutputValidationTest < Minitest::Test
   end
 
   class ItemResponse < Versponse::Base
-    version("2025-09") { array :names, type: :string }
+    version("2025-09") { field :meta, type: :object, additional_properties: {type: "string"} }
   end
 
   class EitherResponse < Versponse::Base
     version "2025-09" do
       one_of(:either) { reference from: ItemResponse, match: Hash }
-      field(:later, type: :boolean) { |object| object[:either][:names] << 1 && true }
+      field(:later, type: :boolean) { |object| object[:either][:meta].store("count", 1) && true }
     end
   end
 
-  # A one_of is checked as a whole after it renders; its rendered Hash still holds the source's Array
+  # A one_of is checked as a whole after it renders; its rendered Hash still holds the source's Hash
   def test_subtrees_changed_later_in_the_render_are_caught
     with_configuration(validate_output: true) do
-      assert_raises(Versponse::InvalidOutputError) { EitherResponse.serialize({either: {names: ["a"]}}, version: "2025-09") }
+      assert_raises(Versponse::InvalidOutputError) { EitherResponse.serialize({either: {meta: {}}}, version: "2025-09") }
     end
   end
 
@@ -269,6 +269,31 @@ class OutputValidationTest < Minitest::Test
       error = assert_raises(Versponse::InvalidOutputError) { klass.serialize({a: "x"}, version: "2025-09") }
 
       assert_match(/\AAnonymousResponse output/, error.message)
+    end
+  end
+
+  class CodeResponse < Versponse::Base
+    version("2025-09") { field :code, type: :string, pattern: /\A[a-z]+\z/ }
+  end
+
+  # Patterns are ECMA-262, where ^ and $ anchor the whole string, not a line
+  def test_patterns_anchor_the_whole_string
+    with_configuration(validate_output: true) do
+      assert_equal({"code" => "abc"}, CodeResponse.serialize({code: "abc"}, version: "2025-09"))
+      assert_raises(Versponse::InvalidOutputError) { CodeResponse.serialize({code: "abc\nDEF"}, version: "2025-09") }
+    end
+  end
+
+  # Items are validated one by one, so their messages are rewritten to point into the collection
+  def test_message_names_the_first_two_errors
+    with_configuration(validate_output: true) do
+      error = assert_raises(Versponse::InvalidOutputError) do
+        StrictResponse.serialize([{id: 1, count: "x"}, {id: 2, count: "y"}], version: "2025-09")
+      end
+
+      assert_equal "OutputValidationTest::StrictResponse output does not match its 2025-09/default schema: " \
+        "value at `/0/id` is not a string; value at `/0/count` is not an integer; and 2 more", error.message
+      assert_equal "value at `/1/count` is not an integer", error.errors.last[:message]
     end
   end
 end

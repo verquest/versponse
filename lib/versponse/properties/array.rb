@@ -35,10 +35,11 @@ module Versponse
       # @param formatters [Hash{String => #call}] formatters by JSON Schema format, for the compiling class and version
       # @param policies [Versponse::ClassPolicies] class-level on_nil and on_error of the compiling class
       # @return [Versponse::Steps::Value] compiled step; like a collection, the value is read with {Collections.items}
-      #   (to_ary values and Sets; anything else raises), and items are formatted by their format
+      #   (to_ary values and Sets; anything else raises) into a new Array, and items are formatted by their format
       def step(version:, formatters:, policies: ClassPolicies::NONE)
         formatter = formatters[@item_schema_options["format"]]
-        return value_step(formatter: ->(items) { Collections.items(items) }, policies:) unless formatter
+        # The source's Array (or a relation's loaded records) is copied, so changing the output leaves it alone
+        return value_step(formatter: ->(items) { Collections.items(items).dup }, policies:) unless formatter
 
         value_step(formatter: ->(items) { Collections.items(items).map { |item| item.nil? ? nil : formatter.call(item) } }, policies:)
       end

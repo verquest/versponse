@@ -13,8 +13,14 @@
 
 - `default:` on `reference`, `collection`, `object`, `one_of` and `const` raises `DefinitionError`. On `field`, `enum` and `array` a static value must match the property's schema, and `default: nil` means no default (it no longer writes `"default": null`).
 - `responses namespace:` and `requests namespace:` take a Module or a String and eager-load the namespace through Zeitwerk at build. An undefined namespace, or one with no response classes or body requests, raises `DefinitionError`, and so does a listed class of the wrong kind or a listed query request. `rswag_specs` raises for a document without `versions`.
-- `wrapper` and `to_schema` raise `ArgumentError` for a `meta:` that isn't a class, and `to_schema` raises `VersionNotFoundError` when the `meta:` class doesn't serve the version.
+- `wrapper` and `to_schema` raise `DefinitionError` for a `meta:` that isn't a class, and `to_schema` raises `VersionNotFoundError` when the `meta:` class doesn't serve the version.
 - `wrapper` turns a Symbol name into PascalCase (`:contact_list` declares `ContactList`), and hand-written `schema` components are camelized like every other schema.
+- `Document.build` returns a copy the caller can change, with or without `finalize` hooks. Rendered arrays are new Arrays, and Hash or Array defaults and consts render as copies.
+- Under `:openapi30`, nullable references, `one_of` and expandable properties get a `{"nullable": true, "enum": [null]}` branch instead of `nullable: true` beside a combinator, which strict validators ignore. Object schemas leave out an empty `required`, which 3.0 and draft 4 reject.
+- A Regexp `pattern:` is written as ECMA-262 (`\A` and `\z` become `^` and `$`), and options (flags or inline groups) or `\Z` raise `DefinitionError`. Output validation reads patterns as ECMA-262, as documents do.
+- `const` values need a JSON type, like `enum` values.
+- `view: nil`, and `view: :collapsed` on a class without an identifier, raise `ViewNotFoundError`; `context: nil` renders with an empty context.
+- `InvalidOutputError`'s message names the first two errors, and errors of collection items point into the collection (`/1/count`).
 - A document subclass's `info` merges over its parent's. `schema`, `wrapper` and `security_scheme` with a parent's name replace the parent's entry, and one class declaring a name twice raises `DefinitionError`.
 
 ### Fixed
@@ -23,7 +29,9 @@
 - Inline validation checks a value once the render has finished whenever a later block could still change it in place and break its schema: frozen Hashes and Arrays with unfrozen contents, Strings whose schema limits more than their type (length, pattern, format, enum), and integers (a mutable Numeric can stop being whole). Such changes were accepted before.
 - The built-in date and date-time formatters return frozen Strings.
 - Callable objects (anything with `#call` that isn't a proc) passed to `on_nil`, `on_error` or `validate_output` are checked for their arity when they are set, like lambdas, instead of failing on a render.
-- Camelizing `schema_options` keeps `x-` extension keys and their values, and a discriminator's `mapping` keys, as written.
+- Camelizing `schema_options` keeps `x-` extension keys and their values, a discriminator's `mapping` keys, and `definitions` names, as written.
+- An error raised by `config.on_recovered_error` as a `NoMethodError` or `KeyError` propagates instead of being recovered by a parent association's `on_error:`.
+- Under `unknown_fields = :ignore`, a `fields:` list with no valid path renders only identifiers and consts instead of the whole object.
 
 ## [0.1.0] - 2026-11-06
 

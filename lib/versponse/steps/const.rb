@@ -8,7 +8,7 @@ module Versponse
     class Const
       # @return [String] output key
       attr_reader :key
-      # @return [Object] the rendered constant
+      # @return [Object] the frozen constant value (each render copies a Hash or Array)
       attr_reader :value
 
       # @param key [String] output key
@@ -17,6 +17,8 @@ module Versponse
       def initialize(key:, value:, condition:)
         @key = key
         @value = value
+        # A Hash or Array is the caller's to change, so each render gets its own copy
+        @copy = DeepCopy.container?(value)
         @condition = condition
         freeze
       end
@@ -35,7 +37,7 @@ module Versponse
       def call(object, _hash, context, output, _expansion)
         return if @condition && !@condition.call(object, context)
 
-        output[@key] = @value
+        output[@key] = @copy ? DeepCopy.call(@value) : @value
       end
     end
   end

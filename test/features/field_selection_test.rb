@@ -212,7 +212,11 @@ class FieldSelectionTest < Minitest::Test
     assert_equal %w[nope lines.nope], error.paths
     with_configuration(unknown_fields: :ignore) do
       assert_equal({"id" => "o1", "status" => "open"}, serialize(fields: %w[nope status]))
-      assert_equal serialize, serialize(fields: %w[nope])
+      reads = OrderResponse.total_reads
+
+      # Paths were given, so none valid selects nothing: only the identifier renders, and no block runs
+      assert_equal({"id" => "o1"}, serialize(fields: %w[nope]))
+      assert_equal reads, OrderResponse.total_reads
     end
   end
 

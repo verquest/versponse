@@ -7,11 +7,11 @@ module Versponse
   module Wrapper
     # @param meta [Object, nil] meta: given for a wrapper schema
     # @return [void]
-    # @raise [ArgumentError] when meta isn't a class with a $ref, such as the Hash serialize takes
+    # @raise [Versponse::DefinitionError] when meta isn't a class with a $ref, such as the Hash serialize takes
     def self.check_meta!(meta)
       return if meta.nil? || meta.respond_to?(:to_ref)
 
-      raise ArgumentError, %(meta: takes a response class, whose $ref describes "meta"; serialize(meta:) takes the Hash)
+      raise DefinitionError, %(meta: takes a response class, whose $ref describes "meta"; serialize(meta:) takes the Hash)
     end
 
     # The envelope is strict (additionalProperties: false) whatever config.default_additional_properties says

@@ -46,8 +46,8 @@ class SchemaOptionCombinatorsTest < Minitest::Test
   def test_openapi30_refs_keep_the_ref_next_to_all_of
     with_configuration(json_schema_version: :openapi30) do
       assert_equal({"allOf" => [*USER_ALL_OF, MONEY_REF]}, properties["ref"])
-      assert_includes properties["nullable_ref"]["allOf"], MONEY_REF
-      assert_includes properties["poly"]["allOf"].last.keys, "oneOf"
+      assert_includes properties["nullable_ref"]["allOf"], {"anyOf" => [MONEY_REF, {"nullable" => true, "enum" => [nil]}]}
+      assert_includes properties["poly"]["anyOf"].first.keys, "oneOf"
       assert_equal USER_ALL_OF.first, properties["poly"]["allOf"].first
     end
   end

@@ -16,12 +16,14 @@ module Versponse
     VALUE_KEYWORDS = %w[example examples default const enum].freeze
 
     # Keywords whose keys are user-chosen names or payload values, kept as given; only their Hash values are schemas
-    NAME_MAPS = %w[properties patternProperties $defs dependentRequired dependentSchemas mapping].freeze
+    NAME_MAPS = %w[properties patternProperties $defs definitions dependentRequired dependentSchemas mapping].freeze
 
     # @param hash [Hash] snake_case keys, nested schema Hashes and Arrays of them included
     # @return [Hash{String => Object}] camelCase String keys at every schema level; keys of
-    #   name maps (properties, patternProperties, $defs, dependentRequired, dependentSchemas, a discriminator's mapping)
-    #   are only stringified, "x-" extensions are kept with their values as given, and a Regexp pattern becomes its source
+    #   name maps (properties, patternProperties, $defs, definitions, dependentRequired, dependentSchemas, a
+    #   discriminator's mapping) are only stringified, "x-" extensions are kept with their values as given, and a
+    #   Regexp pattern becomes an ECMA-262 String (see {Pattern.source})
+    # @raise [Versponse::DefinitionError] for a Regexp pattern ECMA-262 can't express
     def self.camelize_keys(hash)
       hash.to_h do |key, value|
         key = extension?(key) ? key.to_s : camelize(key)
@@ -35,7 +37,7 @@ module Versponse
 
     def self.camelize_value(key, value)
       return value if VALUE_KEYWORDS.include?(key) || extension?(key)
-      return value.source if key == "pattern" && value.is_a?(Regexp)
+      return Pattern.source(value) if key == "pattern"
       return camelize_name_map(value) if NAME_MAPS.include?(key) && value.is_a?(Hash)
 
       camelize_nested(value)

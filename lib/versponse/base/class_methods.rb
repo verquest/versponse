@@ -19,7 +19,7 @@ module Versponse
     # @param object [Object, Hash, #to_ary, Set] source
     # @param version [String, nil] requested version, config.current_version when nil
     # @param view [Symbol] view name
-    # @param context [Hash] passed to blocks and conditions
+    # @param context [Hash, nil] passed to blocks and conditions; nil for none
     # @param root [String, Symbol, nil] wraps the result under this key
     # @param meta [Hash, nil] added under "meta" with String keys (requires root:)
     # @return [Hash, Array<Hash>] rendered output
@@ -31,11 +31,13 @@ module Versponse
     # @raise [Versponse::InvalidFieldsError] for unknown paths or paths below unexpanded associations
     #   (config.unknown_fields = :raise)
     # @raise [Versponse::VersionNotFoundError] when no declared version matches, or supported_versions leaves it out
-    # @raise [Versponse::ViewNotFoundError] for an unknown view
+    # @raise [Versponse::ViewNotFoundError] for an unknown or nil view
     # @raise [Versponse::ExtractionError] when reading a value fails
     def serialize(object, version: nil, view: :default, context: EMPTY_CONTEXT, root: nil, meta: nil, expand: nil, fields: nil)
       raise ArgumentError, "meta: requires root:" if meta && root.nil?
+      raise ViewNotFoundError, "view: can't be nil; the default view is :default" if view.nil?
 
+      context ||= EMPTY_CONTEXT
       internals = versponse
       internals.requesting(version) do |canonical|
         expansion = internals.expansion(expand, version: canonical, view:)
@@ -77,7 +79,8 @@ module Versponse
     # @param meta [Class, nil] class whose $ref describes "meta" (requires root:)
     # @param collection [Boolean] the root key holds an array
     # @return [Hash] frozen schema
-    # @raise [ArgumentError] with meta: but no root:, or a meta: that isn't a class with a $ref
+    # @raise [ArgumentError] with meta: but no root:
+    # @raise [Versponse::DefinitionError] for a meta: that isn't a class with a $ref
     # @raise [Versponse::VersionNotFoundError] when the class, or a Versponse meta: class, doesn't serve the version
     # @raise [Versponse::ViewNotFoundError] for an unknown view (wrappers too)
     def to_schema(version: nil, view: :default, root: nil, meta: nil, collection: false)

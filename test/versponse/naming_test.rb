@@ -70,4 +70,14 @@ class Versponse::NamingTest < Minitest::Test
 
     assert_equal expected, Versponse::Naming.camelize_keys(discriminator: {property_name: "object", mapping: {unit_type: "#/components/schemas/UnitType"}})
   end
+
+  def test_definitions_keep_their_names
+    expected = {"definitions" => {"my_type" => {"maxLength" => 1}}}
+
+    assert_equal expected, Versponse::Naming.camelize_keys(definitions: {my_type: {max_length: 1}})
+  end
+
+  def test_regexp_patterns_are_ecma
+    assert_equal({"pattern" => "^[a-z]+$"}, Versponse::Naming.camelize_keys(pattern: /\A[a-z]+\z/))
+  end
 end

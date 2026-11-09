@@ -11,11 +11,13 @@ module Versponse
 
       # @param value [Object] constant value
       # @param options [Hash] see {Base#initialize}
-      # @raise [Versponse::DefinitionError] with a block, map: or nullable: (a response constant never reads the object)
+      # @raise [Versponse::DefinitionError] with a block, map: or nullable: (a response constant never reads the object),
+      #   or a value with no JSON type
       def initialize(value:, **options)
         super(**options)
         raise DefinitionError, "#{key}: const never reads the object, so it takes no map: or block (use enum or field for computed values)" if block || map
         raise DefinitionError, "#{key}: const always renders its value, so it can't be nullable (use enum with nil)" if nullable?
+        raise DefinitionError, "#{key}: const value #{value.inspect} has no JSON type#{" (Symbols render as Symbols, use Strings)" if value.is_a?(::Symbol)}" unless JSONValue.json?(value)
 
         @constant = DeepFreeze.call(value)
       end

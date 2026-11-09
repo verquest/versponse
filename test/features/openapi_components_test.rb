@@ -232,7 +232,7 @@ class OpenapiComponentsTest < Minitest::Test
   end
 
   def test_wrapper_meta_must_be_a_class
-    error = assert_raises(ArgumentError) do
+    error = assert_raises(Versponse::DefinitionError) do
       Class.new(Versponse::OpenAPI::Document) { wrapper :sites, Api::SiteResponse, root: "sites", meta: {"page" => 1} }
     end
 

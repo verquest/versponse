@@ -135,16 +135,6 @@ module Versponse
       versions.resolve(Registry.canonical(version.to_s), supported: supported_version_range)
     end
 
-    # Maps the requested version to a registered name before it reaches a cache (see Registry.canonical).
-    # Assumes the resolver picks the closest earlier version, like the default one.
-    #
-    # @param version [String, Symbol, nil] requested version, config.current_version when nil
-    # @return [String] canonical version name
-    # @raise [ArgumentError] without a version when config.current_version is not set
-    def version_name(version)
-      Registry.canonical(version&.to_s || current_version_name)
-    end
-
     # Yields the canonical name of the requested version. Caches and errors work with canonical names, so a
     # VersionNotFoundError is re-raised naming what was requested.
     #
@@ -240,7 +230,8 @@ module Versponse
       fresh!
       @schemers.fetch([version, view.to_sym]) do
         require "json_schemer"
-        JSONSchemer.schema(validation_schema(version:, view:), meta_schema: Versponse.configuration.json_schema_uri)
+        # Patterns are ECMA-262, as in documents (JSONSchemer.openapi reads them the same way)
+        JSONSchemer.schema(validation_schema(version:, view:), meta_schema: Versponse.configuration.json_schema_uri, regexp_resolver: "ecma")
       end
     end
 
@@ -269,7 +260,7 @@ module Versponse
       @selected_validators.fetch([version, view.to_sym, selection.signature]) do
         require "json_schemer"
         schema = DeepFreeze.call(SelectionSchema.call(validation_schema(version:, view:), selection))
-        schemer = JSONSchemer.schema(schema, meta_schema: Versponse.configuration.json_schema_uri)
+        schemer = JSONSchemer.schema(schema, meta_schema: Versponse.configuration.json_schema_uri, regexp_resolver: "ecma")
         [Validator::Compiler.call(schema, schemer), schemer].freeze
       end
     end
@@ -369,7 +360,9 @@ module Versponse
       # gives the same key
       selection, reasons = @field_paths.fetch([version, view.to_sym, paths.sort, expansion]) do
         problems = paths.to_h { |path| [path, field_path_problem(path, version:, view:, expansion:)] }.compact
-        [Selection.build(paths - problems.keys), problems.freeze].freeze
+        valid = paths - problems.keys
+        # Paths were given, so none left selects nothing (Selection.build reads no paths as everything)
+        [valid.empty? ? Selection.none : Selection.build(valid), problems.freeze].freeze
       end
       raise InvalidFieldsError.new(paths: reasons.keys, reasons:) if reasons.any? && Versponse.configuration.unknown_fields == :raise
 

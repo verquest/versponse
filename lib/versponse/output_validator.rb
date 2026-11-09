@@ -5,6 +5,9 @@ module Versponse
   #
   # @api private
   module OutputValidator
+    # Errors the message names; the rest are counted
+    MESSAGE_ERRORS = 2
+
     # @param klass [Class] response class
     # @param data [Hash, Array<Hash>] rendered output, before root/meta wrapping
     # @param version [String] requested version name
@@ -25,7 +28,7 @@ module Versponse
       end
       return if errors.empty?
 
-      raise InvalidOutputError.new("#{klass.name || "AnonymousResponse"} output does not match its #{version}/#{view} schema", errors:)
+      raise InvalidOutputError.new(error_message(klass, version, view, errors), errors:)
     end
 
     # Whether this render is validated: validate_output must allow it (true, or a callable returning truthy for
@@ -58,11 +61,22 @@ module Versponse
     # @param schemer [JSONSchemer::Schema] compiled schema
     # @param data [Hash] one rendered object
     # @param prefix [String] pointer prefix for collection items
-    # @return [Array<Hash>] errors with :pointer, :type, :message and :details
+    # @return [Array<Hash>] errors with :pointer, :type, :message and :details; messages point into the collection
     def self.errors_for(schemer, data, prefix)
       schemer.validate(data).map do |error|
-        {pointer: prefix + error["data_pointer"], type: error["type"], message: error["error"], details: error["details"]}
+        pointer = prefix + error["data_pointer"]
+        # An item is validated on its own, so its message points inside the item
+        message = prefix.empty? ? error["error"] : error["error"].sub("`#{error["data_pointer"]}`", "`#{pointer}`")
+        {pointer:, type: error["type"], message:, details: error["details"]}
       end
     end
+
+    # json_schemer's messages name their pointer
+    def self.error_message(klass, version, view, errors)
+      details = errors.first(MESSAGE_ERRORS).map { |error| error[:message] }
+      details << "and #{errors.size - MESSAGE_ERRORS} more" if errors.size > MESSAGE_ERRORS
+      "#{klass.name || "AnonymousResponse"} output does not match its #{version}/#{view} schema: #{details.join("; ")}"
+    end
+    private_class_method :error_message
   end
 end

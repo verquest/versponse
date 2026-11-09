@@ -74,8 +74,8 @@ class OneOfTest < Minitest::Test
     with_configuration(json_schema_version: :openapi30) do
       schema = TaskResponse.to_schema(version: "2025-09")["properties"]["resource"]
 
-      assert schema["nullable"]
-      assert_equal 2, schema["allOf"].first["oneOf"].size
+      assert_equal({"nullable" => true, "enum" => [nil]}, schema["anyOf"].last)
+      assert_equal 2, schema["anyOf"].first["oneOf"].size
     end
   end
 

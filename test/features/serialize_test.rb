@@ -177,10 +177,6 @@ class SerializeTest < Minitest::Test
     assert_equal({"a" => 1}, klass.serialize({a: 1, b: "x", hide_b: true}, version: "2025-09"))
   end
 
-  def test_requested_versions_are_canonicalized_before_caching
-    assert_equal UnitTypeResponse.versponse.version_name("2099-01-01-a"), UnitTypeResponse.versponse.version_name("2099-01-01-b")
-  end
-
   # Internals live on klass.versponse, so a response class's own class methods can't break rendering
   def test_user_class_methods_do_not_clash_with_internals
     klass = Class.new(Versponse::Base) do
@@ -278,5 +274,19 @@ class SerializeTest < Minitest::Test
     error = assert_raises(ArgumentError) { serialize(meta: {}) }
 
     assert_equal "meta: requires root:", error.message
+  end
+
+  def test_nil_context_renders_with_the_empty_context
+    klass = Class.new(Versponse::Base) { version("2025-09") { field :id, type: :string, if: ->(_object, context) { !context[:hide] } } }
+
+    assert_equal({"id" => "1"}, klass.serialize({id: "1"}, version: "2025-09", context: nil))
+  end
+
+  def test_nil_view_raises_view_not_found
+    klass = Class.new(Versponse::Base) { version("2025-09") { field :id, type: :string } }
+
+    error = assert_raises(Versponse::ViewNotFoundError) { klass.serialize({id: "1"}, version: "2025-09", view: nil) }
+
+    assert_equal "view: can't be nil; the default view is :default", error.message
   end
 end

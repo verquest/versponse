@@ -77,4 +77,16 @@ class SelectionSchemaTest < Minitest::Test
     refute valid?(whole, {"children" => [{"name" => "a"}]})
     assert valid?(whole, {"children" => [{"name" => "a", "children" => []}]})
   end
+
+  def test_an_emptied_required_is_left_out
+    klass = Class.new(Versponse::Base) do
+      version("2025-09") do
+        field :id, type: :string
+        field :name, type: :string
+      end
+    end
+    schema = Versponse::SelectionSchema.call(klass.to_validation_schema(version: "2025-09"), Versponse::Selection.build(["nope"]))
+
+    refute schema.key?("required")
+  end
 end

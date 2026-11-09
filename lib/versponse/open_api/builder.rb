@@ -13,17 +13,14 @@ module Versponse
         @version = version
       end
 
-      # @return [Hash] the document
+      # @return [Hash] the document, a copy the caller can change
       # @raise [ArgumentError] for a version the document doesn't declare
       # @raise [Versponse::DefinitionError] for colliding component names, an openapi version config.json_schema_version
       #   doesn't write, or webhooks in an OpenAPI 3.0 document
       def call
         check_version!
-        document = base.merge("components" => components)
-        return document if @declarations.finalizers.empty?
-
-        # Components are the classes' frozen, cached schemas, so hooks change a copy
-        document = mutable(document)
+        # Components are the classes' frozen, cached schemas, so the caller and the hooks get a copy
+        document = DeepCopy.call(base.merge("components" => components))
         # A hook that takes one argument gets only the document
         @declarations.finalizers.each { |hook| (hook.arity == 1) ? hook.call(document) : hook.call(document, @version) }
         document
@@ -60,15 +57,6 @@ module Versponse
       # Each layer is resolved for the version and merged over the ones before it
       def info
         @declarations.info.reduce({"version" => @version}) { |merged, layer| merged.merge(resolve(layer) || {}) }
-      end
-
-      def mutable(value)
-        case value
-        when Hash then value.to_h { |key, item| [key, mutable(item)] }
-        when Array then value.map { |item| mutable(item) }
-        when String then value.dup
-        else value
-        end
       end
 
       def components

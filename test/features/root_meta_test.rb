@@ -63,7 +63,7 @@ class RootMetaTest < Minitest::Test
   end
 
   def test_wrapper_schema_meta_must_be_a_class
-    error = assert_raises(ArgumentError) { ItemResponse.to_schema(version: "2025-09", root: "item", meta: {"page" => 1}) }
+    error = assert_raises(Versponse::DefinitionError) { ItemResponse.to_schema(version: "2025-09", root: "item", meta: {"page" => 1}) }
 
     assert_equal %(meta: takes a response class, whose $ref describes "meta"; serialize(meta:) takes the Hash), error.message
   end

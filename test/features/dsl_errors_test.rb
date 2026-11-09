@@ -261,4 +261,12 @@ class DslErrorsTest < Minitest::Test
 
     assert_match(/anonymous/, error.message)
   end
+
+  def test_const_needs_a_json_value
+    error = assert_raises(Versponse::DefinitionError) do
+      Class.new(Versponse::Base) { version("2025-09") { const :object, value: :thing } }
+    end
+
+    assert_equal "object: const value :thing has no JSON type (Symbols render as Symbols, use Strings)", error.message
+  end
 end

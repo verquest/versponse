@@ -343,4 +343,22 @@ class ErrorPolicyTest < Minitest::Test
       assert_raises(ArgumentError) { render(parent) }
     end
   end
+
+  # Wrapping the hook's NoMethodError or KeyError in a new ExtractionError used to drop its mark, so a parent's
+  # policy recovered it
+  def test_hook_errors_of_any_class_pass_every_parent_policy
+    middle = define { reference :child, from: RecoveringChildResponse, map: "." }
+    through_reference = define { reference :middle, from: middle, map: ".", nullable: true, on_error: :nullify }
+    through_collection = define { collection :items, item: RecoveringChildResponse, nullable: true, on_error: :nullify }
+
+    [NoMethodError, KeyError].each do |error_class|
+      hook = ->(_error, response:, **) { raise error_class, "hook" if response == RecoveringChildResponse }
+
+      with_configuration(on_recovered_error: hook) do
+        assert_raises(error_class) { render(through_reference) }
+        assert_raises(error_class) { through_collection.serialize({items: [Item.new("i1")]}, version: "2025-09") }
+        assert_raises(error_class) { RecoveringChildResponse.serialize([Item.new("i1")], version: "2025-09") }
+      end
+    end
+  end
 end

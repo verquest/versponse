@@ -29,6 +29,41 @@ class OpenapiDocumentTest < Minitest::Test
     webhooks "site.deleted" => {"post" => {"summary" => "Site deleted"}}
   end
 
+  class NoteResponse < Versponse::Base
+    version "2025-09" do
+      identifier :id
+      const :object, value: "note"
+      field :text, type: :string
+    end
+  end
+
+  class CallResponse < Versponse::Base
+    version "2025-09" do
+      identifier :id
+      const :object, value: "call"
+      field :minutes, type: :integer
+    end
+  end
+
+  # Every nullable form OpenAPI 3.0 writes, and an object whose properties are all conditional
+  class NullableResponse < Versponse::Base
+    version "2025-09" do
+      reference :note, from: NoteResponse, nullable: true
+      reference :linked, from: NoteResponse, nullable: true, expandable: true
+      one_of :pinned, nullable: true do
+        reference from: NoteResponse, match: ->(value) { value[:object] == "note" }
+        reference from: CallResponse, match: ->(value) { value[:object] == "call" }
+      end
+      one_of :typed, discriminator: "object", nullable: true do
+        reference from: NoteResponse, match: ->(value) { value[:object] == "note" }
+        reference from: CallResponse, match: ->(value) { value[:object] == "call" }
+      end
+      object :extra, map: "." do
+        field :hint, type: :string, if: ->(_object) { false }
+      end
+    end
+  end
+
   def build(document = ApiDocument, version: "2025-09") = document.build(version:)
 
   def test_openapi_version_follows_the_configured_schema_version
@@ -223,5 +258,39 @@ class OpenapiDocumentTest < Minitest::Test
 
     assert_equal [{"url" => "https://internal.example.com", "x-internal" => true}], built["servers"]
     assert_equal [{"name" => "Admin", "x-display-name" => "Administration"}], built["tags"]
+  end
+
+  # Strict 3.0 validators ignore nullable beside a combinator, so null is a branch of its own
+  def test_openapi30_documents_validate_and_accept_null
+    with_configuration(json_schema_version: :openapi30) do
+      document = Class.new(Versponse::OpenAPI::Document) do
+        info "title" => "API"
+        responses NullableResponse, NoteResponse, CallResponse
+      end
+
+      assert_empty document.validate(version: "2025-09")
+
+      require "json_schemer"
+      schemer = JSONSchemer.openapi(document.build(version: "2025-09")).schema("NullableResponse")
+      nulls = {"note" => nil, "linked" => nil, "pinned" => nil, "typed" => nil, "extra" => {}}
+
+      assert_empty schemer.validate(nulls).map { |error| error["error"] }
+      %w[note linked pinned typed].each do |key|
+        refute schemer.valid?(nulls.merge(key => 1)), "#{key} accepts 1"
+      end
+    end
+  end
+
+  # Response components are the classes' frozen, cached schemas; build hands out a copy, with or without finalize hooks
+  def test_built_documents_are_the_callers_to_change
+    document = Class.new(Versponse::OpenAPI::Document) do
+      info "title" => "API"
+      responses NoteResponse
+    end
+    built = document.build(version: "2025-09")
+
+    built["components"]["schemas"]["NoteResponse"]["description"] = "Changed"
+
+    refute document.build(version: "2025-09")["components"]["schemas"]["NoteResponse"].key?("description")
   end
 end

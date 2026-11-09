@@ -9,7 +9,7 @@ require_relative "versponse/gem_version"
 loader = Zeitwerk::Loader.new
 loader.tag = File.basename(__FILE__, ".rb")
 loader.ignore("#{File.dirname(__FILE__)}/versponse/gem_version.rb")
-loader.inflector.inflect("dsl" => "DSL", "open_api" => "OpenAPI")
+loader.inflector.inflect("dsl" => "DSL", "open_api" => "OpenAPI", "json_value" => "JSONValue")
 loader.push_dir(File.dirname(__FILE__))
 loader.setup
 

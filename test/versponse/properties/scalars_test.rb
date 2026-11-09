@@ -182,13 +182,16 @@ class Versponse::Properties::ScalarsTest < Minitest::Test
   end
 
   # The same value goes into every response, so a nested change must not leak into later ones
-  def test_const_value_is_deeply_frozen
+  # The declared value is frozen; each render gets an unfrozen copy of a Hash or Array
+  def test_const_value_is_frozen_and_rendered_as_a_copy
     value = {"a" => [+"x"]}
-    rendered = render(Versponse::Properties::Const.new(name: :meta, value:), Item.new)["meta"]
+    const = Versponse::Properties::Const.new(name: :meta, value:)
+    rendered = render(const, Item.new)["meta"]
+    rendered["a"] << "y"
 
     refute_predicate value["a"], :frozen?
-    assert_predicate rendered["a"], :frozen?
-    assert_predicate rendered["a"].first, :frozen?
+    assert_predicate const.value, :frozen?
+    assert_equal({"a" => ["x"]}, render(const, Item.new)["meta"])
   end
 
   def test_nullable_enum_does_not_duplicate_nil

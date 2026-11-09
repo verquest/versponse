@@ -36,7 +36,8 @@ module Versponse
     #   its selection in a selected render
     # @return [Hash{String => Object}] rendered object
     # @raise [Versponse::ExtractionError] when a step raises NoMethodError or KeyError that no policy recovers (the
-    #   original error is kept as `cause`); other errors no policy recovers propagate unchanged
+    #   original error is kept as `cause`), unless an on_recovered_error hook raised it, which propagates as raised;
+    #   other errors no policy recovers propagate unchanged
     def call(object, context, expansion = Expansion::NONE)
       return call_selected(object, context, expansion) if Selection::Scope === expansion
 
@@ -80,7 +81,8 @@ module Versponse
       output
     end
 
-    # Recovers the step's error with its policy, or raises it (as an ExtractionError for NoMethodError and KeyError)
+    # Recovers the step's error with its policy, or raises it (as an ExtractionError for NoMethodError and KeyError,
+    # except a hook's error)
     def recover!(error, step, index, object, context, output)
       recovery = @recoveries&.[](index)
       raise extraction_error(error, step) unless recovery&.recovers?(error)
@@ -88,7 +90,10 @@ module Versponse
       recovery.recover(error, object, context, output)
     end
 
+    # An error the on_recovered_error hook raised keeps its class and mark, so no parent policy recovers it
     def extraction_error(error, step)
+      return error if ErrorPolicy.unrecoverable?(error)
+
       case error
       when ExtractionError then ExtractionError.new(label:, keys: [step&.key, *error.keys].compact, detail: error.detail)
       when NoMethodError, KeyError then ExtractionError.new(label:, keys: [step&.key].compact, detail: error.message)

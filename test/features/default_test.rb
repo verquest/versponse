@@ -92,4 +92,31 @@ class DefaultTest < Minitest::Test
   def test_reference_property_carries_the_default_over
     assert_equal({"label" => "unnamed"}, ReuseResponse.serialize(Item.new("i1"), version: "2025-09"))
   end
+
+  def test_rendered_arrays_are_new_arrays
+    klass = Class.new(Versponse::Base) { version("2025-09") { array :tags, type: :string } }
+    tags = ["a"]
+
+    klass.serialize({tags:}, version: "2025-09")["tags"] << "b"
+
+    assert_equal ["a"], tags
+  end
+
+  # A Hash or Array default: or const is a copy, so changing the output doesn't touch later renders
+  def test_static_hash_and_array_values_are_copies
+    klass = Class.new(Versponse::Base) do
+      version("2025-09") do
+        array :flags, type: :string, default: ["new"]
+        field :settings, type: :object, default: {"theme" => "dark"}
+        const :links, value: {"self" => "/x"}
+      end
+    end
+    output = klass.serialize({flags: nil, settings: nil}, version: "2025-09")
+
+    output["flags"] << "seen"
+    output["settings"]["theme"] = "light"
+    output["links"]["self"] = "/y"
+
+    assert_equal({"flags" => ["new"], "settings" => {"theme" => "dark"}, "links" => {"self" => "/x"}}, klass.serialize({flags: nil, settings: nil}, version: "2025-09"))
+  end
 end

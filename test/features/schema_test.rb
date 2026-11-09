@@ -211,4 +211,20 @@ class SchemaTest < Minitest::Test
     assert_same schema, ProductResponse.to_schema(version: "2025-09")
     assert_predicate schema["properties"]["id"], :frozen?
   end
+
+  # OpenAPI 3.0 and draft 4 need at least one item in required
+  def test_objects_without_required_properties_leave_required_out
+    klass = Class.new(Versponse::Base) do
+      version("2025-09") do
+        field :id, type: :string
+        object :extra, map: "." do
+          field :note, type: :string, if: ->(_object) { true }
+        end
+      end
+    end
+    schema = klass.to_schema(version: "2025-09")
+
+    assert_equal %w[id extra], schema["required"]
+    refute schema["properties"]["extra"].key?("required")
+  end
 end

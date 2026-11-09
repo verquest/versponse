@@ -44,7 +44,7 @@ class Versponse::Properties::BaseTest < Minitest::Test
     ref = {"$ref" => "#/x"}
 
     with_configuration(json_schema_version: :openapi30) do
-      assert_equal({"allOf" => [ref], "nullable" => true}, property.send(:nullable_ref, ref, Struct.new(:validation?).new(false)))
+      assert_equal({"anyOf" => [ref, {"nullable" => true, "enum" => [nil]}]}, property.send(:nullable_ref, ref, Struct.new(:validation?).new(false)))
       assert_equal({"anyOf" => [ref, {"type" => "null"}]}, property.send(:nullable_ref, ref, Struct.new(:validation?).new(true)))
     end
   end
