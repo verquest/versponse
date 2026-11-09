@@ -427,6 +427,8 @@ PublicApiDocument.validate(version: "2025-09")   # => [] when valid OpenAPI and 
 - A block that takes an argument receives the version. A `finalize` block that takes one argument receives only the document.
 - `responses` and `requests` take one or more classes, or `namespace:` with a Module or a String. At build, Versponse eager-loads the namespace through Zeitwerk, so its classes don't have to be loaded first. An undefined namespace, or one with no response classes or body requests, raises `Versponse::DefinitionError`. So does a listed class of the wrong kind, or a listed request whose `location` isn't `:body`.
 - `wrapper` turns a Symbol name into PascalCase (`:contact_list` declares `ContactList`) and uses a String as given. Its `meta:` takes a response class, whose `$ref` describes `"meta"`, and anything else raises `Versponse::DefinitionError`. `serialize(meta:)` takes the Hash instead.
+- `ref(name)` returns the `$ref` of a wrapper or `schema` the document declares, like a response class's `to_ref`: `PublicApiDocument.ref(:ContactList)` returns `"#/components/schemas/ContactList"`. A name the document doesn't declare, its parents included, raises `Versponse::DefinitionError`, so a typo fails when the spec loads.
+- `ref` turns a Symbol into PascalCase as `wrapper` does, so `:ContactList` and `:contact_list` name the same component. Spell the Symbol as the component is named, so the spec matches the generated document. A String is used as given. `component_name(name)` returns the name without the `#/components/schemas/` prefix.
 - `server` and `tag` write keywords that start with `x_` as extensions, with every underscore turned into a hyphen: `x_internal: true` becomes `"x-internal" => true`, and `x_display_name:` becomes `"x-display-name"`.
 - `security` sets the top-level security requirement. `versions` and `document_name` called without arguments return what the class declares.
 - `openapi` defaults to `"3.1.1"`, or `"3.0.3"` under `config.json_schema_version = :openapi30`, to match how schemas are written. Declaring `openapi "3.0.3"` while schemas are written for 3.1 (or the other way round) raises `Versponse::DefinitionError` on `build`.
@@ -451,6 +453,24 @@ config.openapi_specs = Versponse::OpenAPI.rswag_specs(PublicApiDocument)
 ```
 
 `rswag_specs` needs `document_name` and `versions` on every document. It builds each document once, because rswag adds its paths to it.
+
+In a spec, take each `$ref` from code instead of writing the string. A typo or a renamed component then fails when the spec loads, not when rswag validates the response:
+
+```ruby
+get "Lists contacts" do
+  response "200", "contacts listed" do
+    schema "$ref" => PublicApiDocument.ref(:ContactList)
+  end
+end
+
+post "Creates a contact" do
+  parameter name: :params, in: :body, schema: {"$ref" => PublicApi::ContactsCreateRequest.to_ref}
+
+  response "422", "invalid contact" do
+    schema "$ref" => PublicApiDocument.ref(:Error)
+  end
+end
+```
 
 ## Output validation
 

@@ -75,7 +75,32 @@ module Versponse
         # @return [Array<String>] declared versions
         def document_versions = versions
 
+        # Component name of a declared wrapper or hand-written schema, inherited declarations included
+        #
+        # @param name [Symbol, String] a Symbol is turned into PascalCase as {wrapper} does (:contact_list is
+        #   "ContactList"), a String is used as given
+        # @return [String] component name
+        # @raise [Versponse::DefinitionError] when the document declares no such wrapper or schema
+        def component_name(name)
+          component = declared_name(name)
+          return component if declarations.wrappers.key?(component) || declarations.schemas.key?(component)
+
+          shown = name.is_a?(Symbol) ? "#{name.inspect} (#{component})" : name.inspect
+          raise DefinitionError, "#{self} declares no wrapper or schema #{shown}"
+        end
+
+        # @param name [Symbol, String] wrapper or schema name, as {component_name} takes it
+        # @return [String] "#/components/schemas/<name>" reference
+        # @raise [Versponse::DefinitionError] when the document declares no such wrapper or schema
+        def ref(name)
+          "#/components/schemas/#{component_name(name)}"
+        end
+
         private
+
+        def declared_name(name)
+          name.is_a?(Symbol) ? Naming.pascalize(name) : name.to_s
+        end
 
         def openapi(value)
           declarations.openapi = value.to_s
@@ -117,7 +142,7 @@ module Versponse
 
         def wrapper(name, klass, root:, collection: false, meta: nil, view: :default)
           Versponse::Wrapper.check_meta!(meta)
-          name = name.is_a?(Symbol) ? Naming.pascalize(name) : name.to_s
+          name = declared_name(name)
           declarations.claim!(:wrapper, name)
           declarations.wrappers[name] = Declarations::Wrapper.new(name:, klass:, root:, collection:, meta:, view:)
         end

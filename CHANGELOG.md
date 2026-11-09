@@ -8,6 +8,7 @@
 - `fields:` on `serialize` renders a selection of fields, `selectable_paths` lists the paths, and `config.unknown_fields` sets what happens to invalid ones.
 - `expandable_targets` maps each expandable path to the response classes it renders.
 - OpenAPI documents: `versions` and `document_name` without arguments return the declared values, `responses` and `requests` take several classes, a `finalize` lambda may take only the document, and `server` and `tag` write `x_` keywords as extensions (`x_display_name:` becomes `"x-display-name"`).
+- `Versponse::OpenAPI::Document.ref` and `.component_name` return the `$ref` and component name of a declared wrapper or `schema`, and raise `Versponse::DefinitionError` for a name the document doesn't declare.
 
 ### Changed
 
