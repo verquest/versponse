@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-09
+
 ### Added
 
 - `root "contact"` declares the keys a class's output is wrapped under: `"contact"` for one object and `"contacts"` for a collection. `collection:` names the collection root; without it, `root` pluralizes the name with ActiveSupport's `String#pluralize` and raises when that's undefined. Subclasses don't inherit a root. `root_key` and `collection_root_key` read it.
