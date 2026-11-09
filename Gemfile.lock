@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    versponse (0.1.0)
+    versponse (0.2.0)
       json_schemer (~> 2.4)
       zeitwerk (~> 2.7)
 
@@ -190,7 +190,7 @@ CHECKSUMS
   unicode-display_width (3.3.0) sha256=4b7aa66a4b11db50f6f7e98411215cd0dd10eaecb665d36eec5bcacb3fa0b613
   unicode-emoji (4.3.0) sha256=11c02fa73290378c066bb0562cd4c87d8e1b706fbbe0059ca12746a4244de8ce
   verquest (0.7.1) sha256=30da13759ff0d0598ae38b34765ca916e5141c5f92d730281a076bb351f9d1d4
-  versponse (0.1.0)
+  versponse (0.2.0)
   yard (0.9.45) sha256=52e211493f7cb8a3ebf7e104a25a1e73937a3103092545d34cb88fafebb3dc51
   zeitwerk (2.8.3) sha256=2c85125a8467ce069e20123d1e709a08955c9d29c118c25b46b7b7fafdbb92e5
 

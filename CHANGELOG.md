@@ -1,70 +1,63 @@
 ## [Unreleased]
 
-### Added
-
-- `context:` on `reference`, `collection`, `object`, `one_of` and `one_of` variants renders the subtree with its own context: a Hash merged over the parent context, or a callable returning it.
-- `default:` on `field`, `enum` and `array`, and class-level `on_nil`, replace nil values.
-- `on_error` on properties, classes and `config` recovers failed properties (`:nullify`, `:omit` or a handler), with `config.recoverable_errors` and the `config.on_recovered_error` hook. `reference property:` reuses the property's policy only where it fits the copy (an `:omit` only when the copy has `if:`/`unless:`).
-- `fields:` on `serialize` renders a selection of fields, `selectable_paths` lists the paths, and `config.unknown_fields` sets what happens to invalid ones.
-- `expandable_targets` maps each expandable path to the response classes it renders.
-- OpenAPI documents: `versions` and `document_name` without arguments return the declared values, `responses` and `requests` take several classes, a `finalize` lambda may take only the document, and `server` and `tag` write `x_` keywords as extensions (`x_display_name:` becomes `"x-display-name"`).
-- `Versponse::OpenAPI::Document.ref` and `.component_name` return the `$ref` and component name of a declared wrapper or `schema`, and raise `Versponse::DefinitionError` for a name the document doesn't declare.
-
-### Changed
-
-- `default:` on `reference`, `collection`, `object`, `one_of` and `const` raises `DefinitionError`. On `field`, `enum` and `array` a static value must match the property's schema, and `default: nil` means no default (it no longer writes `"default": null`).
-- `responses namespace:` and `requests namespace:` take a Module or a String and eager-load the namespace through Zeitwerk at build. An undefined namespace, or one with no response classes or body requests, raises `DefinitionError`, and so does a listed class of the wrong kind or a listed query request. `rswag_specs` raises for a document without `versions`.
-- `wrapper` and `to_schema` raise `DefinitionError` for a `meta:` that isn't a class, and `to_schema` raises `VersionNotFoundError` when the `meta:` class doesn't serve the version.
-- `wrapper` turns a Symbol name into PascalCase (`:contact_list` declares `ContactList`), and hand-written `schema` components are camelized like every other schema.
-- `Document.build` returns a copy the caller can change, with or without `finalize` hooks. Rendered arrays are new Arrays, and Hash or Array defaults and consts render as copies.
-- Under `:openapi30`, nullable references, `one_of` and expandable properties get a `{"nullable": true, "enum": [null]}` branch instead of `nullable: true` beside a combinator, which strict validators ignore. Object schemas leave out an empty `required`, which 3.0 and draft 4 reject.
-- A Regexp `pattern:` is written as ECMA-262 (`\A` and `\z` become `^` and `$`), and options (flags or inline groups) or `\Z` raise `DefinitionError`. Output validation reads patterns as ECMA-262, as documents do.
-- `const` values need a JSON type, like `enum` values.
-- `view: nil`, and `view: :collapsed` on a class without an identifier, raise `ViewNotFoundError`; `context: nil` renders with an empty context.
-- `InvalidOutputError`'s message names the first two errors, and errors of collection items point into the collection (`/1/count`).
-- A document subclass's `info` merges over its parent's. `schema`, `wrapper` and `security_scheme` with a parent's name replace the parent's entry, and one class declaring a name twice raises `DefinitionError`.
-
-### Fixed
-
-- Validation reads Symbol keys of rendered Hashes as their Strings, like json_schemer, instead of deferring the whole output to json_schemer. Inline validation no longer reports a failure for such values (for example image URL Hashes built with Symbol keys), which made every such render validate twice.
-- Inline validation checks a value once the render has finished whenever a later block could still change it in place and break its schema: frozen Hashes and Arrays with unfrozen contents, Strings whose schema limits more than their type (length, pattern, format, enum), and integers (a mutable Numeric can stop being whole). Such changes were accepted before.
-- The built-in date and date-time formatters return frozen Strings.
-- Callable objects (anything with `#call` that isn't a proc) passed to `on_nil`, `on_error` or `validate_output` are checked for their arity when they are set, like lambdas, instead of failing on a render.
-- Camelizing `schema_options` keeps `x-` extension keys and their values, a discriminator's `mapping` keys, and `definitions` names, as written.
-- An error raised by `config.on_recovered_error` as a `NoMethodError` or `KeyError` propagates instead of being recovered by a parent association's `on_error:`.
-- Under `unknown_fields = :ignore`, a `fields:` list with no valid path renders only identifiers and consts instead of the whole object.
-
-## [0.1.0] - 2026-11-06
+## [0.2.0] - 2026-11-09
 
 ### Added
 
-- Response DSL shared with verquest: `field`, `enum`, `const`, `array`, `object`, `collection`, `reference`, `one_of`, `with_options` (a nested block replaces the outer options and ignores `map:`, as in verquest; `view:` and `discriminator:` apply).
-- Class-level `description` and `schema_options` reach subclasses, looked up when schemas are built like `supported_versions`; a subclass's `schema_options` merge with its ancestors' (the subclass wins per key).
+- Response DSL shared with verquest: `field`, `enum`, `const`, `array`, `object`, `collection`, `reference`, `one_of`, and `with_options`. As in verquest, a nested `with_options` replaces the outer options and ignores `map:`. `view:` and `discriminator:` apply.
+- Class-level `description` and `schema_options` reach subclasses and are looked up when schemas are built. A subclass's `schema_options` merge with its ancestors', and the subclass wins per key.
 - `field type: :object` for free-form maps, and `one_of` with `source` and `match:` arrays.
 - Versions with inheritance and closest-earlier resolution.
 - Blueprinter-style views (`view`, `include_view`, `exclude_properties`) that later versions inherit.
 - `serialize` and `serialize_json` with root keys and meta.
 - OpenAPI schemas per version and view, validation schemas, component names and `$ref`s.
 - `Versponse.components` and `Versponse.eager_load!`.
-- Opt-in output validation (`validate_output`): `true`, or a callable called with the response class per render (e.g. reading Rails' `Current`), and `validate_output_sample_rate` to validate a share of renders. Fields are checked while rendering where the schema proves it equivalent (most classes), so validation costs about 0.5x of a render; a callable `validate_output` is called before the render.
+- Opt-in output validation. `validate_output` takes `true`, or a callable that receives the response class on each render, for example to read Rails' `Current`. `validate_output_sample_rate` validates a share of renders. Setting a callable that can't take the response class raises `ArgumentError`.
+- Output validation checks most fields while rendering, which adds about half the cost of a plain render. A value that a later block could change in place and so break its schema is checked after the render finishes. Such values are a Hash or Array not frozen all the way down, a String whose schema constrains more than its type, and an integer. The built-in `date` and `date-time` formatters return frozen Strings, so their values are checked while rendering.
 - References to verquest request schemas.
 - Polymorphic collections: an unnamed `one_of` inside a `collection` block types each item.
 - `reference property:` reuses a property of another response class.
 - `source { }` in inline `object` and `collection`.
 - `one_of` with `discriminator:` emits an OpenAPI discriminator `mapping` built from each variant's `const`.
 - Errors inside collection properties name the item index (`activity.3`).
-- Expansion: `expandable: true` on `reference`, `collection item:` and `one_of`, `identifier` for the collapsed shape, `serialize(expand: [...])` with dotted paths, `"*"` (every path `expandable_paths` lists, so recursive associations expand once) and `"path.*"`, `anyOf` full/collapsed schemas with `<Name>Collapsed` components, `expandable_paths`, and `config.unknown_expand`.
-- OpenAPI documents: `Versponse::OpenAPI::Document` class DSL (base sections, `responses`/`requests` by namespace or list, named `wrapper` components, `finalize` hooks, an `openapi` version that follows `config.json_schema_version`), `build`, `validate` (the OpenAPI meta-schema plus local `$ref`s that don't resolve), and `Versponse::OpenAPI.rswag_specs` for rswag's `openapi_specs`.
+- Expansion:
+  - `expandable: true` on `reference`, `collection item:`, and `one_of`.
+  - `identifier` for the collapsed shape.
+  - `serialize(expand: [...])` with dotted paths, `"path.*"`, and `"*"`. `"*"` expands every path `expandable_paths` lists, so recursive associations expand once.
+  - Schemas that describe both shapes with `anyOf`, and `<Name>Collapsed` components.
+  - `expandable_paths` and `config.unknown_expand`.
+- OpenAPI documents:
+  - A `Versponse::OpenAPI::Document` class DSL with base sections, `finalize` hooks, and an `openapi` version that follows `config.json_schema_version`. `versions` and `document_name` without arguments return the declared values. A `finalize` block or lambda may take only the document.
+  - `responses` and `requests` take one or more classes, or `namespace:` with a Module or a String, eager-loaded through Zeitwerk at build. An undefined namespace, one with no response classes or body requests, a listed class of the wrong kind, and a listed query request raise `Versponse::DefinitionError`.
+  - Named `wrapper` components. A Symbol name becomes PascalCase (`:contact_list` declares `ContactList`). `meta:` takes a response class, checked when declared (`Versponse::DefinitionError` otherwise), and a meta class that doesn't serve the version raises `Versponse::VersionNotFoundError`, as in `to_schema`.
+  - `server` and `tag` write `x_` keywords as extensions (`x_display_name:` becomes `"x-display-name"`).
+  - Subclasses inherit declarations. `info` merges over the parent's, `schema`, `wrapper` and `security_scheme` with a parent's name replace the parent's entry, and one class declaring a name twice raises `Versponse::DefinitionError`.
+  - `build`, which returns a copy the caller can change, and `validate`, which checks the OpenAPI meta-schema and reports local `$ref`s that don't resolve.
+  - `Versponse::OpenAPI.rswag_specs` for rswag's `openapi_specs`. Every document needs `document_name` and `versions`.
 - `config.custom_field_types` in verquest's shape (`type` and `schema_options`), used by `field` and `array`.
-- `config.json_schema_version` takes the same versions as verquest (`:draft4`, `:draft6`, `:draft7`, `:draft2019_09`, `:draft2020_12`, `:openapi30`, `:openapi31`; default `:openapi31`). Output validation uses that version's meta-schema, `const` is a one-value `enum` under `:draft4` and `:openapi30`, and recursive classes are named with `$anchor`, a plain-name `$id` (drafts 6 and 7) or `id` (draft 4 and OpenAPI 3.0).
-- Output validation compiles each validation schema into Ruby checks and calls json_schemer only for errors and unsupported keywords, making validation-on rendering faster than alba and blueprinter without validation.
+- `config.json_schema_version` takes the same versions as verquest (`:draft4`, `:draft6`, `:draft7`, `:draft2019_09`, `:draft2020_12`, `:openapi30`, and `:openapi31`, the default). Output validation uses that version's meta-schema, and `const` is a one-value `enum` under `:draft4` and `:openapi30`. Recursive classes are named with `$anchor`, a plain-name `$id` in drafts 6 and 7, or `id` in draft 4 and OpenAPI 3.0. Under `:openapi30`, nullable references, `one_of` and expandable properties get a `{"nullable": true, "enum": [null]}` branch, and object schemas leave out an empty `required`.
+- Output validation compiles each validation schema into Ruby checks and calls json_schemer only for errors and unsupported keywords. With validation on, versponse renders faster than alba and blueprinter do without it. Like json_schemer, validation reads the Symbol keys of rendered Hashes as Strings. `InvalidOutputError`'s message names the first two errors, and errors of collection items point into the collection.
 - `config.field_order = :alphabetical` orders output and schemas like blueprinter's `sort_fields_by :name_asc`.
-- OpenAPI documents: `schema` for hand-written components and a `webhooks` section.
-- `supported_versions min:, max:` limits the versions a class serves (both inclusive, both optional; `min` defaults to the first declared version). Resolving a version outside the range raises `Versponse::VersionNotFoundError`, so `Versponse.components` and OpenAPI documents leave the class and its wrappers out of that version, and `eager_load!` compiles only the versions the range serves. Only the requested version is checked, so `min: "preview"` can be served by an earlier block. `min` after `max`, or a `max` before the first declared version, raises `Versponse::DefinitionError`. Versions are compared with `config.version_resolver`, and subclasses inherit the range.
-- `identifier collapse_if:` renders an expandable association in full instead of collapsed when the condition is false for its value. A `collection item:` renders in full when it is false for any item; an expandable `one_of` decides per value. Schemas don't change, and associations without it cost nothing extra.
-- Type unions: `field` and `array` take `type: [:integer, :string]`, written as a JSON Schema `type` array with `"null"` added for `nullable: true`, or as an `anyOf` of single types under OpenAPI 3.0. Built-in types only; `format:` and its formatter still apply, and the compiled validator checks them. A union combines with `any_of:` (an `allOf` of both under OpenAPI 3.0). `nullable:` doesn't add a null branch to `any_of:`.
+- OpenAPI documents: `schema` for hand-written components, camelized like every other schema, and a `webhooks` section.
+- Schema options are camelized (`max_length:` becomes `maxLength`), except `x-` extensions with their values, keys of name maps such as `properties` and `definitions`, and a discriminator's `mapping` keys. A Regexp `pattern:` is written as ECMA-262 (`\A` and `\z` become `^` and `$`), and options or `\Z` raise `Versponse::DefinitionError`, also from `config.custom_field_types`. Output validation reads patterns as ECMA-262, as documents do.
+- `supported_versions min:, max:` limits the versions a class serves. Both bounds are inclusive and optional, and `min` defaults to the first declared version. Resolving a version outside the range raises `Versponse::VersionNotFoundError`. `Versponse.components` and OpenAPI documents leave the class and its wrappers out of that version, and `eager_load!` compiles only the versions the range serves. Only the requested version is checked, so `min: "preview"` can be served by an earlier block. `min` after `max`, or a `max` before the first declared version, raises `Versponse::DefinitionError`. Versions are compared with `config.version_resolver`, and subclasses inherit the range.
+- `identifier collapse_if:` renders an expandable association in full instead of collapsed when the condition is false for its value. A `collection item:` renders in full when the condition is false for any item. An expandable `one_of` decides per value. Schemas don't change, and associations without it cost nothing extra.
+- Type unions: `field` and `array` take `type: [:integer, :string]`, written as a JSON Schema `type` array with `"null"` added for `nullable: true`, or as an `anyOf` of single types under OpenAPI 3.0. Unions take only built-in types. `format:` and its formatter still apply, and the compiled validator checks them. A union combines with `any_of:`, as an `allOf` of both under OpenAPI 3.0. `nullable:` doesn't add a null branch to `any_of:`.
 - `enum` writes a `type` next to its values, from `type:` (built-in, union or the base type of a custom type, falling back to `with_options type:`) or inferred from the values (`string`, `integer`, `number`, `boolean`, `object`, or a union for mixed values). A value that isn't of the type, or has no JSON type such as a Symbol, raises `Versponse::DefinitionError`. `nullable: true` adds `"null"` to `type` and `nil` to the values, or writes `nullable: true` under OpenAPI 3.0.
+- `const` values need a JSON type, like `enum` values, so a Symbol raises `Versponse::DefinitionError`.
 - `identifier` also declares its field in the full shape, so it needs no matching `field :id`. A property with an identifier's key raises `Versponse::DefinitionError`. With `collapse_if:`, the full shape leaves the identifier out when the condition is false.
 - `Versponse::OpenAPI.rswag_specs` writes security scheme `type` and `in` as symbols, so rswag sends API key headers.
 - The class registry replaces a class when one with the same name is defined again, so code reloading in development doesn't grow it.
-- `time_precision digits, from:` sets the fraction digits of `date-time` values per class, from a version on, so an API can keep whole seconds in released versions and change precision in a new one. A subclass without `time_precision` inherits its closest ancestor's settings; one that declares any uses only its own. Each `from:` is registered like a `supported_versions` bound.
+- `time_precision digits, from:` sets the fraction digits of `date-time` values per class, from a version on, so an API can keep whole seconds in released versions and change precision in a new one. A subclass without `time_precision` inherits its closest ancestor's settings. A subclass that declares any uses only its own. Each `from:` is registered like a `supported_versions` bound.
+- `context:` on `reference`, `collection`, `object`, `one_of` and `one_of` variants renders the subtree with its own context: a Hash merged over the parent context, or a callable returning it.
+- `default:` on `field`, `enum` and `array`, and class-level `on_nil`, replace nil values. A static `default:` must match the property's schema, `default: nil` means no default, and `default:` on `reference`, `collection`, `object`, `one_of` or `const` raises `DefinitionError`.
+- `on_error` on properties, classes and `config` recovers failed properties (`:nullify`, `:omit` or a handler), with `config.recoverable_errors` and the `config.on_recovered_error` hook. `reference property:` reuses the property's policy only where it fits the copy. An `:omit` carries over only when the copy has `if:` or `unless:`. Lambdas, Methods and objects with `#call` given to `on_nil` or `on_error` are checked for their arity when they are set. An error raised by `config.on_recovered_error` propagates past every policy.
+- `fields:` on `serialize` renders a selection of fields, `selectable_paths` lists the paths, and `config.unknown_fields` sets what happens to invalid ones. Under `:ignore`, a list with no valid path renders only identifiers and consts.
+- `expandable_targets` maps each expandable path to the response classes it renders.
+- Rendered arrays are new Arrays, and Hash or Array defaults and consts render as copies, so output can be changed without touching the source or later renders.
+- `serialize(context: nil)` renders with an empty context. `view: nil`, and `view: :collapsed` on a class without an identifier, raise `Versponse::ViewNotFoundError`.
+- `Versponse::OpenAPI::Document.ref` and `.component_name` return the `$ref` and component name of a declared wrapper or `schema`, and raise `Versponse::DefinitionError` for a name the document doesn't declare.
+
+## [0.1.0] - 2025-06-17
+
+- Name reservation.
