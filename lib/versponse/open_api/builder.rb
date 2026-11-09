@@ -24,7 +24,8 @@ module Versponse
 
         # Components are the classes' frozen, cached schemas, so hooks change a copy
         document = mutable(document)
-        @declarations.finalizers.each { |hook| hook.call(document, @version) }
+        # A hook that takes one argument gets only the document
+        @declarations.finalizers.each { |hook| (hook.arity == 1) ? hook.call(document) : hook.call(document, @version) }
         document
       end
 
@@ -46,7 +47,7 @@ module Versponse
 
         {
           "openapi" => openapi,
-          "info" => {"version" => @version}.merge(resolve(@declarations.info) || {}),
+          "info" => info,
           "externalDocs" => resolve(@declarations.external_docs),
           "servers" => presence(resolve(@declarations.servers)),
           "tags" => presence(resolve(@declarations.tags)),
@@ -54,6 +55,11 @@ module Versponse
           "paths" => {},
           "webhooks" => webhooks
         }.compact
+      end
+
+      # Each layer is resolved for the version and merged over the ones before it
+      def info
+        @declarations.info.reduce({"version" => @version}) { |merged, layer| merged.merge(resolve(layer) || {}) }
       end
 
       def mutable(value)
@@ -95,7 +101,7 @@ module Versponse
 
       # Wrapper schemas only $ref the class, so skip classes that don't cover the version (supported_versions)
       def add_wrappers(set)
-        @declarations.wrappers.each do |wrapper|
+        @declarations.wrappers.each_value do |wrapper|
           next unless Components.resolved(wrapper.klass, @version)
 
           schema = wrapper.klass.to_schema(version: @version, view: wrapper.view, root: wrapper.root, meta: wrapper.meta, collection: wrapper.collection)
@@ -103,24 +109,24 @@ module Versponse
         end
       end
 
+      # Hand-written components are schemas, so they're camelized like every other schema; other document values aren't
       def add_schemas(set)
-        @declarations.schemas.each { |schema| set.add(schema.name, resolve(schema.value), "schema #{schema.name}") }
+        @declarations.schemas.each do |name, value|
+          value = resolve(value)
+          set.add(name, value.is_a?(Hash) ? Naming.camelize_keys(value) : value, "schema #{name}")
+        end
       end
 
       def response_classes
-        select(@declarations.response_sources) { Registry.classes }
+        select(@declarations.response_sources, :responses, "response classes") { Registry.classes }
       end
 
       def request_classes
-        select(@declarations.request_sources) { verquest_classes }.select { |klass| !klass.respond_to?(:location) || klass.location == :body }
+        select(@declarations.request_sources, :requests, "body requests") { verquest_classes.select { |klass| Sources.body?(klass) } }
       end
 
-      def select(sources, &candidates)
-        sources.flat_map do |source|
-          next source.classes if source.classes
-
-          candidates.call.select { |klass| klass.name&.start_with?("#{source.namespace}::") }.sort_by(&:name)
-        end.uniq
+      def select(sources, keyword, kind, &candidates)
+        sources.flat_map { |source| source.classes || Sources.in_namespace(keyword, source.namespace, kind, &candidates) }.uniq
       end
 
       def verquest_classes

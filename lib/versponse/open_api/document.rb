@@ -10,7 +10,7 @@ module Versponse
     #     document_name "public_api"
     #     versions "2025-09", "preview"
     #     info "title" => "Public API"
-    #     responses namespace: "PublicApi"
+    #     responses namespace: PublicApi
     #   end
     #
     #   PublicApiDocument.build(version: "2025-09")
@@ -62,23 +62,25 @@ module Versponse
           declarations.document_name = value.to_s
         end
 
+        # @param names [Array<String, Symbol>] versions to declare, none to read them
         # @return [Array<String>] declared versions
-        def document_versions
-          declarations.versions
-        end
-
-        private
-
         def versions(*names)
+          return declarations.versions.dup if names.empty?
+
           declarations.versions = names.map(&:to_s)
         end
+
+        # @return [Array<String>] declared versions
+        def document_versions = versions
+
+        private
 
         def openapi(value)
           declarations.openapi = value.to_s
         end
 
         def info(value = nil, &block)
-          declarations.info = required_value(:info, value, block)
+          declarations.info << required_value(:info, value, block)
         end
 
         def external_docs(value = nil, &block)
@@ -90,31 +92,38 @@ module Versponse
         end
 
         def server(url, description: nil, **extra)
-          declarations.servers << {"url" => url, "description" => description}.compact.merge(extra)
+          declarations.servers << {"url" => url, "description" => description}.compact.merge(extensions(extra))
         end
 
         def tag(name, description: nil, **extra)
-          declarations.tags << {"name" => name, "description" => description}.compact.merge(extra)
+          declarations.tags << {"name" => name, "description" => description}.compact.merge(extensions(extra))
         end
 
         def security_scheme(name, value = nil, &block)
-          declarations.security_schemes[name.to_s] = required_value(:security_scheme, value, block)
+          value = required_value(:security_scheme, value, block)
+          declarations.claim!(:security_scheme, name.to_s)
+          declarations.security_schemes[name.to_s] = value
         end
 
-        def responses(classes = nil, namespace: nil)
-          declarations.response_sources << source(:responses, classes, namespace)
+        def responses(*classes, namespace: nil)
+          declarations.response_sources << source(:responses, classes.flatten, namespace)
         end
 
-        def requests(classes = nil, namespace: nil)
-          declarations.request_sources << source(:requests, classes, namespace)
+        def requests(*classes, namespace: nil)
+          declarations.request_sources << source(:requests, classes.flatten, namespace)
         end
 
         def wrapper(name, klass, root:, collection: false, meta: nil, view: :default)
-          declarations.wrappers << Declarations::Wrapper.new(name: name.to_s, klass:, root:, collection:, meta:, view:)
+          Versponse::Wrapper.check_meta!(meta)
+          name = name.is_a?(Symbol) ? Naming.pascalize(name) : name.to_s
+          declarations.claim!(:wrapper, name)
+          declarations.wrappers[name] = Declarations::Wrapper.new(name:, klass:, root:, collection:, meta:, view:)
         end
 
         def schema(name, value = nil, &block)
-          declarations.schemas << Declarations::Schema.new(name: name.to_s, value: required_value(:schema, value, block))
+          value = required_value(:schema, value, block)
+          declarations.claim!(:schema, name.to_s)
+          declarations.schemas[name.to_s] = value
         end
 
         def webhooks(value = nil, &block)
@@ -122,9 +131,16 @@ module Versponse
         end
 
         def source(keyword, classes, namespace)
-          raise DefinitionError, "#{keyword} needs a list of classes or namespace:" if classes.nil? == namespace.nil?
+          raise DefinitionError, "#{keyword} needs a list of classes or namespace:" if classes.empty? == namespace.nil?
+          return Declarations::Source.new(classes: nil, namespace: namespace.is_a?(Module) ? namespace : namespace.to_s) if namespace
 
-          Declarations::Source.new(classes: classes && Array(classes), namespace: namespace&.to_s)
+          Sources.check!(keyword, classes)
+          Declarations::Source.new(classes:, namespace: nil)
+        end
+
+        # Keyword keys that start with x_ are OpenAPI extensions: x_internal becomes "x-internal"
+        def extensions(extra)
+          extra.to_h { |key, value| [key.start_with?("x_") ? key.to_s.tr("_", "-") : key.to_s, value] }
         end
 
         def finalize(&block)

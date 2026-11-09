@@ -386,11 +386,7 @@ PriceListResponse.to_schema(version: "2025-09")
 - `description` and `schema_options` on a class reach its subclasses, so an abstract `ApplicationResponse` can carry them. Versponse looks them up when it builds schemas, so a later change to the parent still applies. A subclass's `schema_options` merge with its ancestors', and the subclass wins per key. A version's own `description` and `schema_options` win over both.
 - Collapsed shapes are strict (`additionalProperties: false`) whatever `default_additional_properties` says, so only a real collapsed payload matches them.
 
-`Versponse.components(version:)` returns every component of every loaded class and view for an OpenAPI document. In rswag's `swagger_helper.rb`:
-
-```ruby
-components: {schemas: Versponse.components(version: "2025-09")}
-```
+`Versponse.components(version:)` returns every component of every loaded class and view. To build a whole document, with request components, wrappers, and checked `$ref`s, use an [OpenAPI document](#openapi-documents-and-rswag).
 
 ## OpenAPI documents and rswag
 
@@ -406,9 +402,9 @@ class PublicApiDocument < Versponse::OpenAPI::Document
   tag "Contacts", description: "People who rent storage"
   security_scheme("OAuth2") { {"type" => "oauth2", "flows" => {...}} }   # blocks run at build time
 
-  responses namespace: "PublicApi"
-  requests namespace: "PublicApi"              # verquest body requests
-  wrapper :contact_list, PublicApi::ContactResponse, root: "contacts", collection: true, meta: PublicApi::MetaResponse
+  responses namespace: PublicApi
+  requests namespace: PublicApi                # verquest body requests
+  wrapper :contact_list, PublicApi::ContactResponse, root: "contacts", collection: true, meta: PublicApi::MetaResponse   # component "ContactList"
 
   schema "Error", ERROR_SCHEMA                  # hand-written components, collision-checked
   webhooks { |version| Webhooks.openapi(version) }
@@ -420,11 +416,24 @@ PublicApiDocument.build(version: "2025-09")      # => String-keyed Hash
 PublicApiDocument.validate(version: "2025-09")   # => [] when valid OpenAPI and every "#/..." $ref resolves
 ```
 
-- Values use OpenAPI's own key names, which are never camelized. A block that takes an argument receives the version.
+- Values use OpenAPI's own key names, which are never camelized. The exception is `schema`: a hand-written component is a schema, so its keys are camelized like every other schema (`additional_properties:` becomes `additionalProperties`). Keys inside `properties` and a discriminator's `mapping`, values of `enum`, `example`, and `default`, and `x-` extensions keep their spelling.
+- A block that takes an argument receives the version. A `finalize` block that takes one argument receives only the document.
+- `responses` and `requests` take one or more classes, or `namespace:` with a Module or a String. At build, Versponse eager-loads the namespace through Zeitwerk, so its classes don't have to be loaded first. An undefined namespace, or one with no response classes or body requests, raises `Versponse::DefinitionError`. So does a listed class of the wrong kind, or a listed request whose `location` isn't `:body`.
+- `wrapper` turns a Symbol name into PascalCase (`:contact_list` declares `ContactList`) and uses a String as given. Its `meta:` takes a response class, whose `$ref` describes `"meta"`. `serialize(meta:)` takes the Hash instead.
+- `server` and `tag` write keywords that start with `x_` as extensions, with every underscore turned into a hyphen: `x_internal: true` becomes `"x-internal" => true`, and `x_display_name:` becomes `"x-display-name"`.
+- `security` sets the top-level security requirement. `versions` and `document_name` called without arguments return what the class declares.
 - `openapi` defaults to `"3.1.1"`, or `"3.0.3"` under `config.json_schema_version = :openapi30`, to match how schemas are written. Declaring `openapi "3.0.3"` while schemas are written for 3.1 (or the other way round) raises `Versponse::DefinitionError` on `build`.
 - `finalize` hooks run last, on a copy of the document they can change freely, components included.
-- Subclasses inherit declarations, so several documents can share a base class.
 - Two components with the same name raise `Versponse::DefinitionError`.
+
+Subclasses inherit declarations, so several documents can share a base class:
+
+| Behaviour | Declarations |
+|---|---|
+| A subclass's entry with a parent's name replaces it in place. One class declaring a name twice raises `Versponse::DefinitionError`. | `schema`, `wrapper`, `security_scheme` |
+| Merged over the parent's, key by key | `info` |
+| Replaces the parent's value | `external_docs`, `security`, `webhooks`, `openapi`, `document_name`, `versions` |
+| Added to the parent's | `server`, `tag`, `responses`, `requests`, `finalize` |
 
 In rswag's `swagger_helper.rb`:
 
@@ -433,7 +442,7 @@ config.openapi_specs = Versponse::OpenAPI.rswag_specs(PublicApiDocument)
 # keys: "public_api/2025-09.json", "public_api/preview.json"
 ```
 
-Call `Rails.application.eager_load!` before this line. `responses namespace:` and `requests namespace:` see only loaded classes, and `rswag_specs` builds each document once, because rswag adds its paths to it.
+`rswag_specs` needs `document_name` and `versions` on every document. It builds each document once, because rswag adds its paths to it.
 
 ## Output validation
 
@@ -529,6 +538,7 @@ Definitions can be copied between the gems (`one_of name:` and `inherit:` behave
 - `const` takes no `map:`, block or `nullable:`, because a response constant never reads the object. Use `enum` (with `nil` for nullable) for computed values.
 - Response-only DSL: `view`, `include_view`, `view:` on `reference` and `collection`, `match:` on `one_of` variants, `identifier`, `expandable:` and `source`.
 - Request-only DSL: `location`, `parameter_examples:`, `explode:` and conditions (`condition`, `depends_on`).
+- Component names: versponse classes rename through `base_component_name`, which keeps the view suffix, while verquest requests override `component_name`.
 
 verquest schemas embedded in versponse follow verquest's `config.json_schema_version`, so it must be in the same group as versponse's. The groups are:
 

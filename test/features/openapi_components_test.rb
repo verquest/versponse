@@ -55,6 +55,18 @@ class OpenapiComponentsTest < Minitest::Test
     end
   end
 
+  module Empty
+  end
+
+  module NoBodyRequests
+    class SearchRequest < Verquest::Base
+      location :query
+      version "2025-06" do
+        field :page, type: :integer
+      end
+    end
+  end
+
   class ApiDocument < Versponse::OpenAPI::Document
     info "title" => "API"
     responses namespace: "OpenapiComponentsTest::Api"
@@ -65,7 +77,7 @@ class OpenapiComponentsTest < Minitest::Test
   def schemas(document = ApiDocument, version: "2025-09") = document.build(version:)["components"]["schemas"]
 
   def test_collects_responses_requests_and_wrappers
-    expected = %w[ApiMetaResponse ApiSiteCreateRequest ApiSiteResponse ApiSiteResponseCollapsed site_list]
+    expected = %w[ApiMetaResponse ApiSiteCreateRequest ApiSiteResponse ApiSiteResponseCollapsed SiteList]
 
     assert_equal expected, schemas.keys.sort
   end
@@ -73,7 +85,7 @@ class OpenapiComponentsTest < Minitest::Test
   def test_component_schemas
     assert_equal Api::SiteResponse.to_schema(version: "2025-09"), schemas["ApiSiteResponse"]
     assert_equal Api::SiteCreateRequest.to_schema(version: "2025-09"), schemas["ApiSiteCreateRequest"]
-    assert_equal Api::SiteResponse.to_schema(version: "2025-09", root: "sites", collection: true, meta: Api::MetaResponse), schemas["site_list"]
+    assert_equal Api::SiteResponse.to_schema(version: "2025-09", root: "sites", collection: true, meta: Api::MetaResponse), schemas["SiteList"]
   end
 
   def test_later_versions_add_classes
@@ -170,5 +182,99 @@ class OpenapiComponentsTest < Minitest::Test
     error = assert_raises(Versponse::DefinitionError) { schemas(document) }
 
     assert_equal "Component ApiSiteResponse from wrapper ApiSiteResponse collides with OpenapiComponentsTest::Api::SiteResponse", error.message
+  end
+
+  def test_namespace_takes_a_module
+    document = Class.new(Versponse::OpenAPI::Document) { responses namespace: Api }
+
+    assert_includes schemas(document).keys, "ApiSiteResponse"
+  end
+
+  def test_undefined_namespace_raises
+    document = Class.new(Versponse::OpenAPI::Document) { responses namespace: "OpenapiComponentsTest::APi" }
+
+    error = assert_raises(Versponse::DefinitionError) { schemas(document) }
+
+    assert_equal "responses namespace: OpenapiComponentsTest::APi is not defined", error.message
+  end
+
+  def test_namespace_must_be_a_module
+    document = Class.new(Versponse::OpenAPI::Document) { responses namespace: "Float::INFINITY" }
+
+    error = assert_raises(Versponse::DefinitionError) { schemas(document) }
+
+    assert_equal "responses namespace: Float::INFINITY is not a module", error.message
+  end
+
+  # Locals named after the DSL methods would turn `responses [X]` in the blocks into indexing
+  def test_namespace_without_classes_raises
+    response_document = Class.new(Versponse::OpenAPI::Document) { responses namespace: Empty }
+    request_document = Class.new(Versponse::OpenAPI::Document) { requests namespace: NoBodyRequests }
+
+    assert_equal "responses namespace: OpenapiComponentsTest::Empty matched no response classes",
+      assert_raises(Versponse::DefinitionError) { schemas(response_document) }.message
+    assert_equal "requests namespace: OpenapiComponentsTest::NoBodyRequests matched no body requests",
+      assert_raises(Versponse::DefinitionError) { schemas(request_document) }.message
+  end
+
+  def test_explicit_lists_take_only_their_kind
+    response_error = assert_raises(Versponse::DefinitionError) { Class.new(Versponse::OpenAPI::Document) { responses [Api::SiteCreateRequest] } }
+    request_error = assert_raises(Versponse::DefinitionError) { Class.new(Versponse::OpenAPI::Document) { requests [Api::SiteResponse] } }
+
+    assert_equal "responses takes Versponse::Base subclasses, got OpenapiComponentsTest::Api::SiteCreateRequest", response_error.message
+    assert_equal "requests takes Verquest::Base subclasses, got OpenapiComponentsTest::Api::SiteResponse", request_error.message
+  end
+
+  def test_explicit_query_request_raises
+    error = assert_raises(Versponse::DefinitionError) { Class.new(Versponse::OpenAPI::Document) { requests [Api::SiteSearchRequest] } }
+
+    assert_equal "requests: OpenapiComponentsTest::Api::SiteSearchRequest is a :query request; only body requests are components", error.message
+  end
+
+  def test_wrapper_meta_must_be_a_class
+    error = assert_raises(ArgumentError) do
+      Class.new(Versponse::OpenAPI::Document) { wrapper :sites, Api::SiteResponse, root: "sites", meta: {"page" => 1} }
+    end
+
+    assert_includes error.message, "serialize(meta:) takes the Hash"
+  end
+
+  def test_wrapper_meta_outside_the_version_raises
+    document = Class.new(Versponse::OpenAPI::Document) { wrapper :sites, Api::SiteResponse, root: "sites", meta: Api::FutureResponse }
+
+    assert_raises(Versponse::VersionNotFoundError) { schemas(document) }
+  end
+
+  def test_subclass_replaces_a_wrapper
+    document = Class.new(ApiDocument) { wrapper :site_list, Api::SiteResponse, root: "items", collection: true }
+
+    assert_equal ["items"], schemas(document)["SiteList"]["required"]
+  end
+
+  def test_responses_take_several_classes
+    document = Class.new(Versponse::OpenAPI::Document) { responses Api::MetaResponse, Api::SiteResponse }
+
+    assert_equal %w[ApiMetaResponse ApiSiteResponse ApiSiteResponseCollapsed], schemas(document).keys.sort
+  end
+
+  # Symbols are pascalized like class components; Strings are used as given
+  def test_wrapper_names
+    document = Class.new(Versponse::OpenAPI::Document) do
+      wrapper :site_list, Api::SiteResponse, root: "sites"
+      wrapper "site_page", Api::SiteResponse, root: "sites"
+    end
+
+    assert_equal %w[SiteList site_page], schemas(document).keys
+  end
+
+  def test_a_class_declares_each_wrapper_once
+    error = assert_raises(Versponse::DefinitionError) do
+      Class.new(Versponse::OpenAPI::Document) do
+        wrapper "sites", Api::SiteResponse, root: "sites"
+        wrapper "sites", Api::SiteResponse, root: "sites"
+      end
+    end
+
+    assert_equal "wrapper sites is declared twice", error.message
   end
 end

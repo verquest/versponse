@@ -56,4 +56,18 @@ class Versponse::NamingTest < Minitest::Test
 
     assert_equal expected, Versponse::Naming.camelize_keys(dependent_schemas: {credit_card: {required: ["x"]}})
   end
+
+  # Extensions are free-form, so neither the key nor anything under it is camelized
+  def test_extensions_keep_their_spelling
+    expected = {"x-internal_flag" => {"keep_me" => true}, "maxLength" => 1}
+
+    assert_equal expected, Versponse::Naming.camelize_keys("x-internal_flag": {"keep_me" => true}, max_length: 1)
+  end
+
+  # Mapping keys are discriminator values from the payload
+  def test_discriminator_mapping_keeps_its_keys
+    expected = {"discriminator" => {"propertyName" => "object", "mapping" => {"unit_type" => "#/components/schemas/UnitType"}}}
+
+    assert_equal expected, Versponse::Naming.camelize_keys(discriminator: {property_name: "object", mapping: {unit_type: "#/components/schemas/UnitType"}})
+  end
 end

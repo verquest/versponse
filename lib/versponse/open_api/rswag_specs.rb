@@ -10,9 +10,11 @@ module Versponse
 
       # @param documents [Array<Class>] Versponse::OpenAPI::Document subclasses with document_name and versions
       # @raise [Versponse::DefinitionError] when a document has no document_name
+      # @raise [Versponse::DefinitionError] when a document has no versions
       def initialize(documents)
         @entries = documents.each_with_object({}) do |document, entries|
           raise DefinitionError, "#{document.name} needs document_name for rswag" unless document.document_name
+          raise DefinitionError, "#{document.name} needs versions for rswag" if document.document_versions.empty?
 
           document.document_versions.each { |version| entries["#{document.document_name}/#{version}.json"] = [document, version] }
         end
@@ -21,7 +23,7 @@ module Versponse
 
       # @param key [String] e.g. "public_api/2025-09.json" (.yaml and .yml are accepted too)
       # @return [Hash, nil] the symbol-keyed document, nil for an unknown key (rswag checks for nil); built on
-      #   first access and kept, because rswag merges its paths into it (so load response classes first)
+      #   first access and kept, because rswag merges its paths into it
       def [](key)
         key = normalize(key)
         return unless @entries.key?(key)

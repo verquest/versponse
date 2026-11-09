@@ -196,7 +196,7 @@ class SupportedVersionsTest < Minitest::Test
   end
 
   def test_components_documents_and_eager_load_skip_versions_outside_the_range
-    assert_equal %w[LegacyRequest LegacyResponse legacy_single], ApiDocument.build(version: "2025-09")["components"]["schemas"].keys.sort
+    assert_equal %w[LegacyRequest LegacyResponse LegacySingle], ApiDocument.build(version: "2025-09")["components"]["schemas"].keys.sort
     assert_equal %w[PreviewRequest PreviewResponse], ApiDocument.build(version: "preview")["components"]["schemas"].keys.sort
     assert_equal ["PreviewResponse"], Versponse.components(version: "preview", classes: [LegacyResponse, PreviewResponse]).keys
     assert_equal [PreviewResponse], Versponse.eager_load!(classes: [PreviewResponse])

@@ -7,10 +7,15 @@
 - `on_error` on properties, classes and `config` recovers failed properties (`:nullify`, `:omit` or a handler), with `config.recoverable_errors` and the `config.on_recovered_error` hook. `reference property:` reuses the property's policy only where it fits the copy (an `:omit` only when the copy has `if:`/`unless:`).
 - `fields:` on `serialize` renders a selection of fields, `selectable_paths` lists the paths, and `config.unknown_fields` sets what happens to invalid ones.
 - `expandable_targets` maps each expandable path to the response classes it renders.
+- OpenAPI documents: `versions` and `document_name` without arguments return the declared values, `responses` and `requests` take several classes, a `finalize` lambda may take only the document, and `server` and `tag` write `x_` keywords as extensions (`x_display_name:` becomes `"x-display-name"`).
 
 ### Changed
 
 - `default:` on `reference`, `collection`, `object`, `one_of` and `const` raises `DefinitionError`. On `field`, `enum` and `array` a static value must match the property's schema, and `default: nil` means no default (it no longer writes `"default": null`).
+- `responses namespace:` and `requests namespace:` take a Module or a String and eager-load the namespace through Zeitwerk at build. An undefined namespace, or one with no response classes or body requests, raises `DefinitionError`, and so does a listed class of the wrong kind or a listed query request. `rswag_specs` raises for a document without `versions`.
+- `wrapper` and `to_schema` raise `ArgumentError` for a `meta:` that isn't a class, and `to_schema` raises `VersionNotFoundError` when the `meta:` class doesn't serve the version.
+- `wrapper` turns a Symbol name into PascalCase (`:contact_list` declares `ContactList`), and hand-written `schema` components are camelized like every other schema.
+- A document subclass's `info` merges over its parent's. `schema`, `wrapper` and `security_scheme` with a parent's name replace the parent's entry, and one class declaring a name twice raises `DefinitionError`.
 
 ### Fixed
 
@@ -18,6 +23,7 @@
 - Inline validation checks a value once the render has finished whenever a later block could still change it in place and break its schema: frozen Hashes and Arrays with unfrozen contents, Strings whose schema limits more than their type (length, pattern, format, enum), and integers (a mutable Numeric can stop being whole). Such changes were accepted before.
 - The built-in date and date-time formatters return frozen Strings.
 - Callable objects (anything with `#call` that isn't a proc) passed to `on_nil`, `on_error` or `validate_output` are checked for their arity when they are set, like lambdas, instead of failing on a render.
+- Camelizing `schema_options` keeps `x-` extension keys and their values, and a discriminator's `mapping` keys, as written.
 
 ## [0.1.0] - 2026-11-06
 

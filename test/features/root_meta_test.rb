@@ -15,6 +15,12 @@ class RootMetaTest < Minitest::Test
     end
   end
 
+  class LateMetaResponse < Versponse::Base
+    version "2026-01" do
+      field :request_id, type: :string
+    end
+  end
+
   def test_meta_requires_root
     error = assert_raises(ArgumentError) { ItemResponse.to_schema(version: "2025-09", meta: MetaResponse) }
 
@@ -54,5 +60,15 @@ class RootMetaTest < Minitest::Test
   def test_wrapper_schema_checks_the_version_and_view
     assert_raises(Versponse::VersionNotFoundError) { ItemResponse.to_schema(version: "1900-01", root: "item") }
     assert_raises(Versponse::ViewNotFoundError) { ItemResponse.to_schema(version: "2025-09", root: "item", view: :nope) }
+  end
+
+  def test_wrapper_schema_meta_must_be_a_class
+    error = assert_raises(ArgumentError) { ItemResponse.to_schema(version: "2025-09", root: "item", meta: {"page" => 1}) }
+
+    assert_equal %(meta: takes a response class, whose $ref describes "meta"; serialize(meta:) takes the Hash), error.message
+  end
+
+  def test_wrapper_schema_checks_the_meta_version
+    assert_raises(Versponse::VersionNotFoundError) { ItemResponse.to_schema(version: "2025-09", root: "item", meta: LateMetaResponse) }
   end
 end

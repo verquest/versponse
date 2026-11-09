@@ -121,4 +121,107 @@ class OpenapiDocumentTest < Minitest::Test
   def test_info_needs_a_value
     assert_raises(Versponse::DefinitionError) { Class.new(Versponse::OpenAPI::Document) { info } }
   end
+
+  # Like every other schema in the gem; name maps, data keywords and extensions keep their spelling
+  def test_hand_written_schemas_are_camelized
+    document = Class.new(Versponse::OpenAPI::Document) do
+      schema "Note", {
+        type: "object", additional_properties: false,
+        properties: {due_at: {type: "string", min_length: 1}},
+        discriminator: {property_name: "kind", mapping: {unit_type: "#/components/schemas/UnitType"}},
+        "x-internal_flag": {keep_me: true},
+        enum: [{snake_case: 1}]
+      }
+    end
+    expected = {
+      "type" => "object", "additionalProperties" => false,
+      "properties" => {"due_at" => {"type" => "string", "minLength" => 1}},
+      "discriminator" => {"propertyName" => "kind", "mapping" => {"unit_type" => "#/components/schemas/UnitType"}},
+      "x-internal_flag" => {"keep_me" => true},
+      "enum" => [{"snake_case" => 1}]
+    }
+
+    assert_equal expected, document.build(version: "1")["components"]["schemas"]["Note"]
+  end
+
+  def test_subclass_info_merges_over_the_parent
+    assert_equal({"version" => "2025-09", "title" => "Sub API", "description" => "Test API"}, build(SubDocument)["info"])
+  end
+
+  def test_subclass_info_block_is_resolved_for_the_version
+    document = Class.new(ApiDocument) { info { |version| {"summary" => "Built for #{version}"} } }
+
+    assert_equal({"version" => "preview", "title" => "API", "description" => "Test API", "summary" => "Built for preview"}, build(document, version: "preview")["info"])
+  end
+
+  # The inheritance table's other rows: these declarations already behave this way
+  def test_subclass_replaces_and_appends
+    document = Class.new(ApiDocument) do
+      external_docs "url" => "https://sub.example.com"
+      security []
+      server "https://sub.example.com"
+      finalize { |built, _version| built["x-sub"] = true }
+    end
+    built = build(document)
+
+    assert_equal({"url" => "https://sub.example.com"}, built["externalDocs"])
+    assert_empty built["security"]
+    assert_equal %w[https://api.example.com https://sub.example.com], built["servers"].map { |server| server["url"] }
+    assert_equal "2025-09", built["x-built-for"]
+    assert built["x-sub"]
+  end
+
+  def test_subclass_replaces_named_declarations_in_place
+    document = Class.new(ApiDocument) do
+      schema "Error", {type: "string"}
+      security_scheme "OAuth2", {"type" => "http", "scheme" => "bearer"}
+    end
+    built = build(document)
+
+    assert_equal %w[Error VersionedError], built["components"]["schemas"].keys
+    assert_equal({"type" => "string"}, built["components"]["schemas"]["Error"])
+    assert_equal({"type" => "http", "scheme" => "bearer"}, built["components"]["securitySchemes"]["OAuth2"])
+  end
+
+  def test_a_class_declares_each_name_once
+    %i[schema security_scheme].each do |keyword|
+      error = assert_raises(Versponse::DefinitionError) do
+        Class.new(Versponse::OpenAPI::Document) do
+          send(keyword, "Error", {"type" => "object"})
+          send(keyword, "Error", {"type" => "object"})
+        end
+      end
+
+      assert_equal "#{keyword} Error is declared twice", error.message
+    end
+  end
+
+  def test_versions_reads_without_arguments
+    assert_equal %w[2025-09 preview], ApiDocument.versions
+    assert_equal %w[2025-09 preview], ApiDocument.document_versions
+  end
+
+  def test_subclass_versions_replace_the_parent
+    document = Class.new(ApiDocument) { versions "2026-01" }
+
+    assert_equal ["2026-01"], document.versions
+    assert_equal %w[2025-09 preview], ApiDocument.versions
+  end
+
+  def test_finalize_block_may_take_only_the_document
+    document = Class.new(Versponse::OpenAPI::Document) { finalize(&->(built) { built["x-one"] = true }) }
+
+    assert document.build(version: "1")["x-one"]
+  end
+
+  def test_server_and_tag_extensions
+    document = Class.new(Versponse::OpenAPI::Document) do
+      server "https://internal.example.com", x_internal: true
+      tag "Admin", x_display_name: "Administration"
+    end
+    built = document.build(version: "1")
+
+    assert_equal [{"url" => "https://internal.example.com", "x-internal" => true}], built["servers"]
+    assert_equal [{"name" => "Admin", "x-display-name" => "Administration"}], built["tags"]
+  end
 end

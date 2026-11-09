@@ -16,6 +16,11 @@ class OpenapiRswagTest < Minitest::Test
     finalize { |document, _version| document["info"].delete("version") }
   end
 
+  class UnversionedDocument < Versponse::OpenAPI::Document
+    document_name "unversioned"
+    info "title" => "Unversioned"
+  end
+
   def specs = Versponse::OpenAPI.rswag_specs(ApiDocument)
 
   def test_keys_and_values
@@ -73,5 +78,11 @@ class OpenapiRswagTest < Minitest::Test
 
     assert_equal "/info", error[:pointer]
     assert_equal "required", error[:type]
+  end
+
+  def test_versions_are_required
+    error = assert_raises(Versponse::DefinitionError) { Versponse::OpenAPI.rswag_specs(UnversionedDocument) }
+
+    assert_equal "OpenapiRswagTest::UnversionedDocument needs versions for rswag", error.message
   end
 end
