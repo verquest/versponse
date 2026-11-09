@@ -6,16 +6,16 @@
 
 Versponse describes your API's responses with a small Ruby DSL, one definition per API version, with blueprinter-style views. From that definition you get:
 
-- fast rendering of objects and hashes to JSON-ready hashes (or JSON strings);
-- an OpenAPI schema for every response, version and view, so your docs can't drift from your output;
-- optional validation of every rendered response against its own schema, for tests and development;
-- version resolution: ask for `2026-01` and get the closest earlier definition, so unchanged responses need no new version.
+- Rendering of objects and hashes to JSON-ready hashes or JSON strings.
+- An OpenAPI schema for every response, version, and view, built from the same definition that renders the output.
+- Optional validation of every rendered response against its own schema, for tests and development.
+- Version resolution. A request for `2026-01` gets the closest earlier definition, so an unchanged response needs no new version.
 
 The DSL is shared with [verquest](https://github.com/verquest/verquest), which describes requests, and the two gems can reference each other's schemas. See [differences from verquest's DSL](#differences-from-verquests-dsl).
 
 Sponsored by [Stora](https://stora.co)
 
-> Versponse is not 1.0 yet, so minor releases can change the API; the [changelog](CHANGELOG.md) lists every change.
+> Versponse is not 1.0 yet, so minor releases can change the API. The [changelog](CHANGELOG.md) lists every change.
 
 ## Contents
 
@@ -88,7 +88,9 @@ UnitTypeResponse.serialize(unit_type, version: "2025-09")
 # }
 ```
 
-`serialize` takes an object, a Hash (symbol or string keys), or anything that responds to `to_ary`, such as an Array or an ActiveRecord relation, or a Set. A `collection` or `array` property takes the same; any other value raises `Versponse::ExtractionError`. It returns String keys. `serialize_json` takes the same arguments and returns a String.
+`serialize` takes an object, a Hash with Symbol or String keys, a Set, or anything that responds to `to_ary`, such as an Array or an ActiveRecord relation. It returns a Hash with String keys. `serialize_json` takes the same arguments and returns a String.
+
+The value of a `collection` or `array` property must be a Set or respond to `to_ary`. Any other value raises `Versponse::ExtractionError`.
 
 ```ruby
 UnitTypeResponse.serialize(unit_types, version: "2025-09", view: :embedded, root: "unit_types", meta: {"request_id" => "r1"})
@@ -103,14 +105,14 @@ UnitTypeResponse.serialize(unit_types, version: "2025-09", view: :embedded, root
 | `enum` | A value from a fixed list (`values:`, optional `type:`) |
 | `const` | A constant (`value:`) |
 | `array` | An array of scalars (`type:`, `item_schema_options:`) |
-| `object` | An inline object; its block declares the properties |
+| `object` | An inline object whose block declares its properties |
 | `collection` | An array of objects: of another response class (`item:`) or inline (block) |
 | `reference` | Another response class in place (`from:`, `view:`) |
 | `one_of` | One of several response classes, picked with `match:` |
 
 Options shared by every property:
 
-- `map:` reads the value from another method or key. A path digs into nested objects (`map: "address/city"`), and `"."` means the same object, which is handy for grouping fields into an inline `object`.
+- `map:` reads the value from another method or key. A path reads through nested objects (`map: "address/city"`). `"."` means the same object, so an inline `object` can group fields of its parent.
 - A block computes the value. It gets the object and the `context:` passed to `serialize`:
   ```ruby
   field :secret, type: :string, nullable: true do |endpoint, context|
@@ -129,11 +131,11 @@ Options shared by every property:
 
   It applies to everything below the property (full and collapsed shapes, `collapse_if`, blocks and conditions), while the parent and its other properties keep theirs. The callable runs once per value: once for a whole collection, and not at all for `nil` or a property its condition leaves out. A `one_of` variant takes `context:` too, applied after the `one_of`'s, and its callable gets the matched value. `reference property:` carries the reused property's `context:` over unless it declares its own, and `with_options context:` applies it to the associations in the block. A `reference` or `collection item:` of a non-Versponse class, and the unnamed `one_of` of a collection, reject `context:`.
 - `nullable: true` allows `null`.
-- `default:` on `field`, `enum` and `array` replaces a `nil` value: a value, or `->(object)` / `->(object, context)`. A value is written to schemas as `default` and must match the property's schema. A Time default has to be a callable, and is formatted like any value. `default: nil` means no default. `reference … property:` keeps the reused property's `default:`. Other properties raise `Versponse::DefinitionError` for `default:`, and `with_options default:` skips them.
-- `type:` on `field` and `array` takes a union of two or more built-in types. `field :notice_period, type: [:integer, :string], nullable: true` writes `"type": ["integer", "string", "null"]`, and under `json_schema_version = :openapi30` an `anyOf` of single types, each with `nullable: true` (3.0's `nullable` only applies next to a `type`). `format:` and its formatter still apply.
+- `default:` on `field`, `enum`, and `array` replaces a `nil` value. It takes a value, `->(object)`, or `->(object, context)`. A value is written to schemas as `default` and must match the property's schema. A Time default must be a callable, and is formatted like any value. `default: nil` means no default. `reference property:` keeps the reused property's `default:`. Other properties raise `Versponse::DefinitionError` for `default:`, and `with_options default:` skips them.
+- `type:` on `field` and `array` takes a union of two or more built-in types. `field :notice_period, type: [:integer, :string], nullable: true` writes `"type": ["integer", "string", "null"]`. Under `json_schema_version = :openapi30` it writes an `anyOf` of single types, each with `nullable: true`, because 3.0's `nullable` applies only next to a `type`. `format:` and its formatter still apply.
 - A union can be narrowed with `any_of:`, as in `field :notice_period, type: [:integer, :string], nullable: true, any_of: [{"type" => "integer"}, {"enum" => ["send_immediately"]}, {"type" => "null"}]`. Under OpenAPI 3.0 the two `anyOf`s are combined with `allOf`. `nullable:` adds `"null"` to `type` but never adds a null branch to your `any_of:`, so list `{"type" => "null"}` yourself when the field is nullable. Otherwise `nil` matches no alternative.
 - A user-supplied `any_of:` is written verbatim, in documents and validation schemas alike. `{"type" => "null"}` isn't valid OpenAPI 3.0, so under `:openapi30` it ends up in the document as is, but leaving it out makes `nil` fail output validation. For a nullable union under OpenAPI 3.0, `enum:` with `nil` in its values avoids the problem.
-- `enum` writes a `type` next to its values. Without `type:` it's inferred from them: Strings are `string`, Integers `integer`, Integers with Floats `number`, `true`/`false` `boolean`, and mixed values a union. Pass `type:` (or `with_options type:`) for a custom type, of which only the base type is used, or to say `number` for whole numbers. Every value must be of the type, and a value with no JSON type, such as a Symbol, raises `Versponse::DefinitionError`. `nullable: true` adds `"null"` to `type` and `nil` to the values, or writes `nullable: true` under OpenAPI 3.0:
+- `enum` writes a `type` next to its values. Without `type:`, Versponse infers it from the values: Strings give `string`, Integers give `integer`, Integers with Floats give `number`, `true` and `false` give `boolean`, and mixed values give a union. Pass `type:` or `with_options type:` to use a custom type, of which only the base type is written, or to write `number` for whole numbers. Every value must be of the type, and a value with no JSON type, such as a Symbol, raises `Versponse::DefinitionError`. `nullable: true` adds `"null"` to `type` and `nil` to the values, or writes `nullable: true` under OpenAPI 3.0:
   ```ruby
   enum :status, values: %w[active archived], nullable: true
   # => {"type" => ["string", "null"], "enum" => ["active", "archived", nil]}
@@ -143,9 +145,9 @@ Options shared by every property:
 - Other options are JSON Schema keywords in snake case, such as `description:`, `format:` or `max_length:`. They're written in camel case (`maxLength`). OpenAPI extensions go in as written (`"x-internal": true`). Anything else raises `Versponse::DefinitionError`, with a suggestion for typos such as `nulable:`.
 - `with_options type: :string, nullable: true do ... end` applies options to every property in the block, `view:` and `discriminator:` included. Explicit options win. As in verquest, a nested `with_options` replaces the outer options, `map:` is ignored, and each `version` block starts without defaults.
 
-`required` is computed for you: every property without `if:`/`unless:` is always emitted, so it's required.
+Versponse computes `required`. A property without `if:` or `unless:` is always emitted, so the schema lists it as required.
 
-`one_of` picks a variant with `match:` (a class, a lambda or an array of them, compared with `===`):
+`one_of` picks a variant with `match:`. It takes a class, a lambda, or an array of them, and compares each with `===`:
 
 ```ruby
 one_of :creator, discriminator: "object" do
@@ -178,7 +180,7 @@ An item that matches no variant raises `Versponse::ExtractionError` with its ind
 reference :billing_address, from: ContactResponse, property: :address, map: "billing"
 ```
 
-This renders as if `ContactResponse`'s `address` were declared here. A `map:` or block on the reference overrides the source. The referenced property's `if:`/`unless:` don't carry over, and `nullable:` comes from the referenced property. `context:` carries over too, unless the reusing reference declares its own.
+This renders as if `ContactResponse`'s `address` were declared here. A `map:` or block on the reference overrides the source. The referenced property's `nullable:` carries over, and so does its `context:` unless the reference declares its own. Its `if:` and `unless:` don't carry over.
 
 ## Versions
 
@@ -225,9 +227,9 @@ OverlockResponse.serialize(overlock, version: "2025-12") # uses 2025-09
 OverlockResponse.serialize(overlock, version: "2026-06") # raises Versponse::VersionNotFoundError
 ```
 
-- `min` defaults to the first declared version. Set it when a class should appear later than its first `version` block. The range applies to the requested version, not to the blocks: with `supported_versions min: "preview"` and a single `version "2025-09"` block, `"preview"` is served by the 2025-09 block and `"2025-09"` raises. `max` defaults to no upper bound.
-- A version outside the range raises `Versponse::VersionNotFoundError`, like a version older than every declared one. `serialize`, schemas, references and `expandable_paths` raise it. `Versponse.components` and OpenAPI documents leave the class, and its wrappers, out of that version. `Versponse.eager_load!` compiles only the versions the range serves.
-- Versions are compared with `config.version_resolver`, so with the default resolver `"preview"` sorts after dated versions. Before caching, a request is mapped to the closest earlier registered name: every version any class declares, plus every `supported_versions` bound. So ranges hold exactly: `min: "preview"` works without any class declaring `"preview"`, and a request after a `max` stays outside it. Errors name the version that was requested.
+- `min` defaults to the first declared version. Set it when a class should appear later than its first `version` block. The range applies to the requested version, not to the blocks. With `supported_versions min: "preview"` and a single `version "2025-09"` block, the 2025-09 block serves `"preview"`, and `"2025-09"` raises. `max` defaults to no upper bound.
+- A version outside the range raises `Versponse::VersionNotFoundError`, like a version older than every declared one. `serialize`, schemas, references, and `expandable_paths` raise it. `Versponse.components` and OpenAPI documents leave the class and its wrappers out of that version. `Versponse.eager_load!` compiles only the versions the range serves.
+- `config.version_resolver` compares versions, so with the default resolver `"preview"` sorts after dated versions. Before caching, Versponse maps a request to the closest earlier registered name. The registered names are every version any class declares, plus every `supported_versions` bound. As a result, `min: "preview"` works without any class declaring `"preview"`, and a request after a `max` stays outside the range. Errors name the requested version.
 - `min` after `max` raises `Versponse::DefinitionError` when declared. A `max` before the first declared version would leave nothing to serve, so it raises `Versponse::DefinitionError` the first time the class resolves a version, and from `eager_load!`.
 - Declare it on the class before the first `version` block. Subclasses of an abstract base class inherit the range and can declare their own. `supported_versions` with no arguments removes an inherited range.
 
@@ -248,10 +250,10 @@ class BaseResponse < Versponse::Base
 end
 ```
 
-- A request uses the setting with the closest `from:` at or before it, compared with `config.version_resolver`, or the one without `from:`. Without any, `config.formatters` applies (milliseconds by default).
+- A request uses the setting with the closest `from:` at or before it, compared with `config.version_resolver`. If no `from:` matches, it uses the setting without `from:`. Without either, `config.formatters` applies, which writes milliseconds by default.
 - Each `from:` is registered like a `supported_versions` bound, so it takes effect even when no class declares that version.
-- It replaces the `date-time` formatter of `config.formatters`, and applies to the class's fields, arrays, inline objects and `reference property:`. A nested class (`reference from:`, `collection item:`, `one_of` variants) renders with its own setting, so declare it on a shared base class.
-- Declare it on the class before the first `version` block. A subclass without `time_precision` inherits its closest ancestor's settings; one that sets any uses only its own, so two timelines never mix. Schemas don't change.
+- It replaces the `date-time` formatter of `config.formatters` for the class's fields, arrays, inline objects, and `reference property:`. A nested class (`reference from:`, `collection item:`, or a `one_of` variant) renders with its own setting, so declare `time_precision` on a shared base class.
+- Declare it on the class before the first `version` block. A subclass without `time_precision` inherits its closest ancestor's settings. A subclass that sets any uses only its own, so settings from two classes never mix. Schemas don't change.
 
 ## Views
 
@@ -286,9 +288,17 @@ ProductResponse.serialize(product, version: "2026-01", view: :embedded)
 # => {"id" => "p1", "title" => "Box"}
 ```
 
-`reference` and `collection` take `view:` to render the nested class in one of its views, which is how cycles are broken (an order embeds its tenancy without the tenancy's order). Redeclaring a view in a later version replaces it. A property declared at version level replaces an inherited view's view-only property with the same key, so promoting a view-only field to every view takes one line.
+`reference` and `collection` take `view:` to render the nested class in one of its views. Use it to break cycles: an order embeds its tenancy in a view without the tenancy's order. Redeclaring a view in a later version replaces it. A property declared at version level replaces an inherited view's view-only property with the same key, so one line moves a view-only field into every view.
 
-Mistakes in a definition raise `Versponse::DefinitionError` when the version block closes: excluding an unknown property or an identifier (redeclare the identifiers instead), declaring a version or a view twice, `inherit:` naming a version before every declared one, `include_view` of an unknown view, or views including each other in a cycle. `VersionNotFoundError`, `ViewNotFoundError` and `PropertyNotFoundError` are left for what a caller asks for at runtime (a version, a view, or `to_validation_schema(property:)`), so they are safe to map to client errors.
+These mistakes raise `Versponse::DefinitionError` when the version block closes:
+
+- Excluding an unknown property or an identifier. Redeclare the identifiers instead.
+- Declaring a version or a view twice.
+- An `inherit:` that names a version before every declared one.
+- An `include_view` of an unknown view.
+- Views that include each other in a cycle.
+
+`VersionNotFoundError`, `ViewNotFoundError`, and `PropertyNotFoundError` are raised only for what a caller asks for at runtime: a version, a view, or `to_validation_schema(property:)`. You can map them to client errors.
 
 ## Expansion
 
@@ -317,14 +327,13 @@ UnitResponse.serialize(unit, version: "2025-09", expand: ["site", "deal.stage"])
 # => site and deal.stage in full
 ```
 
-- `expand:` takes dotted paths through any association, or `"*"` for every path `expandable_paths` lists (use it for webhooks and internal renders). `"deal.*"` expands `deal` and every path below it. Recursive associations expand once under `"*"`, so cyclic object graphs are safe; name deeper paths explicitly to go further. Validated `expand:` lists are cached per class (up to 256 combinations).
+- `expand:` takes dotted paths through any association, or `"*"` for every path `expandable_paths` lists. Use `"*"` for webhooks and internal renders. `"deal.*"` expands `deal` and every path below it. Under `"*"`, a recursive association expands once, so cyclic object graphs are safe. An explicit path through a recursive class goes as deep as you name it (`children.children`). Each class caches up to 256 validated `expand:` lists.
 - An expandable `one_of` collapses each variant. With `discriminator:` the collapsed form keeps the discriminator const (`{"object" => "order", "id" => "o1"}`), but the OpenAPI `discriminator` keyword is left out, because a mapping would send collapsed payloads to the full schema.
 - `identifier` declares the field in both shapes: the full one and the collapsed one. It takes `field` options except `if:` and `unless:`, and a property with the same key raises `Versponse::DefinitionError`. Redeclare the identifier to change it.
 - `identifier :id, map: "public_id", collapse_if: ->(stage) { !stage.archived? }` renders the association in full when the condition is false, for objects with no identifier to show. The full shape then leaves the identifier out, so it isn't required in the full schema. A `collection item:` renders in full when any item fails. An expandable `one_of` decides for each value, so each item of a polymorphic collection decides for itself. Schemas don't change, because the `anyOf` already includes the full shape. The condition takes `(object)` or `(object, context)`. Only one identifier per version can declare it, and later versions inherit it until they redeclare their identifiers.
-- `expand:` paths through recursive classes go as deep as you like (`children.children`); `expandable_paths` lists each recursive association once.
 - Schemas describe both shapes as `anyOf: [{$ref Site}, {$ref SiteCollapsed}]`, and each class with an identifier gets a `<Name>Collapsed` component.
-- `UnitResponse.expandable_paths(version: "2025-09")` lists every path (`["deal.stage", "prices", "site"]`), for scope checks.
-- `UnitResponse.expandable_targets(version: "2025-09")` maps each of those paths to the classes it renders (`{"deal.stage" => [StageResponse], ...}`): a `reference`'s `from:`, a `collection`'s `item:`, or every `one_of` variant. Use it to derive per-path metadata from the classes, such as the scopes an expand needs. It's built on first call and cached.
+- `UnitResponse.expandable_paths(version: "2025-09")` lists every path (`["deal.stage", "prices", "site"]`), for scope checks. It lists each recursive association once.
+- `UnitResponse.expandable_targets(version: "2025-09")` maps each of those paths to the classes it renders (`{"deal.stage" => [StageResponse], ...}`). A path renders a `reference`'s `from:`, a `collection`'s `item:`, or every `one_of` variant. Use it to derive per-path metadata from the classes, such as the scopes an expand needs. Versponse builds the map on the first call and caches it.
 - An unknown path raises `Versponse::InvalidExpandError` (its `paths` lists them), unless `config.unknown_expand = :ignore`.
 
 ## Field selection
@@ -335,8 +344,8 @@ UnitResponse.serialize(unit, version: "2025-09", expand: ["site", "deal.stage"])
 OrderResponse.serialize(order, fields: ["status", "total", "line_items.price"], expand: ["line_items"])
 ```
 
-- `"line_items"` selects the whole association, and `"line_items.price"` only `price` inside it (and implies the `line_items` key). `"line_items.*"` and `"*"` select everything at that level. `nil` or `[]` renders everything.
-- Identifiers and `const` properties (one_of discriminators among them) always render.
+- `"line_items"` selects the whole association. `"line_items.price"` selects only `price` inside it, and implies the `line_items` key. `"line_items.*"` and `"*"` select everything at that level. `nil` or `[]` renders everything.
+- Identifiers and `const` properties, including `one_of` discriminators, always render.
 - Unselected properties never run their blocks, so their queries are skipped too.
 - A path below an expandable association needs that association expanded. Otherwise, like an unknown path, it raises `Versponse::InvalidFieldsError` (`paths` lists them), unless `config.unknown_fields = :ignore`.
 - `UnitResponse.selectable_paths(version: "2025-09")` lists every path.
@@ -369,12 +378,12 @@ PriceListResponse.to_schema(version: "2025-09")
 
 - `to_schema(version:, view:)` returns the OpenAPI schema, with `$ref`s to other components.
 - `to_validation_schema(version:, view:, property: nil)` inlines every reference. A class that recurses into itself is named for `"#Name"` references: `$anchor` from draft 2019-09 and in OpenAPI 3.1, `$id: "#Name"` in drafts 6 and 7, `id: "#Name"` in draft 4 and OpenAPI 3.0.
-- `component_name(view:)` is the class name without its first namespace, squashed, plus the view: `PriceListResponse`, `PriceListResponseEmbedded` (`Api::V1::UserResponse` becomes `V1UserResponse`). Override `self.base_component_name` to rename, for example `def self.base_component_name = super.delete_suffix("Response")`.
+- `component_name(view:)` drops the class name's first namespace, joins the rest, and appends the view: `PriceListResponse`, `PriceListResponseEmbedded`. `Api::V1::UserResponse` becomes `V1UserResponse`. To rename, override `self.base_component_name`, for example `def self.base_component_name = super.delete_suffix("Response")`.
 - `to_ref(view:, property: nil)` returns `"#/components/schemas/<name>"`. An anonymous class has no component name, so it raises `Versponse::DefinitionError`.
 - With `discriminator:`, `one_of` emits an OpenAPI `mapping` built from each variant's `const`, such as `{"order" => "#/components/schemas/OrderResponse"}`. A variant without that `const`, or two variants with the same value, raise `DefinitionError` when the schema is built.
 - A `one_of` is a `oneOf`, in documents and validation schemas alike. Without `discriminator:`, its variants need shapes a client can tell apart: if one payload fits two variants, `oneOf` rejects it, so `validate_output` raises and strict consumers such as rswag's response validation fail. For polymorphic responses, prefer `discriminator:`.
 - `to_schema(root: "unit_types", meta: MetaResponse, collection: true)` returns a wrapper schema for the whole response body. The envelope is strict (`additionalProperties: false`) whatever `default_additional_properties` says.
-- `description` and `schema_options` on a class reach its subclasses, so an abstract `ApplicationResponse` can carry them. They're looked up when schemas are built, so a parent changed later still applies. A subclass's `schema_options` merge with its ancestors', the subclass winning per key; a version's own `description` and `schema_options` win over both.
+- `description` and `schema_options` on a class reach its subclasses, so an abstract `ApplicationResponse` can carry them. Versponse looks them up when it builds schemas, so a later change to the parent still applies. A subclass's `schema_options` merge with its ancestors', and the subclass wins per key. A version's own `description` and `schema_options` win over both.
 - Collapsed shapes are strict (`additionalProperties: false`) whatever `default_additional_properties` says, so only a real collapsed payload matches them.
 
 `Versponse.components(version:)` returns every component of every loaded class and view for an OpenAPI document. In rswag's `swagger_helper.rb`:
@@ -414,7 +423,7 @@ PublicApiDocument.validate(version: "2025-09")   # => [] when valid OpenAPI and 
 - Values use OpenAPI's own key names, which are never camelized. A block that takes an argument receives the version.
 - `openapi` defaults to `"3.1.1"`, or `"3.0.3"` under `config.json_schema_version = :openapi30`, to match how schemas are written. Declaring `openapi "3.0.3"` while schemas are written for 3.1 (or the other way round) raises `Versponse::DefinitionError` on `build`.
 - `finalize` hooks run last, on a copy of the document they can change freely, components included.
-- Subclasses inherit declarations, which is handy for sharing a base between documents.
+- Subclasses inherit declarations, so several documents can share a base class.
 - Two components with the same name raise `Versponse::DefinitionError`.
 
 In rswag's `swagger_helper.rb`:
@@ -424,7 +433,7 @@ config.openapi_specs = Versponse::OpenAPI.rswag_specs(PublicApiDocument)
 # keys: "public_api/2025-09.json", "public_api/preview.json"
 ```
 
-Eager-load your app before this line (`Rails.application.eager_load!`): `responses namespace:` and `requests namespace:` only see loaded classes, and each document is built once, because rswag adds its paths to it.
+Call `Rails.application.eager_load!` before this line. `responses namespace:` and `requests namespace:` see only loaded classes, and `rswag_specs` builds each document once, because rswag adds its paths to it.
 
 ## Output validation
 
@@ -454,7 +463,7 @@ Versponse.configure do |config|
 end
 ```
 
-The sample is drawn per render (a sampled collection is validated in full) and before the callable runs, so the callable runs only for sampled renders. A lambda or method must accept the response class: `-> { ... }` raises `ArgumentError` when it is set.
+Versponse draws the sample once per render, so a sampled collection is validated in full. It draws the sample before it calls the callable, so the callable runs only for sampled renders. A lambda or method must accept the response class. Setting `-> { ... }` raises `ArgumentError`.
 
 For a share that differs per request, draw it in the callable itself:
 
@@ -462,7 +471,9 @@ For a share that differs per request, draw it in the callable itself:
 config.validate_output = ->(response_class) { rand < (Current.account&.beta? ? 1.0 : 0.05) }
 ```
 
-Each validation schema is compiled once into plain Ruby checks, and each field is checked as it is rendered, so a valid render costs about 1.5x a plain one. json_schemer runs only to build the error list when a check fails, and for schemas that use keywords the compiler doesn't support (they fall back automatically). A value that a later block could still change in place (anything not frozen all the way down) is checked once the render has finished instead, so the change is caught. Values whose schema only gives a scalar type (`type: :string`, `:number`, `:boolean`) skip this, since a change in place can't change their type; the built-in date and date-time formatters return frozen Strings for the same reason.
+Versponse compiles each validation schema once into plain Ruby checks and checks each field as it renders it. A valid render takes about 1.5 times as long as a plain one. json_schemer runs only to build the error list when a check fails, and for schemas that use keywords the compiler doesn't support.
+
+A later block can change a value in place if the value isn't frozen all the way down. Versponse checks such a value after the render finishes, so it catches the change. A value whose schema gives only a scalar type (`type: :string`, `:number`, or `:boolean`) is checked while rendering, because a change in place can't change its type. The built-in `date` and `date-time` formatters return frozen Strings, so their values are checked while rendering too.
 
 ## Nil and errors
 
@@ -475,13 +486,19 @@ class ContactResponse < Versponse::Base
 end
 ```
 
-`on_error` decides what happens when a property fails to render: `:raise` (the default), `:nullify`, `:omit`, or a handler `->(error, object, key, context)` whose value is written. Set it on a property (`on_error:`, also through `with_options`), on a class (`on_error :nullify`, before the first version, inherited), or as `config.on_error`. The property's own wins, then the class's, then the config's. Lambdas for `on_nil` and handlers are checked when declared: they must take three and four arguments.
+`on_error` decides what happens when a property fails to render: `:raise` (the default), `:nullify`, `:omit`, or a handler `->(error, object, key, context)` whose return value is written. Set it in one of three places:
 
-- An explicit `on_error: :nullify` needs `nullable: true`, and `:omit` needs `if:` or `unless:`, so recovered output still matches the schema. A class-level or config-level `:nullify`/`:omit` applies only to the properties it fits. The others fall through to the next level, ending at `:raise`. A handler applies to every property.
-- A handler's value isn't known ahead, so with `validate_output` the render is validated in full. So is one with a nullified value, since a declared `any_of:` may still reject `null`.
+- On a property, with `on_error:` or through `with_options`.
+- On a class, with `on_error :nullify` before the first version. Subclasses inherit it.
+- In `config.on_error`.
+
+The property's policy wins, then the class's, then the config's. Versponse checks `on_nil` lambdas and `on_error` handlers when you declare them. An `on_nil` lambda must take three arguments, and a handler four.
+
+- An explicit `on_error: :nullify` needs `nullable: true`, and `:omit` needs `if:` or `unless:`, so recovered output still matches the schema. A class-level or config-level `:nullify` or `:omit` applies only to the properties it fits. The others fall through to the next level, ending at `:raise`. A handler applies to every property.
+- A handler's return value isn't known in advance, so with `validate_output` a render that used a handler is validated in full. So is a render with a nullified value, because a declared `any_of:` may still reject `null`.
 - `config.recoverable_errors` (default `[StandardError]`) lists what a policy recovers. Versponse's own errors aren't recovered, and a `NoMethodError` or `KeyError` no policy recovers still becomes `ExtractionError`.
 - A failure inside a nested class or inline object is recovered only by an `on_error:` declared on that association (`reference :site, from: SiteResponse, nullable: true, on_error: :nullify`), and then an `ExtractionError` from it too. Class-level and config-level policies never drop a whole subtree. The child's failure is marked on the exception object, so a frozen exception can't be marked and is treated like a failure of the association itself.
-- `config.on_recovered_error = ->(error, response:, key:, object:) { ... }` is called for every recovered error, with the class whose plan recovered it, the property's key and the object being rendered. Errors it raises propagate, and no policy (not even a parent association's) recovers them.
+- Versponse calls `config.on_recovered_error = ->(error, response:, key:, object:) { ... }` for every recovered error. It passes the class that recovered the error, the property's key, and the object being rendered. An error raised inside the hook propagates, and no policy recovers it, not even a parent association's.
 
 ## Sharing references with verquest
 
@@ -502,7 +519,7 @@ ContactResponse.to_schema(version: "2025-09")["properties"]["address"]
 
 The values of such references pass through unchanged, so they must already be JSON-ready.
 
-A verquest request can reference a versponse class with a verquest version that supports schema-only references. verquest builds its schemas when a `version` block closes, so declare the versponse class's versions first, and don't reference a forward-declared, still-empty versponse class from verquest.
+A verquest request can reference a versponse class if the installed verquest supports schema-only references. verquest builds its schemas when a `version` block closes. Declare the versponse class's versions first, and don't reference a versponse class from verquest while it is still empty.
 
 ### Differences from verquest's DSL
 
@@ -513,14 +530,21 @@ Definitions can be copied between the gems (`one_of name:` and `inherit:` behave
 - Response-only DSL: `view`, `include_view`, `view:` on `reference` and `collection`, `match:` on `one_of` variants, `identifier`, `expandable:` and `source`.
 - Request-only DSL: `location`, `parameter_examples:`, `explode:` and conditions (`condition`, `depends_on`).
 
-verquest schemas embedded in versponse follow verquest's `config.json_schema_version`, so it must be compatible with versponse's: the same group of `:draft4`, `:openapi30`, `:draft6`/`:draft7`, or `:draft2019_09`/`:draft2020_12`/`:openapi31` (the defaults, `:draft2020_12` and `:openapi31`, are compatible). Otherwise building a schema that references a verquest request raises `Versponse::DefinitionError`.
+verquest schemas embedded in versponse follow verquest's `config.json_schema_version`, so it must be in the same group as versponse's. The groups are:
+
+- `:draft4`
+- `:openapi30`
+- `:draft6` and `:draft7`
+- `:draft2019_09`, `:draft2020_12`, and `:openapi31`
+
+The defaults, `:draft2020_12` and `:openapi31`, are in the same group. Otherwise, building a schema that references a verquest request raises `Versponse::DefinitionError`.
 
 ## Formats and validation notes
 
 - Only properties with a `format:` are formatted. Blueprinter formats every Time, but here a Time field without `format: "date-time"` is emitted as is, and output validation fails it.
-- `date-time` formats Time, DateTime and Date (as midnight) as ISO 8601 in UTC with milliseconds, like Rails' JSON (`2025-09-01T10:00:00.000Z`); `date` formats Date and Time as an ISO 8601 date. Set the fraction digits per class and version with `time_precision` (see [Time precision](#time-precision)). `date` keeps the value's own calendar day while `date-time` converts to UTC, so 23:30 at -05:00 gives `2025-01-01` and `2025-01-02T04:30:00.000Z`.
-- Validation checks the rendered data only, not the `root:`/`meta:` envelope.
-- `field :metadata, type: :object, additional_properties: {type: "string"}` describes a free-form map; its value passes through.
+- `date-time` formats Time, DateTime, and Date (as midnight) as ISO 8601 in UTC with milliseconds, like Rails' JSON (`2025-09-01T10:00:00.000Z`). `date` formats Date and Time as an ISO 8601 date. To set the fraction digits per class and version, use [`time_precision`](#time-precision). `date` keeps the value's own calendar day, while `date-time` converts to UTC. For 23:30 at -05:00 on 1 January 2025, `date` gives `2025-01-01` and `date-time` gives `2025-01-02T04:30:00.000Z`.
+- Validation checks only the rendered data, not the `root:` and `meta:` envelope.
+- `field :metadata, type: :object, additional_properties: {type: "string"}` describes a free-form map. Its value passes through unchanged.
 - In apps and test suites with many response classes, pass `classes:` to `Versponse.components`, or keep component names unique.
 
 ## Configuration
@@ -535,24 +559,30 @@ end
 | Setting | Default |
 |---|---|
 | `current_version` | none |
-| `version_resolver` | closest earlier version; a custom one is called with `(requested, names)`, `names` String-sorted, must return the closest name at or before `requested` (or nil), and also orders `supported_versions` bounds |
-| `json_generator` | `JSON.generate` (e.g. `->(hash) { Oj.dump(hash, mode: :compat) }`) |
+| `version_resolver` | closest earlier version. A custom resolver is called with `(requested, names)`, where `names` is sorted as Strings, and returns the closest name at or before `requested`, or `nil`. It also orders `supported_versions` bounds. |
+| `json_generator` | `JSON.generate` (or a callable such as `->(hash) { Oj.dump(hash, mode: :compat) }`) |
 | `json_schema_version` | `:openapi31` (also `:openapi30`, `:draft2020_12`, `:draft2019_09`, `:draft7`, `:draft6`, `:draft4`, as in verquest) |
 | `validate_output` | `false` (or `true`, or a callable called with the response class per render) |
-| `validate_output_sample_rate` | `1.0`; the share of renders `validate_output` allows that are validated |
+| `validate_output_sample_rate` | `1.0`. The share of renders that `validate_output` allows and that are validated. |
 | `formatters` | `date-time` and `date`, keyed by JSON Schema format |
-| `custom_field_types` | `{}`; verquest-shaped custom types (see below) |
+| `custom_field_types` | `{}`. Custom types in verquest's shape, described in [Custom field types](#custom-field-types). |
 | `default_additional_properties` | `false` |
 | `unknown_expand` | `:raise` (or `:ignore`) |
 | `unknown_fields` | `:raise` (or `:ignore`) |
 | `field_order` | `:declaration` (or `:alphabetical`: identifier fields first, then by key, like blueprinter's `sort_fields_by :name_asc`) |
 | `on_error` | `:raise` (or `:nullify`, `:omit`, a handler `->(error, object, key, context)`) |
 | `recoverable_errors` | `[StandardError]` |
-| `on_recovered_error` | none; called with `(error, response:, key:, object:)` |
+| `on_recovered_error` | none. Called with `(error, response:, key:, object:)`. |
 
-`json_schema_version` works as in verquest: output validation uses that version's meta-schema, `const` is written as a one-value `enum` under `:draft4` and `:openapi30`, and recursive classes are named with `$anchor` from 2019-09, a plain-name `$id` in drafts 6 and 7, and `id` in draft 4 and OpenAPI 3.0. `:openapi30` also writes `nullable: true` and documents declare `openapi: "3.0.3"`. A nullable enum lists `null` among its values there too. A nullable `reference`, `one_of` or other `$ref` is written as `{"allOf": [{"$ref": ...}], "nullable": true}`, the form code generators expect. Strict 3.0 validators ignore `nullable` without a `type`, so they reject `null` there; output validation always uses the 3.1 forms internally and accepts it.
+`json_schema_version` works as in verquest:
 
-Plans and schemas are cached. Settings that change output (`json_schema_version`, `formatters`, `version_resolver`, `field_order`, `default_additional_properties`, `on_error`, `recoverable_errors`) reset the caches when set. Set `custom_field_types` before response classes load, because properties resolve their types when they're defined.
+- Output validation uses that version's meta-schema.
+- `const` is written as a one-value `enum` under `:draft4` and `:openapi30`.
+- Recursive classes are named with `$anchor` from 2019-09, a plain-name `$id` in drafts 6 and 7, and `id` in draft 4 and OpenAPI 3.0.
+
+`:openapi30` writes `nullable: true` instead of a `"null"` type, and documents declare `openapi: "3.0.3"`. A nullable enum also lists `null` among its values. A nullable `reference`, `one_of`, or other `$ref` is written as `{"allOf": [{"$ref": ...}], "nullable": true}`, the form that code generators expect. Strict 3.0 validators ignore `nullable` without a `type`, so they reject `null` in that form. Output validation always uses the 3.1 forms internally and accepts it.
+
+Versponse caches plans and schemas. Setting any of these clears the caches, because they change output: `json_schema_version`, `formatters`, `version_resolver`, `field_order`, `default_additional_properties`, `on_error`, and `recoverable_errors`. Set `custom_field_types` before response classes load, because properties resolve their types when they're defined.
 
 ### Custom field types
 
@@ -597,7 +627,7 @@ end
 
 ## Performance
 
-`bundle exec rake bench` compares versponse with alba and blueprinter on flat, nested and collection payloads, and prints allocations per serialized object.
+`bundle exec rake bench` compares versponse with alba and blueprinter on flat, nested, and collection payloads, and prints allocations per serialized object.
 
 Iterations per second on Ruby 4.0.6 (arm64-darwin), higher is better:
 
@@ -608,7 +638,7 @@ Iterations per second on Ruby 4.0.6 (arm64-darwin), higher is better:
 | nested with `expand: ["site"]` | 171.1k | 120.2k | | |
 | collection (1000 nested) | 201.5 | 148.0 | 63.4 | 37.9 |
 
-Measured without YJIT; with `ruby --yjit`, versponse renders these 1.7-2x faster again.
+These numbers are without YJIT. With `ruby --yjit`, versponse renders the same payloads 1.7 to 2 times faster.
 
 ## License
 
