@@ -21,6 +21,8 @@ module Versponse
     attr_writer :on_nil
     # @return [Symbol, #call, nil] on_error declared on this class, nil to remove an inherited one
     attr_writer :on_error
+    # @return [Array(String, String), nil] single and collection root declared on this class; subclasses don't inherit it
+    attr_accessor :roots
 
     # @param klass [Class] response class
     def initialize(klass)

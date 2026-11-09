@@ -93,6 +93,7 @@ module Versponse
           next unless Components.resolved(wrapper.klass, @version)
 
           schema = wrapper.klass.to_schema(version: @version, view: wrapper.view, root: wrapper.root, meta: wrapper.meta, collection: wrapper.collection)
+          schema = schema.merge("description" => wrapper.description).freeze if wrapper.description
           set.add(wrapper.name, schema, "wrapper #{wrapper.name}")
         end
       end

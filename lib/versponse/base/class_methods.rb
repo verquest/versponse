@@ -65,10 +65,22 @@ module Versponse
     end
 
     # @param object [Object] source
-    # @param options [Hash] see {#serialize}
+    # @param options [Hash] see {#serialize}. Without root:, the output is wrapped under the declared root (the collection
+    #   root for a collection); root: false renders it unwrapped.
     # @return [String] JSON produced by config.json_generator
     def serialize_json(object, **options)
-      Versponse.configuration.json_generator.call(serialize(object, **options))
+      root = options.fetch(:root) { Collections.collection?(object) ? collection_root_key : root_key }
+      Versponse.configuration.json_generator.call(serialize(object, **options, root: root || nil))
+    end
+
+    # @return [String, nil] key that serialize_json wraps one object under; nil when the class declares no root
+    def root_key
+      versponse.roots&.first
+    end
+
+    # @return [String, nil] key that serialize_json wraps a collection under; nil when the class declares no root
+    def collection_root_key
+      versponse.roots&.last
     end
 
     # OpenAPI schema with $refs to other components, or a root/meta wrapper schema

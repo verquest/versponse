@@ -9,7 +9,7 @@ module Versponse
       # One response or request source: an explicit list, or a namespace (Module or String) resolved at build
       Source = Data.define(:classes, :namespace)
       # One named wrapper component
-      Wrapper = Data.define(:name, :klass, :root, :collection, :meta, :view)
+      Wrapper = Data.define(:name, :klass, :root, :collection, :meta, :view, :description)
 
       # @return [String, nil] rswag key prefix
       attr_accessor :document_name

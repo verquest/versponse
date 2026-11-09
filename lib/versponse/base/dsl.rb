@@ -14,6 +14,16 @@ module Versponse
       versponse.builder.description(text)
     end
 
+    # Declares the keys serialize_json and OpenAPI wrappers wrap the class's output under. Subclasses don't inherit it.
+    #
+    # @param name [String, Symbol] root of one object
+    # @param collection [String, Symbol, nil] root of a collection; name pluralized with String#pluralize when nil
+    # @return [void]
+    # @raise [Versponse::DefinitionError] inside a version, or without collection: when String#pluralize is undefined
+    def root(name, collection: nil)
+      versponse.builder.root(name, collection:)
+    end
+
     # Adds schema keywords to the class or the current version
     #
     # @param options [Hash] JSON Schema keywords in snake_case

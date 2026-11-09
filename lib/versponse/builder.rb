@@ -96,6 +96,19 @@ module Versponse
       Versponse.reset_caches!
     end
 
+    # Declares the keys serialize_json and OpenAPI wrappers wrap the class's output under
+    #
+    # @param name [String, Symbol] root of one object
+    # @param collection [String, Symbol, nil] root of a collection; name pluralized with String#pluralize when nil
+    # @return [void]
+    # @raise [Versponse::DefinitionError] inside a version, or without collection: when String#pluralize is undefined
+    def root(name, collection: nil)
+      raise DefinitionError, "root can only be set on the class" if @current_scope
+
+      name = name.to_s
+      @klass.versponse.roots = [name, collection&.to_s || pluralize_root(name)].freeze
+    end
+
     # Declares a version
     #
     # @param name [String] version name, compared as a String
@@ -331,6 +344,12 @@ module Versponse
     def class_setting!(name)
       raise DefinitionError, "#{name} can only be set on the class" if @current_scope
       raise DefinitionError, "#{name} must come before the first version" unless @klass.versponse.versions.empty?
+    end
+
+    def pluralize_root(name)
+      return name.pluralize if name.respond_to?(:pluralize)
+
+      raise DefinitionError, "root #{name.inspect} needs collection: when String#pluralize is undefined (ActiveSupport isn't loaded)"
     end
 
     def default_options

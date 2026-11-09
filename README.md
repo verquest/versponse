@@ -101,6 +101,21 @@ UnitTypeResponse.serialize(unit_types, version: "2025-09", view: :embedded, root
 # => {"unit_types" => [...], "meta" => {"request_id" => "r1"}}
 ```
 
+Declare a root to wrap `serialize_json` output without passing `root:` each time:
+
+```ruby
+class ContactResponse < Versponse::Base
+  root "contact"                      # "contacts" for a collection, with ActiveSupport's String#pluralize
+  # root "staff", collection: "staff" # or name the collection root yourself
+end
+
+ContactResponse.serialize_json(contact, meta: {"request_id" => "r1"})   # {"contact": {...}, "meta": {...}}
+ContactResponse.serialize_json(contacts)                                # {"contacts": [...]}
+ContactResponse.serialize_json(contact, root: false)                    # {...}
+```
+
+`root:` overrides the declared root. `serialize` never uses it, so data for CSV or webhook payloads stays unwrapped. Without ActiveSupport, `root` needs `collection:`. Subclasses don't inherit a root, and `root_key` and `collection_root_key` read it.
+
 ## Properties
 
 | Method | What it renders |
@@ -411,7 +426,7 @@ class PublicApiDocument < Versponse::OpenAPI::Document
 
   responses namespace: PublicApi
   requests namespace: PublicApi                # verquest body requests
-  wrapper :contact_list, PublicApi::ContactResponse, root: "contacts", collection: true, meta: PublicApi::MetaResponse   # component "ContactList"
+  wrapper :contact_list, PublicApi::ContactResponse, collection: true, meta: PublicApi::MetaResponse, description: "List of Contacts"   # component "ContactList", under the class's collection root
 
   schema "Error", ERROR_SCHEMA                  # hand-written components, collision-checked
   webhooks { |version| Webhooks.openapi(version) }
@@ -426,7 +441,7 @@ PublicApiDocument.validate(version: "2025-09")   # => [] when valid OpenAPI and 
 - Values use OpenAPI's own key names, which are never camelized. The exception is `schema`: a hand-written component is a schema, so its keys are camelized like every other schema (`additional_properties:` becomes `additionalProperties`). Keys inside `properties` and a discriminator's `mapping`, values of `enum`, `example`, and `default`, and `x-` extensions keep their spelling.
 - A block that takes an argument receives the version. A `finalize` block that takes one argument receives only the document.
 - `responses` and `requests` take one or more classes, or `namespace:` with a Module or a String. At build, Versponse eager-loads the namespace through Zeitwerk, so its classes don't have to be loaded first. An undefined namespace, or one with no response classes or body requests, raises `Versponse::DefinitionError`. So does a listed class of the wrong kind, or a listed request whose `location` isn't `:body`.
-- `wrapper` turns a Symbol name into PascalCase (`:contact_list` declares `ContactList`) and uses a String as given. Its `meta:` takes a response class, whose `$ref` describes `"meta"`, and anything else raises `Versponse::DefinitionError`. `serialize(meta:)` takes the Hash instead.
+- `wrapper` turns a Symbol name into PascalCase (`:contact_list` declares `ContactList`) and uses a String as given. Its `meta:` takes a response class, whose `$ref` describes `"meta"`, and anything else raises `Versponse::DefinitionError`. `serialize(meta:)` takes the Hash instead. `root:` defaults to the class's declared root, the collection root with `collection: true`, and `description:` sets the wrapper schema's description. `wrapper_names` lists the declared wrapper components.
 - `ref(name)` returns the `$ref` of a wrapper or `schema` the document declares, like a response class's `to_ref`: `PublicApiDocument.ref(:ContactList)` returns `"#/components/schemas/ContactList"`. A name the document doesn't declare, its parents included, raises `Versponse::DefinitionError`, so a typo fails when the spec loads.
 - `ref` turns a Symbol into PascalCase as `wrapper` does, so `:ContactList` and `:contact_list` name the same component. Spell the Symbol as the component is named, so the spec matches the generated document. A String is used as given. `component_name(name)` returns the name without the `#/components/schemas/` prefix.
 - `server` and `tag` write keywords that start with `x_` as extensions, with every underscore turned into a hyphen: `x_internal: true` becomes `"x-internal" => true`, and `x_display_name:` becomes `"x-display-name"`.

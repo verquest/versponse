@@ -96,10 +96,21 @@ module Versponse
           "#/components/schemas/#{component_name(name)}"
         end
 
+        # @return [Array<String>] names of the declared wrapper components, as {component_name} returns them
+        def wrapper_names
+          declarations.wrappers.keys
+        end
+
         private
 
         def declared_name(name)
           name.is_a?(Symbol) ? Naming.pascalize(name) : name.to_s
+        end
+
+        def declared_root(klass, collection)
+          return unless klass.respond_to?(:root_key)
+
+          collection ? klass.collection_root_key : klass.root_key
         end
 
         def openapi(value)
@@ -140,11 +151,14 @@ module Versponse
           declarations.request_sources << source(:requests, classes.flatten, namespace)
         end
 
-        def wrapper(name, klass, root:, collection: false, meta: nil, view: :default)
+        def wrapper(name, klass, root: nil, collection: false, meta: nil, view: :default, description: nil)
           Versponse::Wrapper.check_meta!(meta)
           name = declared_name(name)
+          root ||= declared_root(klass, collection)
+          raise DefinitionError, "wrapper #{name} needs root: or a #{klass} that declares root" unless root
+
           declarations.claim!(:wrapper, name)
-          declarations.wrappers[name] = Declarations::Wrapper.new(name:, klass:, root:, collection:, meta:, view:)
+          declarations.wrappers[name] = Declarations::Wrapper.new(name:, klass:, root:, collection:, meta:, view:, description:)
         end
 
         def schema(name, value = nil, &block)
