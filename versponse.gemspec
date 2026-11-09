@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.description = "Versponse describes API responses with a Ruby DSL shared with verquest, one definition per API version, with blueprinter-style views. It renders objects to JSON-ready hashes and generates an OpenAPI schema for every response, version and view."
   spec.homepage = "https://github.com/verquest/versponse"
   spec.license = "MIT"
-  spec.required_ruby_version = ">= 3.2"
+  spec.required_ruby_version = ">= 3.3"
 
   spec.metadata["source_code_uri"] = spec.homepage
   spec.metadata["changelog_uri"] = "#{spec.homepage}/blob/main/CHANGELOG.md"

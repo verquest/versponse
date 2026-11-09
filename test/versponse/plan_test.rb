@@ -92,7 +92,7 @@ class Versponse::PlanTest < Minitest::Test
     missing_key = assert_raises(Versponse::ExtractionError) { klass.serialize({}, version: "2025-09") }
     assert_equal ["name"], missing_key.keys
     missing_method = assert_raises(Versponse::ExtractionError) { klass.serialize(Object.new, version: "2025-09") }
-    assert_match(/\.name: undefined method 'name'/, missing_method.message)
+    assert_match(/\.name: undefined method [`']name'/, missing_method.message) # Ruby 3.3 quotes with a backtick
     assert_equal({"name" => "n", "at" => nil}, klass.serialize({"name" => "n", "created" => nil}, version: "2025-09"))
   end
 

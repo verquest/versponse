@@ -42,7 +42,7 @@ Sponsored by [Stora](https://stora.co)
 gem "versponse"
 ```
 
-Versponse needs Ruby 3.2 or later. [verquest](https://github.com/verquest/verquest) is optional: install it to reference request classes and to list them with `requests namespace:`.
+Versponse needs Ruby 3.3 or later. [verquest](https://github.com/verquest/verquest) is optional: install it to reference request classes and to list them with `requests namespace:`.
 
 ## Quick start
 

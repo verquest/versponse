@@ -6,6 +6,10 @@
 - Without `root:`, `serialize_json` wraps its output under the declared root, or the collection root for a collection. `root: false` renders it unwrapped. `serialize` doesn't use the declared root.
 - In OpenAPI documents, `wrapper` takes its root from the class when `root:` is left out, and takes a `description:`. `wrapper_names` lists the declared wrapper components.
 
+### Changed
+
+- Versponse needs Ruby 3.3 or later. Ruby 3.2 reached its end of life on 2026-04-01.
+
 ## [0.2.0] - 2026-11-09
 
 ### Added
