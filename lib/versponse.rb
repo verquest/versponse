@@ -91,11 +91,14 @@ module Versponse
   class InvalidFieldsError < Error
     # @return [Array<String>] the invalid paths
     attr_reader :paths
+    # @return [Hash{String => String}] why each path is invalid, such as "unknown" or "site isn't expanded"
+    attr_reader :reasons
 
     # @param paths [Array<String>] invalid paths
     # @param reasons [Hash{String => String}] why each path is invalid
     def initialize(paths:, reasons:)
       @paths = paths
+      @reasons = reasons
       super("Invalid fields paths: #{paths.map { |path| "#{path.inspect} (#{reasons.fetch(path)})" }.join(", ")}")
     end
   end

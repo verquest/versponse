@@ -220,6 +220,44 @@ class FieldSelectionTest < Minitest::Test
     end
   end
 
+  def test_invalid_fields_error_lists_reasons
+    error = assert_raises(Versponse::InvalidFieldsError) { serialize(fields: %w[nope site.name]) }
+
+    assert_equal({"nope" => "unknown", "site.name" => "site isn't expanded"}, error.reasons)
+  end
+
+  def test_validate_selection_accepts_valid_paths_without_rendering
+    reads = OrderResponse.total_reads
+
+    assert_nil OrderResponse.validate_selection!(fields: %w[total site.name], expand: %w[site], version: "2025-09")
+    assert_equal reads, OrderResponse.total_reads
+  end
+
+  def test_validate_selection_raises_like_serialize
+    error = assert_raises(Versponse::InvalidFieldsError) do
+      OrderResponse.validate_selection!(fields: %w[nope site.name], version: "2025-09")
+    end
+
+    assert_equal %w[nope site.name], error.paths
+    with_configuration(unknown_fields: :ignore) do
+      assert_nil OrderResponse.validate_selection!(fields: %w[nope], version: "2025-09")
+    end
+  end
+
+  def test_validate_selection_without_fields
+    assert_nil OrderResponse.validate_selection!(fields: nil, version: "2025-09")
+    assert_raises(Versponse::VersionNotFoundError) { OrderResponse.validate_selection!(fields: %w[status], version: "1999-01") }
+    assert_raises(Versponse::ViewNotFoundError) { OrderResponse.validate_selection!(fields: %w[status], version: "2025-09", view: nil) }
+  end
+
+  def test_validate_selection_checks_the_version_and_view_without_paths
+    [nil, [], %w[*]].each do |fields|
+      assert_raises(Versponse::ViewNotFoundError) { OrderResponse.validate_selection!(fields:, version: "2025-09", view: :bogus) }
+      assert_raises(Versponse::VersionNotFoundError) { OrderResponse.validate_selection!(fields:, version: "1999-01") }
+    end
+    assert_nil OrderResponse.validate_selection!(expand: %w[site], version: "2025-09")
+  end
+
   def test_json_with_root_and_meta
     json = OrderResponse.serialize_json(order, version: "2025-09", fields: %w[status], root: "data", meta: {request_id: "r1"})
 

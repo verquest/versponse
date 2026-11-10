@@ -73,6 +73,32 @@ module Versponse
       Versponse.configuration.json_generator.call(serialize(object, **options, root: root || nil))
     end
 
+    # Checks fields: and expand: as serialize does, without rendering, so a caller can reject them before acting.
+    # The checked expand and selection are cached, so a later serialize with the same arguments reuses them.
+    #
+    # @param fields [Array<String, Symbol>, nil] see {#serialize}
+    # @param expand [Array<String, Symbol>, nil] see {#serialize}
+    # @param version [String, nil] requested version, config.current_version when nil
+    # @param view [Symbol] view name
+    # @return [nil]
+    # @raise [Versponse::InvalidExpandError] for unknown expand paths (config.unknown_expand = :raise)
+    # @raise [Versponse::InvalidFieldsError] for unknown paths or paths below unexpanded associations
+    #   (config.unknown_fields = :raise)
+    # @raise [Versponse::VersionNotFoundError] when no declared version matches, or supported_versions leaves it out
+    # @raise [Versponse::ViewNotFoundError] for an unknown or nil view
+    def validate_selection!(fields: nil, expand: nil, version: nil, view: :default)
+      raise ViewNotFoundError, "view: can't be nil; the default view is :default" if view.nil?
+
+      internals = versponse
+      internals.requesting(version) do |canonical|
+        # Without paths to check, expansion and selection return early, so the version and view are checked here
+        internals.resolve(canonical).properties_for(view)
+        expansion = internals.expansion(expand, version: canonical, view:)
+        internals.selection(fields, version: canonical, view:, expansion:)
+      end
+      nil
+    end
+
     # @return [String, nil] key that serialize_json wraps one object under; nil when the class declares no root
     def root_key
       versponse.roots&.first

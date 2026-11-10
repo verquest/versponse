@@ -106,6 +106,7 @@ class SupportedVersionsTest < Minitest::Test
     assert_raises(Versponse::VersionNotFoundError) { LegacyResponse.to_schema(version: "preview") }
     assert_raises(Versponse::VersionNotFoundError) { PreviewResponse.to_validation_schema(version: "2025-09") }
     assert_raises(Versponse::VersionNotFoundError) { PreviewResponse.expandable_paths(version: "2025-09") }
+    assert_raises(Versponse::VersionNotFoundError) { LegacyResponse.validate_selection!(version: "preview") }
   end
 
   def test_out_of_range_requests_raise_every_time_and_leave_caches_clean

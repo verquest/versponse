@@ -371,6 +371,7 @@ OrderResponse.serialize(order, fields: ["status", "total", "line_items.price"], 
 - A path below an expandable association needs that association expanded. Otherwise, like an unknown path, it raises `Versponse::InvalidFieldsError` (`paths` lists them), unless `config.unknown_fields = :ignore`.
 - Under `:ignore`, a `fields:` list with no valid path renders only identifiers and consts.
 - `UnitResponse.selectable_paths(version: "2025-09")` lists every path.
+- `UnitResponse.validate_selection!(fields: [...], expand: [...], version: "2025-09")` checks the version, view and paths as `serialize` does, without rendering, so an API can reject a request before it changes anything. `InvalidFieldsError#reasons` maps each invalid path to why (`"unknown"`, `"site isn't expanded"`).
 - Schemas describe the full shape. With `validate_output`, a selected render is validated against a copy of its schema that requires only the selected keys.
 
 ## Schemas
