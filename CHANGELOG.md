@@ -1,5 +1,12 @@
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-10
+
+### Added
+
+- `validate_selection!` checks the version, view, `fields:` and `expand:` as `serialize` does, without rendering. A later `serialize` with the same arguments reuses the checked paths.
+- `InvalidFieldsError#reasons` maps each invalid path to why it's invalid.
+
 ## [0.3.0] - 2026-11-09
 
 ### Added
