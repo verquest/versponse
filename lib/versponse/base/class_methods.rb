@@ -28,7 +28,7 @@ module Versponse
     #   render), "*" or nil for all
     # @raise [ArgumentError] without a version or with meta: but no root:
     # @raise [Versponse::InvalidExpandError] for unknown expand paths (config.unknown_expand = :raise)
-    # @raise [Versponse::InvalidFieldsError] for unknown paths or paths below unexpanded associations
+    # @raise [Versponse::InvalidFieldsError] for unknown paths or paths outside the collapsed shape of unexpanded associations
     #   (config.unknown_fields = :raise)
     # @raise [Versponse::VersionNotFoundError] when no declared version matches, or supported_versions leaves it out
     # @raise [Versponse::ViewNotFoundError] for an unknown or nil view
@@ -82,7 +82,7 @@ module Versponse
     # @param view [Symbol] view name
     # @return [nil]
     # @raise [Versponse::InvalidExpandError] for unknown expand paths (config.unknown_expand = :raise)
-    # @raise [Versponse::InvalidFieldsError] for unknown paths or paths below unexpanded associations
+    # @raise [Versponse::InvalidFieldsError] for unknown paths or paths outside the collapsed shape of unexpanded associations
     #   (config.unknown_fields = :raise)
     # @raise [Versponse::VersionNotFoundError] when no declared version matches, or supported_versions leaves it out
     # @raise [Versponse::ViewNotFoundError] for an unknown or nil view

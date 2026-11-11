@@ -86,7 +86,7 @@ module Versponse
     end
   end
 
-  # Raised when fields: names unknown paths, or paths below associations the render doesn't expand
+  # Raised when fields: names unknown paths, or paths outside the collapsed shape of associations the render doesn't expand
   # (config.unknown_fields = :raise)
   class InvalidFieldsError < Error
     # @return [Array<String>] the invalid paths

@@ -349,7 +349,7 @@ module Versponse
     # @param view [Symbol] view name
     # @param expansion [Versponse::Expansion] the render's expand tree
     # @return [Versponse::Selection] the selection, ALL for no paths
-    # @raise [Versponse::InvalidFieldsError] for unknown paths and paths below unexpanded associations
+    # @raise [Versponse::InvalidFieldsError] for unknown paths and paths outside the collapsed shape of unexpanded associations
     #   (config.unknown_fields = :raise)
     def selection(fields, version:, view:, expansion:)
       return Selection::ALL if fields.nil?

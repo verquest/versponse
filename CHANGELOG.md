@@ -2,7 +2,7 @@
 
 ### Changed
 
-- `fields:` accepts paths in the collapsed shape of an expandable association that isn't expanded, such as `site.id`: its identifiers, and the discriminator of a `one_of`. Other paths below it still raise `InvalidFieldsError` with "isn't expanded".
+- `fields:` accepts paths in the collapsed shape of an expandable association that isn't expanded, such as `site.id`: its identifiers, and the discriminator of a `one_of`. Other paths below it still raise `InvalidFieldsError`: "isn't expanded" when expanding makes them valid, otherwise "unknown".
 
 ## [0.4.0] - 2026-11-10
 

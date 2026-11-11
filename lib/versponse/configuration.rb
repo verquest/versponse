@@ -52,7 +52,7 @@ module Versponse
     attr_reader :json_schema_version
     # @return [Symbol] :raise (default) or :ignore for expand paths that match no expandable association
     attr_reader :unknown_expand
-    # @return [Symbol] :raise (default) or :ignore for fields: paths that are unknown or below unexpanded associations
+    # @return [Symbol] :raise (default) or :ignore for fields: paths that are unknown or outside the collapsed shape of unexpanded associations
     attr_reader :unknown_fields
     # @return [Symbol] :declaration (default) or :alphabetical (identifiers first, then by output key,
     #   like blueprinter's sort_fields_by :name_asc)
