@@ -42,6 +42,27 @@ class FieldSelectionTest < Minitest::Test
     end
   end
 
+  class LabelResponse < Versponse::Base
+    version "2025-09" do
+      field :site, type: :string
+    end
+  end
+
+  class VisitResponse < Versponse::Base
+    version "2025-09" do
+      reference :site, from: SiteResponse, expandable: true
+    end
+  end
+
+  class TimelineResponse < Versponse::Base
+    version "2025-09" do
+      one_of :entry do
+        reference from: LabelResponse, match: Note
+        reference from: VisitResponse, match: Call
+      end
+    end
+  end
+
   class PriceResponse < Versponse::Base
     version "2025-09" do
       field :amount, type: :integer
@@ -239,17 +260,25 @@ class FieldSelectionTest < Minitest::Test
     assert_equal({"site.id.x" => "unknown", "site.nope" => "unknown", "site.name" => "site isn't expanded"}, error.reasons)
   end
 
-  def test_reasons_name_the_outermost_unexpanded_association
+  def test_reasons_name_the_path_to_expand
     error = assert_raises(Versponse::InvalidFieldsError) do
-      MapResponse.validate_selection!(version: "2025-09", fields: %w[area.zone.name area.zone.nope])
+      MapResponse.validate_selection!(version: "2025-09", fields: %w[area.zone.name area.zone.id area.zone.nope])
     end
-    assert_equal({"area.zone.name" => "area isn't expanded", "area.zone.nope" => "unknown"}, error.reasons)
+    reasons = {"area.zone.name" => "area.zone isn't expanded", "area.zone.id" => "area isn't expanded", "area.zone.nope" => "unknown"}
+
+    assert_equal reasons, error.reasons
 
     error = assert_raises(Versponse::InvalidFieldsError) do
       MapResponse.validate_selection!(version: "2025-09", fields: %w[area.zone.name], expand: %w[area])
     end
     assert_equal({"area.zone.name" => "area.zone isn't expanded"}, error.reasons)
     assert_nil MapResponse.validate_selection!(version: "2025-09", fields: %w[area.zone.id], expand: %w[area])
+  end
+
+  def test_reasons_prefer_expanding_over_unknown_across_one_of_variants
+    error = assert_raises(Versponse::InvalidFieldsError) { TimelineResponse.validate_selection!(version: "2025-09", fields: %w[entry.site.name]) }
+
+    assert_equal({"entry.site.name" => "entry.site isn't expanded"}, error.reasons)
   end
 
   def test_validate_selection_accepts_collapsed_paths

@@ -121,14 +121,16 @@ module Versponse
       end
 
       # @param version [String] canonical version name
-      # @return [Array<Versponse::Properties::Base>] every variant's collapsed properties, and its discriminator const
+      # @return [Array<Versponse::Properties::Base>] every variant's collapsed properties, and its discriminator const,
+      #   one per key (collapsed properties have no children, so variants sharing a key walk the same)
       def collapsed_path_children(version)
         return [] unless expandable?
 
-        @variants.flat_map do |variant|
-          properties = References.collapsed_properties(variant.from, version)
-          @discriminator ? [discriminator_property(variant, version), *properties] : properties
+        properties = @variants.flat_map do |variant|
+          collapsed = References.collapsed_properties(variant.from, version)
+          @discriminator ? [discriminator_property(variant, version), *collapsed] : collapsed
         end
+        properties.uniq(&:key)
       end
 
       # @return [Array<Array(Class, Symbol, String)>] every variant's class and view
