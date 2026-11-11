@@ -100,6 +100,14 @@ module Versponse
         References.versponse?(@item) ? @item.versponse.resolve(version).properties_for(@view) : []
       end
 
+      # @param version [String] canonical version name
+      # @return [Array<String>] identifier keys of the item class, or the item one_of's collapsed keys
+      def collapsed_path_keys(version)
+        return @items_one_of.collapsed_path_keys(version) if @items_one_of
+
+        expandable? ? @item.versponse.resolve(version).identifiers.keys : []
+      end
+
       # @return [Array<Array(Class, Symbol, String)>] the item class, the item one_of's variants, or the inline children's targets
       def reference_targets
         return @items_one_of.reference_targets if @items_one_of

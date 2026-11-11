@@ -87,6 +87,12 @@ module Versponse
       end
 
       # @param version [String] canonical version name
+      # @return [Array<String>] identifier keys of the referenced class
+      def collapsed_path_keys(version)
+        expandable? ? @from.versponse.resolve(version).identifiers.keys : []
+      end
+
+      # @param version [String] canonical version name
       # @return [Versponse::Properties::Base] the reused copy for a versponse property:, otherwise self
       def path_target(version)
         versponse_property? ? referenced_property(version) : self

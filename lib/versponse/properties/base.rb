@@ -147,6 +147,12 @@ module Versponse
       end
 
       # @param version [String] canonical version name
+      # @return [Array<String>] keys the collapsed shape renders when the property is expandable and not expanded
+      def collapsed_path_keys(version)
+        []
+      end
+
+      # @param version [String] canonical version name
       # @return [Versponse::Properties::Base] the property a path segment resolves to (self, or a reused copy)
       def path_target(version)
         self

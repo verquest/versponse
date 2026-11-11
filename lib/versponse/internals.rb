@@ -520,7 +520,8 @@ module Versponse
       field_walk(resolve(version).properties_for(view), segments, version, expansion, [])
     end
 
-    # Every property with a matching key is tried, because one_of variants can share keys
+    # Every property with a matching key is tried, because one_of variants can share keys. Below an unexpanded
+    # association only the keys of its collapsed shape are valid.
     def field_walk(properties, segments, version, expansion, walked)
       head, *rest = segments
       candidates = properties.select { |property| property.key == head }
@@ -529,7 +530,11 @@ module Versponse
 
       problems = candidates.map do |property|
         target = property.path_target(version)
-        next "#{[*walked, head].join(".")} isn't expanded" if target.expandable_path? && !expansion.expand?(head)
+        if target.expandable_path? && !expansion.expand?(head)
+          next if rest.one? && target.collapsed_path_keys(version).include?(rest.first)
+
+          next "#{[*walked, head].join(".")} isn't expanded"
+        end
 
         field_walk(target.path_children(version), rest, version, expansion.child(head), [*walked, head])
       end

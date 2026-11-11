@@ -231,4 +231,32 @@ class CollapseIfTest < Minitest::Test
   def test_referenced_class_without_the_version_has_no_condition
     assert_nil Versponse::References.collapse_if(StageResponse, "2025-01")
   end
+
+  def test_fields_select_collapsed_keys_without_expand
+    assert_nil DealResponse.validate_selection!(version: "2025-09", fields: %w[stage.id stages.id])
+    assert_nil FeedResponse.validate_selection!(version: "2025-09", fields: %w[resource.id])
+    assert_nil ListResponse.validate_selection!(version: "2025-09", fields: %w[items.id])
+    assert_nil DiscriminatedFeedResponse.validate_selection!(version: "2025-09", fields: %w[resource.id resource.object])
+  end
+
+  def test_fields_beyond_collapsed_keys_still_need_expand
+    {DealResponse => %w[stage.name stages.name], FeedResponse => %w[resource.name], ListResponse => %w[items.name],
+     DiscriminatedFeedResponse => %w[resource.name]}.each do |klass, paths|
+      error = assert_raises(Versponse::InvalidFieldsError) { klass.validate_selection!(version: "2025-09", fields: paths) }
+
+      assert_equal paths, error.paths
+      assert(error.reasons.values.all? { |reason| reason.end_with?("isn't expanded") })
+    end
+  end
+
+  # collapse_if renders an archived stage in full, without its identifier; fields still follows expand
+  def test_fields_follow_expand_when_collapse_if_renders_full
+    rendered = DealResponse.serialize(Deal.new("d1", archived_stage, [archived_stage]), version: "2025-09", fields: %w[stage.id stages.id])
+
+    # DealResponse's id is a plain field, so it isn't selected
+    assert_equal({"stage" => {}, "stages" => [{}]}, rendered)
+    assert_raises(Versponse::InvalidFieldsError) do
+      DealResponse.serialize(Deal.new("d1", archived_stage, []), version: "2025-09", fields: %w[stage.name])
+    end
+  end
 end

@@ -206,6 +206,22 @@ class FieldSelectionTest < Minitest::Test
     assert_equal "Invalid fields paths: \"site.name\" (site isn't expanded)", error.message
   end
 
+  def test_collapsed_paths_below_an_unexpanded_association
+    assert_equal({"id" => "o1", "site" => {"id" => "s1"}}, serialize(fields: %w[site.id]))
+    assert_equal({"id" => "o1", "site" => {"id" => "s1"}}, serialize(fields: %w[site.*]))
+    assert_equal({"id" => "o1", "site" => {"id" => "s1", "name" => "Leeds"}}, serialize(fields: %w[site.id site.name], expand: %w[site]))
+  end
+
+  def test_paths_beyond_the_collapsed_shape_still_raise
+    error = assert_raises(Versponse::InvalidFieldsError) { serialize(fields: %w[site.id.x site.nope]) }
+
+    assert_equal({"site.id.x" => "site isn't expanded", "site.nope" => "site isn't expanded"}, error.reasons)
+  end
+
+  def test_validate_selection_accepts_collapsed_paths
+    assert_nil OrderResponse.validate_selection!(version: "2025-09", fields: %w[site.id site.*])
+  end
+
   def test_unknown_paths
     error = assert_raises(Versponse::InvalidFieldsError) { serialize(fields: %w[nope lines.nope status]) }
 
