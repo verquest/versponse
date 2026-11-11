@@ -147,8 +147,8 @@ module Versponse
       end
 
       # @param version [String] canonical version name
-      # @return [Array<String>] keys the collapsed shape renders when the property is expandable and not expanded
-      def collapsed_path_keys(version)
+      # @return [Array<Versponse::Properties::Base>] properties of the collapsed shape, for an expandable property that isn't expanded
+      def collapsed_path_children(version)
         []
       end
 

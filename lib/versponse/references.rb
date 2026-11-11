@@ -125,6 +125,15 @@ module Versponse
 
     # @param klass [Class] Versponse response class
     # @param version [String] canonical version name
+    # @return [Array<Versponse::Properties::Base>] properties of the class's collapsed view
+    # @raise [Versponse::DefinitionError] when the class has no identifier
+    def self.collapsed_properties(klass, version)
+      ensure_identifier!(klass, version)
+      klass.versponse.resolve(version).properties_for(:collapsed)
+    end
+
+    # @param klass [Class] Versponse response class
+    # @param version [String] canonical version name
     # @return [#call, nil] the class's identifier collapse_if in that version; nil without one or without the version
     def self.collapse_if(klass, version)
       klass.versponse.resolve(version).collapse_if

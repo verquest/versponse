@@ -101,11 +101,11 @@ module Versponse
       end
 
       # @param version [String] canonical version name
-      # @return [Array<String>] identifier keys of the item class, or the item one_of's collapsed keys
-      def collapsed_path_keys(version)
-        return @items_one_of.collapsed_path_keys(version) if @items_one_of
+      # @return [Array<Versponse::Properties::Base>] properties of the item class's collapsed view, or the item one_of's
+      def collapsed_path_children(version)
+        return @items_one_of.collapsed_path_children(version) if @items_one_of
 
-        expandable? ? @item.versponse.resolve(version).identifiers.keys : []
+        expandable? ? References.collapsed_properties(@item, version) : []
       end
 
       # @return [Array<Array(Class, Symbol, String)>] the item class, the item one_of's variants, or the inline children's targets

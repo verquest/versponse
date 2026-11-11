@@ -520,8 +520,7 @@ module Versponse
       field_walk(resolve(version).properties_for(view), segments, version, expansion, [])
     end
 
-    # Every property with a matching key is tried, because one_of variants can share keys. Below an unexpanded
-    # association only the keys of its collapsed shape are valid.
+    # Every property with a matching key is tried, because one_of variants can share keys
     def field_walk(properties, segments, version, expansion, walked)
       head, *rest = segments
       candidates = properties.select { |property| property.key == head }
@@ -530,15 +529,20 @@ module Versponse
 
       problems = candidates.map do |property|
         target = property.path_target(version)
-        if target.expandable_path? && !expansion.expand?(head)
-          next if rest.one? && target.collapsed_path_keys(version).include?(rest.first)
-
-          next "#{[*walked, head].join(".")} isn't expanded"
-        end
+        next unexpanded_field_walk(target, rest, version, [*walked, head]) if target.expandable_path? && !expansion.expand?(head)
 
         field_walk(target.path_children(version), rest, version, expansion.child(head), [*walked, head])
       end
       problems.include?(nil) ? nil : problems.first
+    end
+
+    # Valid when the collapsed shape renders the path. Otherwise "isn't expanded" when expanding every
+    # association along the path makes it valid, else why it still isn't.
+    def unexpanded_field_walk(target, rest, version, walked)
+      return unless field_walk(target.collapsed_path_children(version), rest, version, Expansion::NONE, walked)
+
+      field_walk(target.path_children(version), rest, version, Expansion.build([rest.join(".")]), walked) ||
+        "#{walked.join(".")} isn't expanded"
     end
 
     # Deepest walk for reused copies (reference property:), whose objects differ on every call

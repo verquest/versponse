@@ -87,9 +87,9 @@ module Versponse
       end
 
       # @param version [String] canonical version name
-      # @return [Array<String>] identifier keys of the referenced class
-      def collapsed_path_keys(version)
-        expandable? ? @from.versponse.resolve(version).identifiers.keys : []
+      # @return [Array<Versponse::Properties::Base>] properties of the referenced class's collapsed view
+      def collapsed_path_children(version)
+        expandable? ? References.collapsed_properties(@from, version) : []
       end
 
       # @param version [String] canonical version name

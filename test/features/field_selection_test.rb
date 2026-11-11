@@ -21,6 +21,27 @@ class FieldSelectionTest < Minitest::Test
     end
   end
 
+  class ZoneResponse < Versponse::Base
+    version "2025-09" do
+      identifier :id
+      field :name, type: :string
+    end
+  end
+
+  class AreaResponse < Versponse::Base
+    version "2025-09" do
+      identifier :id
+      reference :zone, from: ZoneResponse, expandable: true
+    end
+  end
+
+  class MapResponse < Versponse::Base
+    version "2025-09" do
+      identifier :id
+      reference :area, from: AreaResponse, expandable: true
+    end
+  end
+
   class PriceResponse < Versponse::Base
     version "2025-09" do
       field :amount, type: :integer
@@ -212,10 +233,23 @@ class FieldSelectionTest < Minitest::Test
     assert_equal({"id" => "o1", "site" => {"id" => "s1", "name" => "Leeds"}}, serialize(fields: %w[site.id site.name], expand: %w[site]))
   end
 
-  def test_paths_beyond_the_collapsed_shape_still_raise
-    error = assert_raises(Versponse::InvalidFieldsError) { serialize(fields: %w[site.id.x site.nope]) }
+  def test_reasons_beyond_the_collapsed_shape
+    error = assert_raises(Versponse::InvalidFieldsError) { serialize(fields: %w[site.id.x site.nope site.name]) }
 
-    assert_equal({"site.id.x" => "site isn't expanded", "site.nope" => "site isn't expanded"}, error.reasons)
+    assert_equal({"site.id.x" => "unknown", "site.nope" => "unknown", "site.name" => "site isn't expanded"}, error.reasons)
+  end
+
+  def test_reasons_name_the_outermost_unexpanded_association
+    error = assert_raises(Versponse::InvalidFieldsError) do
+      MapResponse.validate_selection!(version: "2025-09", fields: %w[area.zone.name area.zone.nope])
+    end
+    assert_equal({"area.zone.name" => "area isn't expanded", "area.zone.nope" => "unknown"}, error.reasons)
+
+    error = assert_raises(Versponse::InvalidFieldsError) do
+      MapResponse.validate_selection!(version: "2025-09", fields: %w[area.zone.name], expand: %w[area])
+    end
+    assert_equal({"area.zone.name" => "area.zone isn't expanded"}, error.reasons)
+    assert_nil MapResponse.validate_selection!(version: "2025-09", fields: %w[area.zone.id], expand: %w[area])
   end
 
   def test_validate_selection_accepts_collapsed_paths

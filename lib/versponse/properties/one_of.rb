@@ -121,12 +121,14 @@ module Versponse
       end
 
       # @param version [String] canonical version name
-      # @return [Array<String>] every variant's identifier keys, and the discriminator
-      def collapsed_path_keys(version)
+      # @return [Array<Versponse::Properties::Base>] every variant's collapsed properties, and its discriminator const
+      def collapsed_path_children(version)
         return [] unless expandable?
 
-        keys = @variants.flat_map { |variant| variant.from.versponse.resolve(version).identifiers.keys }
-        (@discriminator ? [@discriminator, *keys] : keys).uniq
+        @variants.flat_map do |variant|
+          properties = References.collapsed_properties(variant.from, version)
+          @discriminator ? [discriminator_property(variant, version), *properties] : properties
+        end
       end
 
       # @return [Array<Array(Class, Symbol, String)>] every variant's class and view

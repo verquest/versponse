@@ -249,6 +249,14 @@ class CollapseIfTest < Minitest::Test
     end
   end
 
+  def test_fields_unknown_even_when_expanded_are_unknown
+    {FeedResponse => "resource.nope", ListResponse => "items.nope", DiscriminatedFeedResponse => "resource.object.x"}.each do |klass, path|
+      error = assert_raises(Versponse::InvalidFieldsError) { klass.validate_selection!(version: "2025-09", fields: [path]) }
+
+      assert_equal({path => "unknown"}, error.reasons)
+    end
+  end
+
   # collapse_if renders an archived stage in full, without its identifier; fields still follows expand
   def test_fields_follow_expand_when_collapse_if_renders_full
     rendered = DealResponse.serialize(Deal.new("d1", archived_stage, [archived_stage]), version: "2025-09", fields: %w[stage.id stages.id])
