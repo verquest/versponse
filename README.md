@@ -369,6 +369,7 @@ OrderResponse.serialize(order, fields: ["status", "total", "line_items.price"], 
 - Identifiers and `const` properties, including `one_of` discriminators, always render.
 - Unselected properties never run their blocks, so their queries are skipped too.
 - A path below an unexpanded association is valid when the collapsed shape renders it: an identifier, or a `one_of`'s discriminator. Any other path needs the association expanded. Otherwise, like an unknown path, it raises `Versponse::InvalidFieldsError` (`paths` lists them), unless `config.unknown_fields = :ignore`.
+- When `collapse_if` renders an association in full, its identifier is left out, so `fields: ["stage.id"]` renders `{"stage" => {}}` for that object, whether or not `stage` is expanded.
 - Under `:ignore`, a `fields:` list with no valid path renders only identifiers and consts.
 - `UnitResponse.selectable_paths(version: "2025-09")` lists every path.
 - `UnitResponse.validate_selection!(fields: [...], expand: [...], version: "2025-09")` checks the version, view and paths as `serialize` does, without rendering, so an API can reject a request before it changes anything. `InvalidFieldsError#reasons` maps each invalid path to why: `"deal.stage isn't expanded"` names the path to add to `expand:` to make it valid, otherwise `"unknown"`.

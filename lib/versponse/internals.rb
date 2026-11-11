@@ -512,10 +512,14 @@ module Versponse
       end
     end
 
+    # Reason for a path that names nothing, whatever is expanded
+    UNKNOWN_FIELD = "unknown"
+    private_constant :UNKNOWN_FIELD
+
     # nil for a valid path, else why it isn't
     def field_path_problem(path, version:, view:, expansion:)
       segments = path.delete_suffix(".*").split(".", -1)
-      return "unknown" if segments.empty? || segments.include?("") || segments.include?("*")
+      return UNKNOWN_FIELD if segments.empty? || segments.include?("") || segments.include?("*")
 
       field_walk(resolve(version).properties_for(view), segments, version, expansion, [])
     end
@@ -525,7 +529,7 @@ module Versponse
     def field_walk(properties, segments, version, expansion, walked)
       head, *rest = segments
       candidates = properties.select { |property| property.key == head }
-      return "unknown" if candidates.empty?
+      return UNKNOWN_FIELD if candidates.empty?
       return if rest.empty?
 
       problems = candidates.map do |property|
@@ -536,12 +540,14 @@ module Versponse
       end
       return if problems.include?(nil)
 
-      problems.find { |problem| problem != "unknown" } || "unknown"
+      problems.find { |problem| problem != UNKNOWN_FIELD } || UNKNOWN_FIELD
     end
 
     # Valid when the collapsed shape renders the path. Otherwise the rest is walked with only this association
-    # expanded: valid names it, and a deeper association that also needs expanding names itself.
+    # expanded: valid names it, and a deeper association that also needs expanding names itself. The targets are
+    # checked first, so a broken reference raises DefinitionError as it does when rendering.
     def unexpanded_field_walk(target, rest, version, walked)
+      target.reference_targets.each { |klass, view, key| References.check_target!(klass, version:, view:, key:) }
       return unless field_walk(target.collapsed_path_children(version), rest, version, Expansion::NONE, walked)
 
       field_walk(target.path_children(version), rest, version, Expansion::NONE, walked) || "#{walked.join(".")} isn't expanded"

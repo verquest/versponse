@@ -281,6 +281,20 @@ class FieldSelectionTest < Minitest::Test
     assert_equal({"entry.site.name" => "entry.site isn't expanded"}, error.reasons)
   end
 
+  # A broken reference is a definition mistake, not a client error, also below an unexpanded association
+  def test_paths_below_a_broken_unexpanded_reference_raise_definition_error
+    later = Class.new(Versponse::Base) { version("2030-01") { identifier :id } }
+    no_version = Class.new(Versponse::Base) { version("2025-09") { reference :later, from: later, expandable: true } }
+    no_view = Class.new(Versponse::Base) { version("2025-09") { reference :site, from: SiteResponse, view: :summary, expandable: true } }
+
+    error = assert_raises(Versponse::DefinitionError) { no_version.validate_selection!(version: "2025-09", fields: %w[later.id]) }
+
+    assert_equal "later: AnonymousResponse has no version at or before 2025-09", error.message
+    error = assert_raises(Versponse::DefinitionError) { no_view.validate_selection!(version: "2025-09", fields: %w[site.name]) }
+
+    assert_equal "site: view summary not found in FieldSelectionTest::SiteResponse 2025-09", error.message
+  end
+
   def test_validate_selection_accepts_collapsed_paths
     assert_nil OrderResponse.validate_selection!(version: "2025-09", fields: %w[site.id site.*])
   end
