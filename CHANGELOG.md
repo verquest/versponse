@@ -1,8 +1,11 @@
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-11
+
 ### Changed
 
 - `fields:` accepts paths in the collapsed shape of an expandable association that isn't expanded, such as `site.id`: its identifiers, and the discriminator of a `one_of`. Other paths below it still raise `InvalidFieldsError`: "<path> isn't expanded" names the path to add to `expand:` to make them valid, otherwise "unknown".
+- A `fields:` path below an unexpanded association that references a class without the version or view, or without an identifier, raises `DefinitionError`, as rendering does.
 
 ## [0.4.0] - 2026-11-10
 
