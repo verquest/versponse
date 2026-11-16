@@ -114,7 +114,7 @@ ContactResponse.serialize_json(contacts)                                # {"cont
 ContactResponse.serialize_json(contact, root: false)                    # {...}
 ```
 
-`root:` overrides the declared root. `serialize` never uses it, so data for CSV or webhook payloads stays unwrapped. Without ActiveSupport, `root` needs `collection:`. Subclasses don't inherit a root, and `root_key` and `collection_root_key` read it.
+`root:` overrides the declared root, and `root: "meta"` beside `meta:` raises `Versponse::DefinitionError`. `serialize` never uses the declared root, so data for CSV or webhook payloads stays unwrapped. Without ActiveSupport, `root` needs `collection:`. Subclasses don't inherit a root, and `root_key` and `collection_root_key` read it.
 
 ## Properties
 

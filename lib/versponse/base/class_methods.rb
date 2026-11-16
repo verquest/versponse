@@ -27,6 +27,7 @@ module Versponse
     # @param fields [Array<String, Symbol>, nil] dotted paths of the fields to render (identifiers and consts always
     #   render), "*" or nil for all
     # @raise [ArgumentError] without a version or with meta: but no root:
+    # @raise [Versponse::DefinitionError] for root: "meta" beside meta:
     # @raise [Versponse::InvalidExpandError] for unknown expand paths (config.unknown_expand = :raise)
     # @raise [Versponse::InvalidFieldsError] for unknown paths or paths outside the collapsed shape of unexpanded associations
     #   (config.unknown_fields = :raise)
@@ -35,6 +36,7 @@ module Versponse
     # @raise [Versponse::ExtractionError] when reading a value fails
     def serialize(object, version: nil, view: :default, context: EMPTY_CONTEXT, root: nil, meta: nil, expand: nil, fields: nil)
       raise ArgumentError, "meta: requires root:" if meta && root.nil?
+      Wrapper.check_root!(root, meta)
       raise ViewNotFoundError, "view: can't be nil; the default view is :default" if view.nil?
 
       context ||= EMPTY_CONTEXT
@@ -125,8 +127,8 @@ module Versponse
     # @raise [Versponse::ViewNotFoundError] for an unknown view (wrappers too)
     def to_schema(version: nil, view: :default, root: nil, meta: nil, collection: false, root_description: nil)
       Wrapper.check_meta!(meta)
-      raise ArgumentError, "meta: requires root:" if meta && root.nil?
-      raise ArgumentError, "root_description: requires root:" if root_description && root.nil?
+      raise ArgumentError, "meta: requires root:" if meta && !root
+      raise ArgumentError, "root_description: requires root:" if root_description && !root
 
       Wrapper.check_root!(root, meta)
       Wrapper.check_description!(:root_description, root_description)

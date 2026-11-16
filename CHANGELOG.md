@@ -6,7 +6,7 @@
 
 ### Changed
 
-- In OpenAPI documents, `wrapper` raises `Versponse::DefinitionError` for a `description:` that isn't a non-empty String, and for `root: "meta"` beside `meta:`, whose `$ref` replaced the response. `to_schema` raises for that root and meta too.
+- In OpenAPI documents, `wrapper` raises `Versponse::DefinitionError` for a `description:` that isn't a non-empty String, and for `root: "meta"` beside `meta:`, whose `$ref` replaced the response. `to_schema` and `serialize` raise for that root and meta too, and `to_schema` raises `ArgumentError` for `meta:` beside `root: false`. A `meta:` error from `wrapper` names the wrapper.
 
 ## [0.5.0] - 2026-11-11
 

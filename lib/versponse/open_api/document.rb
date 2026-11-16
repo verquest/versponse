@@ -152,11 +152,11 @@ module Versponse
         end
 
         def wrapper(name, klass, root: nil, collection: false, meta: nil, view: :default, description: nil, root_description: nil)
-          Versponse::Wrapper.check_meta!(meta)
           name = declared_name(name)
           root ||= declared_root(klass, collection)
           raise DefinitionError, "wrapper #{name} needs root: or a #{klass} that declares root" unless root
-          checked(name) do
+          naming_wrapper(name) do
+            Versponse::Wrapper.check_meta!(meta)
             Versponse::Wrapper.check_root!(root, meta)
             Versponse::Wrapper.check_description!(:description, description)
             Versponse::Wrapper.check_description!(:root_description, root_description)
@@ -167,7 +167,7 @@ module Versponse
         end
 
         # Prefixes a DefinitionError with the wrapper's name
-        def checked(name)
+        def naming_wrapper(name)
           yield
         rescue DefinitionError => error
           raise DefinitionError, "wrapper #{name} #{error.message}"

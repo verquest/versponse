@@ -237,6 +237,32 @@ class RootDeclarationTest < Minitest::Test
     assert_equal "root_description: requires root:", error.message
   end
 
+  def test_wrapper_meta_error_names_the_wrapper
+    error = assert_raises(Versponse::DefinitionError) do
+      Class.new(Versponse::OpenAPI::Document) { wrapper :item_list, ItemResponse, collection: true, meta: {"page" => 1} }
+    end
+
+    assert_equal %(wrapper ItemList meta: takes a response class, whose $ref describes "meta"; serialize(meta:) takes the Hash), error.message
+  end
+
+  def test_to_schema_root_description_requires_a_truthy_root
+    error = assert_raises(ArgumentError) { ItemResponse.to_schema(version: "2025-09", root: false, root_description: "The item.") }
+
+    assert_equal "root_description: requires root:", error.message
+  end
+
+  def test_to_schema_meta_requires_a_truthy_root
+    error = assert_raises(ArgumentError) { ItemResponse.to_schema(version: "2025-09", root: false, meta: MetaResponse) }
+
+    assert_equal "meta: requires root:", error.message
+  end
+
+  def test_serialize_root_meta_clashes_with_meta
+    error = assert_raises(Versponse::DefinitionError) { ItemResponse.serialize(Item.new("1"), version: "2025-09", root: "meta", meta: {page: 1}) }
+
+    assert_equal %(root: "meta" clashes with meta:, which describes "meta"), error.message
+  end
+
   def test_to_schema_root_meta_clashes_with_meta
     error = assert_raises(Versponse::DefinitionError) { ItemResponse.to_schema(version: "2025-09", root: :meta, meta: MetaResponse) }
 
