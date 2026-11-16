@@ -3,6 +3,8 @@
 require "test_helper"
 
 class RootDeclarationTest < Minitest::Test
+  include ConfigurationTestHelper
+
   Item = Struct.new(:id)
 
   class ItemResponse < Versponse::Base
@@ -18,6 +20,12 @@ class RootDeclarationTest < Minitest::Test
   end
 
   class ChildResponse < RootedBaseResponse
+  end
+
+  class MetaResponse < Versponse::Base
+    version "2025-09" do
+      field :page, type: :integer
+    end
   end
 
   class PlainResponse < Versponse::Base
@@ -127,6 +135,83 @@ class RootDeclarationTest < Minitest::Test
 
     assert_equal "Single Item", schema["description"]
     assert_equal %w[type required properties additionalProperties description], schema.keys
+  end
+
+  def test_wrapper_root_description_on_a_collection
+    schema = wrapper_schemas { wrapper :item_list, ItemResponse, collection: true, root_description: "Items on this page." }["ItemList"]
+
+    assert_equal({"type" => "array", "items" => {"$ref" => ItemResponse.to_ref}, "description" => "Items on this page."}, schema["properties"]["items"])
+  end
+
+  def test_wrapper_root_description_beside_a_ref
+    schema = wrapper_schemas { wrapper :item_single, ItemResponse, root_description: "The item." }["ItemSingle"]
+
+    assert_equal({"$ref" => ItemResponse.to_ref, "description" => "The item."}, schema["properties"]["item"])
+  end
+
+  def test_wrapper_root_description_wraps_a_ref_in_all_of_for_openapi30
+    with_configuration(json_schema_version: :openapi30) do
+      schema = wrapper_schemas { wrapper :item_single, ItemResponse, root_description: "The item." }["ItemSingle"]
+
+      assert_equal({"allOf" => [{"$ref" => ItemResponse.to_ref}], "description" => "The item."}, schema["properties"]["item"])
+    end
+  end
+
+  def test_wrapper_root_description_with_description_and_meta
+    schema = wrapper_schemas do
+      wrapper :item_list, ItemResponse, collection: true, meta: MetaResponse, description: "List of Items", root_description: "Items on this page."
+    end["ItemList"]
+
+    assert_equal "List of Items", schema["description"]
+    assert_equal "Items on this page.", schema["properties"]["items"]["description"]
+    assert_equal %w[items meta], schema["properties"].keys
+  end
+
+  def test_wrapper_root_description_on_a_collection_for_openapi30
+    with_configuration(json_schema_version: :openapi30) do
+      schema = wrapper_schemas { wrapper :item_list, ItemResponse, collection: true, root_description: "Items on this page." }["ItemList"]
+
+      assert_equal({"type" => "array", "items" => {"$ref" => ItemResponse.to_ref}, "description" => "Items on this page."}, schema["properties"]["items"])
+    end
+  end
+
+  def test_wrapper_root_description_with_a_custom_root
+    schema = wrapper_schemas { wrapper :item_single, ItemResponse, root: "thing", root_description: "The thing." }["ItemSingle"]
+
+    assert_equal({"$ref" => ItemResponse.to_ref, "description" => "The thing."}, schema["properties"]["thing"])
+  end
+
+  def test_wrapper_without_root_description_leaves_the_root_undescribed
+    schemas = wrapper_schemas do
+      wrapper :item_single, ItemResponse
+      wrapper :item_list, ItemResponse, collection: true
+    end
+
+    assert_equal({"$ref" => ItemResponse.to_ref}, schemas["ItemSingle"]["properties"]["item"])
+    assert_equal({"type" => "array", "items" => {"$ref" => ItemResponse.to_ref}}, schemas["ItemList"]["properties"]["items"])
+  end
+
+  def test_wrapper_root_description_must_be_a_string
+    error = assert_raises(Versponse::DefinitionError) do
+      Class.new(Versponse::OpenAPI::Document) { wrapper :item_list, ItemResponse, collection: true, root_description: :items }
+    end
+
+    assert_equal "wrapper ItemList root_description: must be a String, got :items", error.message
+  end
+
+  def test_wrapper_root_description_validates
+    [:openapi31, :openapi30].each do |json_schema_version|
+      with_configuration(json_schema_version:) do
+        document = Class.new(Versponse::OpenAPI::Document) do
+          info "title" => "Items", "version" => "1"
+          responses ItemResponse
+          wrapper :item_single, ItemResponse, root_description: "The item."
+          wrapper :item_list, ItemResponse, collection: true, root_description: "Items on this page."
+        end
+
+        assert_empty document.validate(version: "2025-09"), json_schema_version
+      end
+    end
   end
 
   def test_wrapper_names

@@ -151,14 +151,15 @@ module Versponse
           declarations.request_sources << source(:requests, classes.flatten, namespace)
         end
 
-        def wrapper(name, klass, root: nil, collection: false, meta: nil, view: :default, description: nil)
+        def wrapper(name, klass, root: nil, collection: false, meta: nil, view: :default, description: nil, root_description: nil)
           Versponse::Wrapper.check_meta!(meta)
           name = declared_name(name)
           root ||= declared_root(klass, collection)
           raise DefinitionError, "wrapper #{name} needs root: or a #{klass} that declares root" unless root
+          raise DefinitionError, "wrapper #{name} root_description: must be a String, got #{root_description.inspect}" unless root_description.nil? || root_description.is_a?(String)
 
           declarations.claim!(:wrapper, name)
-          declarations.wrappers[name] = Declarations::Wrapper.new(name:, klass:, root:, collection:, meta:, view:, description:)
+          declarations.wrappers[name] = Declarations::Wrapper.new(name:, klass:, root:, collection:, meta:, view:, description:, root_description:)
         end
 
         def schema(name, value = nil, &block)
