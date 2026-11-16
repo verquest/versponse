@@ -116,14 +116,20 @@ module Versponse
     # @param root [String, Symbol, nil] builds a wrapper schema with the response under this key
     # @param meta [Class, nil] class whose $ref describes "meta" (requires root:)
     # @param collection [Boolean] the root key holds an array
+    # @param root_description [String, nil] description of the property under the root (requires root:)
     # @return [Hash] frozen schema
-    # @raise [ArgumentError] with meta: but no root:
-    # @raise [Versponse::DefinitionError] for a meta: that isn't a class with a $ref
+    # @raise [ArgumentError] with meta: or root_description: but no root:
+    # @raise [Versponse::DefinitionError] for a meta: that isn't a class with a $ref, root: "meta" beside meta:, or a
+    #   root_description: that isn't a non-empty String
     # @raise [Versponse::VersionNotFoundError] when the class, or a Versponse meta: class, doesn't serve the version
     # @raise [Versponse::ViewNotFoundError] for an unknown view (wrappers too)
-    def to_schema(version: nil, view: :default, root: nil, meta: nil, collection: false)
+    def to_schema(version: nil, view: :default, root: nil, meta: nil, collection: false, root_description: nil)
       Wrapper.check_meta!(meta)
       raise ArgumentError, "meta: requires root:" if meta && root.nil?
+      raise ArgumentError, "root_description: requires root:" if root_description && root.nil?
+
+      Wrapper.check_root!(root, meta)
+      Wrapper.check_description!(:root_description, root_description)
 
       versponse.requesting(version) do |canonical|
         next versponse.openapi_schema(version: canonical, view:) unless root
@@ -131,7 +137,7 @@ module Versponse
         # The wrapper only refers to the components, but their versions and the view must exist like for any schema
         versponse.resolve(canonical).properties_for(view)
         meta.versponse.resolve(canonical) if References.versponse?(meta)
-        DeepFreeze.call(Wrapper.schema(self, view:, root:, meta:, collection:))
+        DeepFreeze.call(Wrapper.schema(self, view:, root:, meta:, collection:, root_description:))
       end
     end
 

@@ -92,19 +92,11 @@ module Versponse
         @declarations.wrappers.each_value do |wrapper|
           next unless Components.resolved(wrapper.klass, @version)
 
-          schema = wrapper.klass.to_schema(version: @version, view: wrapper.view, root: wrapper.root, meta: wrapper.meta, collection: wrapper.collection)
-          schema = with_root_description(schema, wrapper.root.to_s, wrapper.root_description) if wrapper.root_description
+          schema = wrapper.klass.to_schema(version: @version, view: wrapper.view, root: wrapper.root, meta: wrapper.meta, collection: wrapper.collection,
+            root_description: wrapper.root_description)
           schema = schema.merge("description" => wrapper.description).freeze if wrapper.description
           set.add(wrapper.name, schema, "wrapper #{wrapper.name}")
         end
-      end
-
-      # Describes the root property; OpenAPI 3.0 ignores keywords next to a $ref, so a bare $ref is wrapped in allOf
-      def with_root_description(schema, root, description)
-        property = schema["properties"][root]
-        property = {"allOf" => [property]} if property.key?("$ref") && Versponse.configuration.nullable_keyword?
-        properties = schema["properties"].merge(root => property.merge("description" => description))
-        DeepFreeze.call(schema.merge("properties" => properties))
       end
 
       # Hand-written components are schemas, so they're camelized like every other schema; other document values aren't

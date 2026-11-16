@@ -196,7 +196,51 @@ class RootDeclarationTest < Minitest::Test
       Class.new(Versponse::OpenAPI::Document) { wrapper :item_list, ItemResponse, collection: true, root_description: :items }
     end
 
-    assert_equal "wrapper ItemList root_description: must be a String, got :items", error.message
+    assert_equal "wrapper ItemList root_description: must be a non-empty String, got :items", error.message
+  end
+
+  def test_wrapper_root_description_must_not_be_empty
+    error = assert_raises(Versponse::DefinitionError) do
+      Class.new(Versponse::OpenAPI::Document) { wrapper :item_list, ItemResponse, collection: true, root_description: "" }
+    end
+
+    assert_equal %(wrapper ItemList root_description: must be a non-empty String, got ""), error.message
+  end
+
+  def test_wrapper_description_must_be_a_string
+    error = assert_raises(Versponse::DefinitionError) do
+      Class.new(Versponse::OpenAPI::Document) { wrapper :item_list, ItemResponse, collection: true, description: :items }
+    end
+
+    assert_equal "wrapper ItemList description: must be a non-empty String, got :items", error.message
+  end
+
+  def test_wrapper_root_meta_clashes_with_meta
+    error = assert_raises(Versponse::DefinitionError) do
+      Class.new(Versponse::OpenAPI::Document) { wrapper :item_single, ItemResponse, root: "meta", meta: MetaResponse }
+    end
+
+    assert_equal %(wrapper ItemSingle root: "meta" clashes with meta:, which describes "meta"), error.message
+  end
+
+  def test_to_schema_root_description
+    schema = ItemResponse.to_schema(version: "2025-09", root: "items", collection: true, root_description: "Items on this page.")
+
+    assert_equal({"type" => "array", "items" => {"$ref" => ItemResponse.to_ref}, "description" => "Items on this page."}, schema["properties"]["items"])
+    assert_predicate schema, :frozen?
+    assert_predicate schema["properties"]["items"], :frozen?
+  end
+
+  def test_to_schema_root_description_requires_root
+    error = assert_raises(ArgumentError) { ItemResponse.to_schema(root_description: "The item.") }
+
+    assert_equal "root_description: requires root:", error.message
+  end
+
+  def test_to_schema_root_meta_clashes_with_meta
+    error = assert_raises(Versponse::DefinitionError) { ItemResponse.to_schema(version: "2025-09", root: :meta, meta: MetaResponse) }
+
+    assert_equal %(root: "meta" clashes with meta:, which describes "meta"), error.message
   end
 
   def test_wrapper_root_description_validates

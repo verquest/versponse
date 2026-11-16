@@ -2,7 +2,11 @@
 
 ### Added
 
-- In OpenAPI documents, `wrapper` takes a `root_description:`, which describes the property under the root: the array of a collection wrapper, or the `$ref` of a single one, wrapped in `allOf` in OpenAPI 3.0 documents. Without it, the output is unchanged.
+- In OpenAPI documents, `wrapper` takes a `root_description:`, which describes the property under the root: the array of a collection wrapper, or the `$ref` of a single one, wrapped in `allOf` in OpenAPI 3.0 documents. Without it, the output is unchanged. `to_schema` takes the same `root_description:` beside `root:`.
+
+### Changed
+
+- In OpenAPI documents, `wrapper` raises `Versponse::DefinitionError` for a `description:` that isn't a non-empty String, and for `root: "meta"` beside `meta:`, whose `$ref` replaced the response. `to_schema` raises for that root and meta too.
 
 ## [0.5.0] - 2026-11-11
 

@@ -156,10 +156,21 @@ module Versponse
           name = declared_name(name)
           root ||= declared_root(klass, collection)
           raise DefinitionError, "wrapper #{name} needs root: or a #{klass} that declares root" unless root
-          raise DefinitionError, "wrapper #{name} root_description: must be a String, got #{root_description.inspect}" unless root_description.nil? || root_description.is_a?(String)
+          checked(name) do
+            Versponse::Wrapper.check_root!(root, meta)
+            Versponse::Wrapper.check_description!(:description, description)
+            Versponse::Wrapper.check_description!(:root_description, root_description)
+          end
 
           declarations.claim!(:wrapper, name)
           declarations.wrappers[name] = Declarations::Wrapper.new(name:, klass:, root:, collection:, meta:, view:, description:, root_description:)
+        end
+
+        # Prefixes a DefinitionError with the wrapper's name
+        def checked(name)
+          yield
+        rescue DefinitionError => error
+          raise DefinitionError, "wrapper #{name} #{error.message}"
         end
 
         def schema(name, value = nil, &block)
