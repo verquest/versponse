@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-17
+
 ### Added
 
 - In OpenAPI documents, `wrapper` takes a `root_description:`, which describes the property under the root: the array of a collection wrapper, or the `$ref` of a single one, wrapped in `allOf` in OpenAPI 3.0 documents. Without it, the output is unchanged. `to_schema` takes the same `root_description:` beside `root:`.
