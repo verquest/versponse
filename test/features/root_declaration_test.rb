@@ -130,6 +130,24 @@ class RootDeclarationTest < Minitest::Test
     assert_equal "wrapper PlainSingle needs root: or a RootDeclarationTest::PlainResponse that declares root", error.message
   end
 
+  def test_wrapper_checks_meta_before_the_root
+    error = assert_raises(Versponse::DefinitionError) do
+      Class.new(Versponse::OpenAPI::Document) { wrapper :plain_single, PlainResponse, meta: {"page" => 1} }
+    end
+
+    assert_equal %(wrapper PlainSingle meta: takes a response class, whose $ref describes "meta"; serialize(meta:) takes the Hash), error.message
+  end
+
+  def test_serialize_root_false_renders_unwrapped
+    assert_equal({"id" => "1"}, ItemResponse.serialize(Item.new("1"), version: "2025-09", root: false))
+  end
+
+  def test_serialize_meta_requires_a_truthy_root
+    error = assert_raises(ArgumentError) { ItemResponse.serialize(Item.new("1"), version: "2025-09", root: false, meta: {page: 1}) }
+
+    assert_equal "meta: requires root:", error.message
+  end
+
   def test_wrapper_description
     schema = wrapper_schemas { wrapper :item_single, ItemResponse, description: "Single Item" }["ItemSingle"]
 

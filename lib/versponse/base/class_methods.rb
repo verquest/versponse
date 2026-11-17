@@ -35,8 +35,11 @@ module Versponse
     # @raise [Versponse::ViewNotFoundError] for an unknown or nil view
     # @raise [Versponse::ExtractionError] when reading a value fails
     def serialize(object, version: nil, view: :default, context: EMPTY_CONTEXT, root: nil, meta: nil, expand: nil, fields: nil)
-      raise ArgumentError, "meta: requires root:" if meta && root.nil?
-      Wrapper.check_root!(root, meta)
+      if meta
+        raise ArgumentError, "meta: requires root:" unless root
+
+        Wrapper.check_root!(root, meta)
+      end
       raise ViewNotFoundError, "view: can't be nil; the default view is :default" if view.nil?
 
       context ||= EMPTY_CONTEXT

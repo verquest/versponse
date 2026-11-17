@@ -54,7 +54,7 @@ module Versponse
     # @param meta [Hash, nil] added under "meta" with String keys
     # @return [Hash, Array<Hash>] data, or the wrapper Hash
     def self.wrap(data, root:, meta:)
-      return data if root.nil?
+      return data unless root
 
       wrapped = {root.to_s => data}
       wrapped["meta"] = string_keys(meta) if meta

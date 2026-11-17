@@ -153,14 +153,15 @@ module Versponse
 
         def wrapper(name, klass, root: nil, collection: false, meta: nil, view: :default, description: nil, root_description: nil)
           name = declared_name(name)
-          root ||= declared_root(klass, collection)
-          raise DefinitionError, "wrapper #{name} needs root: or a #{klass} that declares root" unless root
           naming_wrapper(name) do
             Versponse::Wrapper.check_meta!(meta)
-            Versponse::Wrapper.check_root!(root, meta)
             Versponse::Wrapper.check_description!(:description, description)
             Versponse::Wrapper.check_description!(:root_description, root_description)
           end
+          root ||= declared_root(klass, collection)
+          raise DefinitionError, "wrapper #{name} needs root: or a #{klass} that declares root" unless root
+
+          naming_wrapper(name) { Versponse::Wrapper.check_root!(root, meta) }
 
           declarations.claim!(:wrapper, name)
           declarations.wrappers[name] = Declarations::Wrapper.new(name:, klass:, root:, collection:, meta:, view:, description:, root_description:)
